@@ -1,5 +1,7 @@
 #include "cm_types.h"
+#include "demo.h"
 #include "display.h"
+#include "gui_font.h"
 #include "gui_utils.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -14,6 +16,7 @@ extern cm_image_t *rgn_load(const char *path);
 extern void rgn_free(cm_image_t *img);
 
 static bool g_running = true;
+static bool g_demo = false;
 
 static void handle_event(SDL_Event *e)
 {
@@ -30,6 +33,8 @@ static void handle_event(SDL_Event *e)
         if (e->key.keysym.sym == SDLK_ESCAPE) {
             g_running = false;
         }
+        if (g_demo && e->key.keysym.sym == SDLK_UP) demo_scroll(-1);
+        if (g_demo && e->key.keysym.sym == SDLK_DOWN) demo_scroll(1);
         break;
 
     case SDL_WINDOWEVENT:
@@ -49,10 +54,21 @@ static void handle_event(SDL_Event *e)
     }
 }
 
+/* Usage: cm0102 [--data <folder>] [--demo] [picture.rgn] */
 int main(int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
+    const char *data_dir = "./Data";
+    const char *picture = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--demo")) {
+            g_demo = true;
+        } else if (!strcmp(argv[i], "--data") && i + 1 < argc) {
+            data_dir = argv[++i];
+        } else {
+            picture = argv[i];
+        }
+    }
 
     if (!display_init("Championship Manager 01/02", false)) {
         fprintf(stderr, "Display init failed\n");
@@ -64,14 +80,21 @@ int main(int argc, char *argv[])
 
     display_clear(0x0000);
 
-    if (argc > 1) {
-        cm_image_t *bg = rgn_load(argv[1]);
+    if (g_demo) {
+        if (!gui_fonts_load(data_dir)) {
+            fprintf(stderr, "No fonts in %s. Use --data <folder>.\n", data_dir);
+            display_shutdown();
+            return 1;
+        }
+        demo_draw(data_dir, picture);
+    } else if (picture) {
+        cm_image_t *bg = rgn_load(picture);
         if (bg) {
             printf("Loaded RGN: %dx%d, data_size=%d, g_mask=0x%04x\n",
                    bg->width, bg->height, bg->data_size, bg->g_mask);
             gui_blit(0, 0, bg);
         } else {
-            fprintf(stderr, "Failed to load: %s\n", argv[1]);
+            fprintf(stderr, "Failed to load: %s\n", picture);
         }
     }
 

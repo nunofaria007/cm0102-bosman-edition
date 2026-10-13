@@ -7,6 +7,7 @@ find_package(SDL2 REQUIRED)
 
 add_executable(cm0102
     src/main.c
+    src/demo.c
     src/si/display.c
     src/si/os_compat.c
     src/si/sound.c

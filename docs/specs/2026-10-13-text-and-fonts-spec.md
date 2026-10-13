@@ -33,7 +33,7 @@ The original has a second text path through the T2K font engine, and it is the d
 - Past those left-over bytes, the search of the original reads stack memory that the function never set. What is there depends on the functions that ran before. The port reads zeros there. The differential test sets that part of the stack to zeros when the original enters its text function. Without this, 10 of 2400 random widget draws differ from the port. All ten wrap to three or more lines.
 - The port uses the first 251 characters of a text. The line buffer of the original has 252 bytes, and a longer text writes past it.
 - The app takes the game data folder from a `--data <folder>` argument. The default is `./Data`.
-- The app gets a `--demo` argument that draws one area with widgets and text. It is a developer aid and not part of the original.
+- The app gets a `--demo` argument that draws one area with widgets and text. It is a developer aid and not part of the original. The up and down keys scroll its table.
 - The differential test sets the font global of the original to -1 and loads the fonts with the loader of the original.
 - Commits are local. Nothing is pushed.
 
@@ -82,5 +82,5 @@ Merge danger: two-way door. Blast radius: limited to text.
 Blocked by: 3
 Delivers: `--data` and `--demo` in the app. The demo draws one area with widgets and text over a background.
 Merge danger: two-way door. Blast radius: the app start. The demo code is separate from the ported code.
-- [ ] The app starts with `--demo` and shows the area with text.
-- [ ] The app still shows an RGN file when it gets one as its argument.
+- [x] The app starts with `--demo` and shows the area with text.
+- [x] The app still shows an RGN file when it gets one as its argument.
