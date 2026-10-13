@@ -4,6 +4,7 @@
  */
 #include "display.h"
 #include "gui_utils.h"
+#include "port_scene.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,8 +133,8 @@ int main(void)
             print_image(second);
             if (second != first) rgn_free(second);
             rgn_free(first);
-        } else {
-            fprintf(stderr, "port_driver: unknown command %s\n", cmd);
+        } else if (!scene_command(cmd, args)) {
+            fprintf(stderr, "port_driver: bad command: %s", line);
             return 1;
         }
         fflush(stdout);

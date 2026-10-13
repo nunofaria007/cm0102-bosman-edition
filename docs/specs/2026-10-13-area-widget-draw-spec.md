@@ -23,6 +23,7 @@ Text stays out of this work. The widget calls a text function that does nothing 
 ## Decisions
 - The structs for the area, the widget and the screen manager are native C structs. Each field records its offset in the original. The structs are not byte-exact, because pointers are 8 bytes on macOS.
 - The original packs these structs to 1 byte. An area is 0xBF1 bytes and a widget is 0x18C bytes. The screen manager holds 250 areas and 1200 widgets.
+- Where the original shows its error box (`FUN_005e8290`), the port returns without drawing or writing. The error box is not ported.
 - The port keeps the clip rule of the original. A line, fill, darken, glyph table or capture does nothing when any part of it is off screen. An outline rectangle applies that rule to each side on its own, so the sides that are fully on screen still draw.
 - The port always uses RGB565. The original also supports RGB555 at run time. The port drops that branch, because the RGN loader already converts images to RGB565.
 - The eight glyph tables for scroll arrows and popup arrows are copied from the original into the source.
@@ -70,8 +71,8 @@ Merge danger: two-way door. Blast radius: a wrong reading of a flag gives wrong 
 Blocked by: none
 Delivers: the area, widget and screen manager structs, area layout, scrollbar setup and popup position. Removes the unused struct `cm_area_t`.
 Merge danger: two-way door. Blast radius: wrong edges move every widget on a screen.
-- [ ] Every output field matches the original for random grids, weights, flags and scroll positions.
-- [ ] The popup position matches the original for widgets near each screen edge.
+- [x] Every output field matches the original for random grids, weights, flags and scroll positions.
+- [x] The popup position matches the original for widgets near each screen edge.
 
 ### 4. Widget draw
 Blocked by: 2, 3

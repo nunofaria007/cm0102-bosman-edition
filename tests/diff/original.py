@@ -7,7 +7,7 @@ import hashlib
 import struct
 
 from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_EIP, UC_X86_REG_ESP
+from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_ECX, UC_X86_REG_EIP, UC_X86_REG_ESP
 
 WIDTH, HEIGHT = 800, 600
 PITCH = WIDTH * 2
@@ -40,6 +40,13 @@ CRT_CALLOC = 0x945501
 CRT_FCLOSE = 0x945A09
 CRT_FOPEN = 0x945B00
 CRT_FREAD = 0x945BFE
+CRT_SPLITPATH = 0x944CFF
+CRT_SPRINTF = 0x944C9F
+
+# The error box of the original: FUN_0090d130(name, extension, line) formats the
+# place, FUN_005e8290(title, message, 0) shows it.
+FUN_ERROR_PLACE = 0x90D130
+FUN_ERROR_BOX = 0x5E8290
 
 # IDirectDrawSurface vtable slots used by the drawing code: slot -> stdcall argument bytes.
 SLOT_BLT, SLOT_LOCK, SLOT_UNLOCK = 0x14 // 4, 0x64 // 4, 0x80 // 4
@@ -81,6 +88,11 @@ class Original:
         self._replace(CRT_FOPEN, 2, self._fopen)
         self._replace(CRT_FREAD, 4, self._fread)
         self._replace(CRT_FCLOSE, 1, self._fclose)
+        self._replace(CRT_SPLITPATH, 0, lambda: 0)
+        self._replace(CRT_SPRINTF, 0, lambda: 0)
+        self.error_lines = []
+        self._replace(FUN_ERROR_PLACE, 3, lambda name, ext, line: self.error_lines.append(line) or 0)
+        self._replace(FUN_ERROR_BOX, 0, lambda: 0)
 
         self.write_u32(G_DISPLAY_OFF, 0)
         self.write_u32(G_BACK_BUFFER, SURFACE)
@@ -149,8 +161,8 @@ class Original:
 
     # Calls
 
-    def call(self, addr, *args):
-        """Calls a cdecl function. Returns EAX."""
+    def call(self, addr, *args, this=0):
+        """Calls a cdecl function, or a thiscall function with `this`. Returns EAX."""
         sp = STACK_BASE + STACK_SIZE - 0x1000
         for arg in reversed(args):
             sp -= 4
@@ -158,6 +170,7 @@ class Original:
         sp -= 4
         self.write_u32(sp, RETURN_ADDR)
         self.uc.reg_write(UC_X86_REG_ESP, sp)
+        self.uc.reg_write(UC_X86_REG_ECX, this)
         self.error = None
         try:
             self.uc.emu_start(addr, RETURN_ADDR, timeout=60 * 1000 * 1000)

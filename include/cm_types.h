@@ -42,14 +42,4 @@ typedef struct {
 #define CM_COLOUR_RGB565   0x07e0
 #define CM_COLOUR_RGB555   0x03e0
 
-/* Screen area / UI widget descriptor. */
-typedef struct {
-    s32 x1, y1, x2, y2;
-    u32 flags;
-    s32 cursor_pos;
-    s32 max_len;
-    s32 bg_image;
-    char text[256];
-} cm_area_t;
-
 #endif
