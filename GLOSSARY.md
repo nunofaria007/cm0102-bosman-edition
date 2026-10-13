@@ -17,8 +17,12 @@ _Avoid_: remake, clone, wrapper
 ### Screen
 
 **Screen manager**:
-The single object that owns every area and widget on the current screen and draws them in order.
-_Avoid_: scrman, UI manager
+The single object that owns every area and widget on the current screen and draws them in order. The original keeps it in display.cpp.
+_Avoid_: scrman, display, UI manager
+
+**Screen stack**:
+The list of screens that a player has open, with the newest on top. Each screen names the functions that build it, handle its input and close it. The original keeps it in scrman.cpp.
+_Avoid_: scrman, screen history
 
 **Area**:
 A rectangular region of the screen, split into a grid of columns and rows. An area can scroll its rows.
