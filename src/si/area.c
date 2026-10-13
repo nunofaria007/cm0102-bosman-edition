@@ -1,11 +1,68 @@
 #include "area.h"
 #include "gui_utils.h"
 #include <stddef.h>
+#include <string.h>
 
 extern void rgn_free(cm_image_t *img);
 
 #define BUTTON_RAISED  (GUI_PANEL_FILL | GUI_PANEL_BORDER)
 #define BUTTON_PRESSED (BUTTON_RAISED | GUI_PANEL_SUNKEN)
+
+static void set_weights(u8 *weights, u8 count, const u8 *table)
+{
+    /* The original accepts a table for 1 to 29 columns or rows only. */
+    if (table && count != 0 && count < AREA_MAX_COLUMNS) {
+        memcpy(weights, table, count);
+    } else {
+        memset(weights, 1, count > AREA_MAX_COLUMNS ? AREA_MAX_COLUMNS : count);
+    }
+}
+
+void area_init(area_t *area, struct area *areas, widget_t *widgets, s16 index,
+               s32 x1, s32 y1, s32 x2, s32 y2,
+               u8 column_count, const u8 *column_weights,
+               u8 row_count, const u8 *row_weights,
+               u32 flags, u16 colour, s16 owner_widget)
+{
+    if (owner_widget == -1) {
+        if (x2 < x1) { s32 t = x1; x1 = x2; x2 = t; }
+        if (y2 < y1) { s32 t = y1; y1 = y2; y2 = t; }
+    } else {
+        x1 = y1 = x2 = y2 = 0;
+        memset(area->column_weight, 1, sizeof(area->column_weight));
+        memset(area->row_weight, 1, sizeof(area->row_weight));
+        column_count = 1;
+        row_count = 0;
+        column_weights = NULL;
+        row_weights = NULL;
+    }
+    if (x2 > 799) x2 = 799;
+    if (y2 > 599) y2 = 599;
+    area->x1 = x1 < 1 ? 0 : x1;
+    area->y1 = y1 < 1 ? 0 : y1;
+    area->x2 = x2;
+    area->y2 = y2;
+    area->row_count = row_count;
+    area->column_count = column_count;
+    area->first_row = 0x7fffffff;
+    area->last_row = 0;
+    memset(&area->scrollbar, 0, sizeof(area->scrollbar));
+    area->owner_widget = owner_widget;
+    area->areas = areas;
+    area->widgets = widgets;
+    area->index = index;
+    area->colour = colour;
+    area->has_scrollbar = 0;
+    area->saved = NULL;
+    area->unknown_210 = -1;
+    area->shown = 1;
+    area->first_visible = -1;
+    area->flags = flags;
+    area->scroll_to = -1;
+    if (flags & AREA_GRID_ONLY) return;
+    set_weights(area->column_weight, column_count, column_weights);
+    set_weights(area->row_weight, row_count, row_weights);
+}
 
 /* FUN_00403600. The original also stores the scrollbar address in DAT_00ad9c58. */
 static void setup_scrollbar(area_t *area, s32 margin_x, s32 margin_y)

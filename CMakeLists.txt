@@ -19,6 +19,7 @@ add_executable(cm0102
     src/si/gui_text.c
     src/si/guio.c
     src/si/area.c
+    src/si/scrman.c
     src/cm3/database.c
 )
 
@@ -38,6 +39,7 @@ add_executable(port_driver
     src/si/os_compat.c
     src/si/guio.c
     src/si/area.c
+    src/si/scrman.c
 )
 target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})
 target_link_libraries(port_driver PRIVATE ${SDL2_LIBRARIES})

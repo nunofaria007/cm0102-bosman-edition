@@ -47,6 +47,7 @@ typedef struct area {
     widget_t *widgets;                    /* 0x208, of the screen manager */
     u16 colour;                           /* 0x20c */
     s16 owner_widget;                     /* 0x20e, set for a popup area */
+    s16 unknown_210;                      /* 0x210, area_init sets -1 */
     s16 widget_index[AREA_MAX_WIDGETS];   /* 0x212, its widgets in row order */
     s16 index;                            /* 0xb72, of this area */
     s16 widget_count;                     /* 0xb74 */
@@ -59,6 +60,17 @@ typedef struct area {
     s32 shown;                            /* 0xbe9, screen draw skips it at 0 */
     s32 has_scrollbar;                    /* 0xbed */
 } area_t;
+
+/*
+ * FUN_00402ac0. Fills a zeroed area. An area with an owner widget is a popup
+ * area: it starts with no size, one column and no rows, and each widget that
+ * goes into it makes it larger. See scrman_area_create for the weight tables.
+ */
+void area_init(area_t *area, struct area *areas, widget_t *widgets, s16 index,
+               s32 x1, s32 y1, s32 x2, s32 y2,
+               u8 column_count, const u8 *column_weights,
+               u8 row_count, const u8 *row_weights,
+               u32 flags, u16 colour, s16 owner_widget);
 
 /*
  * FUN_00403350. Splits the area into columns and rows by weight and sets up

@@ -1,5 +1,5 @@
 # Screen manager
-Status: Ready
+Status: In build
 
 ## Problem
 The port can draw one area or one widget, but nothing puts them together. The demo fills the area and widget structs by hand and draws them itself. The 595 places where the original creates an area and the 1,296 places where it creates a widget have no function to call in the port, so no screen of the original can be ported.
@@ -13,7 +13,7 @@ Port the functions of the original that build, draw and empty one screen manager
 3. As a developer of the port, I want every field of a new area and a new widget to equal the field that the original sets, so that later draw and input code reads the right values.
 4. As a developer of the port, I want an area to hold its widgets in row order with the lowest and highest row recorded, as in the original, so that scrolling works on a built screen.
 5. As a developer of the port, I want a widget that goes into a popup area to widen that area, take the next row and pick its column as in the original.
-6. As a developer of the port, I want area create and widget create to return -1 when all 250 or 1200 slots are used.
+6. As a developer of the port, I want area create and widget create to return -1 when no slot is left.
 7. As a developer of the port, I want the reset to free every saved screen and picture and leave the screen manager empty, so that the next screen starts clean.
 8. As a player, I want a screen to draw in the order of the original: background, areas with no owner, widgets with no area, popup areas.
 9. As a player, I want a screen to show its background picture, and the default picture when the file is missing.
@@ -30,7 +30,13 @@ Port the functions of the original that build, draw and empty one screen manager
 - The screen manager counts the slots it used apart from the entries in its draw order. The original keeps the area slots at 0x12e99e and the widget slots at 0x12e9a0.
 - The port has one screen manager. The original has two, and the second draws the screens of a remote player.
 - The port leaves out the network writes. Area create and the reset of the original write each call into a buffer at 0xae2908. The differential test gives the original a real buffer and does not compare it.
-- Where the original shows its error box, the port returns without the box. Area create and widget create return -1 when all slots are used, and set the overflow flags at 0x12f54d and 0x12f549 as the original does.
+- Where the original shows its error box, the port returns without the box. Area create and widget create return -1 when no slot is left, and set the overflow flags at 0x12f54d and 0x12f549 as the original does.
+- Area create of the original refuses a new area when 249 are in use, so the last of its 250 slots stays empty. The port does the same.
+- The original accepts a weight table for 1 to 29 columns or rows. With a count of 30 it ignores the table and gives each column or row the weight 1. The port does the same.
+- A count above 30 makes the original write weights past its two tables, over the end of the area and into the next area. The port sets 30 weights and stops. No differential case uses a count above 30.
+- The constructor of the original leaves the two counts of the draw order as they are. A caller must run the reset before the first create. The port does the same.
+- Area init sets a field at 0x210 to -1. Its purpose is not known. The port stores it under an offset name.
+- The screen manager has a pointer at 0x12f529 that the constructor clears. The differential test does not compare it.
 - Widget create sets three fields whose purpose is not known: 0x08, 0x40 and 0x48. Widget init also stores the tick count of the original (`DAT_00b67a08`) at 0x50 and sets 0x7e to -1. The port stores them under offset names. The differential test compares them and sets the tick count to a fixed value.
 - The screen draw of the original takes the background file name from the screen stack (`FUN_007fee80`). The port's screen draw takes the name as an argument until the screen stack exists. The port passes the name to its RGN loader unchanged.
 - When the name differs from the last one, the screen draw loads that file. When the load fails, it loads `DEFAULT_PIC.RGN` from the data folder. When the name is empty, it captures the present screen as the background.
@@ -42,7 +48,7 @@ Port the functions of the original that build, draw and empty one screen manager
 ## Testing
 One seam: the differential test, as in the two earlier specs.
 
-For the constructor, the reset, area create and widget create, the test runs the same sequence of calls on the original and on the port and compares every known field of the screen manager, of each area and of each widget. The sequences come from a fixed seed. They include reversed and off-screen rectangles, zero and 30 columns and rows, weight tables and no weight tables, widgets with no area, widgets in a plain area, widgets in a popup area, picture widgets, text entry widgets, and a run that uses all 250 area slots and all 1200 widget slots.
+For the constructor, the reset, area create and widget create, the test runs the same sequence of calls on the original and on the port and compares every known field of the screen manager, of each area and of each widget. The sequences come from a fixed seed. They include reversed and off-screen rectangles, zero and 30 columns and rows, weight tables and no weight tables, widgets with no area, widgets in a plain area, widgets in a popup area, picture widgets, text entry widgets, and a run that uses every area slot and every widget slot.
 
 For the screen draw, the test builds the same screen on both sides through the create functions and compares the framebuffer. In the emulator it replaces `FUN_007fee80`, so both sides get the same background name. The cases cover a name that loads, a name that fails, an empty name, an unchanged name on a second draw, each of the five flags on and off, and a flip of part of the screen.
 
@@ -66,10 +72,10 @@ The demo has no counterpart in the original. Its check is a manual one: start th
 Blocked by: none
 Delivers: an empty screen manager, area create with area init and order append, and the reset. Adds the new fields of the screen manager to its struct.
 Merge danger: two-way door. Blast radius: none for the current app, because the demo does not call the new code until slice 4.
-- [ ] After random sequences of area create and reset, every known field of the screen manager and of each area equals the original.
-- [ ] The 251st area create returns -1 on both sides.
-- [ ] The reset frees the saved screens of every area.
-- [ ] The earlier suites still pass.
+- [x] After random sequences of area create and reset, every known field of the screen manager and of each area equals the original.
+- [x] The 250th area create returns -1 on both sides.
+- [x] The reset frees the saved screens of every area.
+- [x] The earlier suites still pass.
 
 ### 2. Widget create and widget release
 Blocked by: 1

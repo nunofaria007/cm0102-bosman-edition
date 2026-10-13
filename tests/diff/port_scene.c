@@ -7,6 +7,7 @@
 #include "area.h"
 #include "port_driver.h"
 #include "gui_utils.h"
+#include "scrman.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,7 +39,8 @@ static const field_t area_fields[] = {
     ARRAY(area_t, column_x1, true), ARRAY(area_t, row_y1, true),
     ARRAY(area_t, column_x2, true), ARRAY(area_t, row_y2, true),
     SCALAR(area_t, scroll_to, true), SCALAR(area_t, colour, false),
-    SCALAR(area_t, owner_widget, true), ARRAY(area_t, widget_index, true),
+    SCALAR(area_t, owner_widget, true),
+    SCALAR(area_t, unknown_210, true), ARRAY(area_t, widget_index, true),
     SCALAR(area_t, index, true), SCALAR(area_t, widget_count, true),
     SCALAR(area_t, first_visible, true),
     SCALAR(area_t, scrollbar.x1, true), SCALAR(area_t, scrollbar.y1, true),
@@ -73,10 +75,32 @@ static const field_t widget_fields[] = {
     SCALAR(widget_t, lighten_once, true), SCALAR(widget_t, highlighted, true),
 };
 
+/* Same order as MANAGER_FIELDS in scene.py. */
+static const field_t manager_fields[] = {
+    SCALAR(scrman_t, mode, true),
+    SCALAR(scrman_t, area_slots, true), SCALAR(scrman_t, widget_slots, true),
+    ARRAY(scrman_t, area_order, true), ARRAY(scrman_t, widget_order, true),
+    SCALAR(scrman_t, area_count, true), SCALAR(scrman_t, widget_count, true),
+    SCALAR(scrman_t, clear_screen, true),
+    SCALAR(scrman_t, unknown_12f4fe, false), SCALAR(scrman_t, unknown_12f4ff, true),
+    SCALAR(scrman_t, unknown_12f501, true), SCALAR(scrman_t, unknown_12f503, true),
+    SCALAR(scrman_t, unknown_12f505, true), ARRAY(scrman_t, unknown_12f509, true),
+    SCALAR(scrman_t, unknown_12f52d, true), SCALAR(scrman_t, unknown_12f52f, true),
+    SCALAR(scrman_t, unknown_12f531, true), SCALAR(scrman_t, unknown_12f533, true),
+    SCALAR(scrman_t, darken_once, true),
+    SCALAR(scrman_t, unknown_12f539, true), SCALAR(scrman_t, unknown_12f53b, true),
+    SCALAR(scrman_t, skip_draw, true), SCALAR(scrman_t, unknown_12f541, false),
+    SCALAR(scrman_t, laid_out, true),
+    SCALAR(scrman_t, widget_overflow, true), SCALAR(scrman_t, area_overflow, true),
+    SCALAR(scrman_t, unknown_12f551, true), SCALAR(scrman_t, unknown_12f555, true),
+    ARRAY(scrman_t, background_name, false),
+};
+
 #define COUNT(table) (sizeof(table) / sizeof((table)[0]))
 
 static area_t g_areas[SCENE_AREAS];
 static widget_t g_widgets[SCENE_WIDGETS];
+static scrman_t g_manager;
 
 static void reset(void)
 {
@@ -121,6 +145,26 @@ static bool select_struct(const char **args, const field_t **fields,
 
     if (sscanf(*args, "%15s %d%n", kind, &index, &used) != 2) return false;
     *args += used;
+    if (!strcmp(kind, "manager") && index == 0) {
+        *fields = manager_fields;
+        *field_count = COUNT(manager_fields);
+        *base = &g_manager;
+        return true;
+    }
+    if (!strcmp(kind, "manager_area") && index >= 0 &&
+        index < SCRMAN_MAX_AREAS) {
+        *fields = area_fields;
+        *field_count = COUNT(area_fields);
+        *base = &g_manager.areas[index];
+        return true;
+    }
+    if (!strcmp(kind, "manager_widget") && index >= 0 &&
+        index < SCRMAN_MAX_WIDGETS) {
+        *fields = widget_fields;
+        *field_count = COUNT(widget_fields);
+        *base = &g_manager.widgets[index];
+        return true;
+    }
     if (!strcmp(kind, "area") && index >= 0 && index < SCENE_AREAS) {
         *fields = area_fields;
         *field_count = COUNT(area_fields);
@@ -186,9 +230,16 @@ static bool get_fields(const char *args)
 /* "fields area": the field names, so the test can check its own table. */
 static bool list_fields(const char *args)
 {
-    const field_t *fields = strstr(args, "area") ? area_fields : widget_fields;
-    size_t count = strstr(args, "area") ? COUNT(area_fields)
-                                        : COUNT(widget_fields);
+    const field_t *fields = widget_fields;
+    size_t count = COUNT(widget_fields);
+
+    if (strstr(args, "area")) {
+        fields = area_fields;
+        count = COUNT(area_fields);
+    } else if (strstr(args, "manager")) {
+        fields = manager_fields;
+        count = COUNT(manager_fields);
+    }
 
     for (size_t f = 0; f < count; f++) {
         printf("%s:%zu ", fields[f].name, fields[f].count);
@@ -207,6 +258,17 @@ static cm_image_t **select_image(const char **args)
         return NULL;
     }
     *args += used;
+    if (!strcmp(kind, "manager") && index == 0) {
+        if (!strcmp(which, "unknown_12f521")) return &g_manager.unknown_12f521;
+        if (!strcmp(which, "background")) return &g_manager.background;
+    }
+    if (!strcmp(kind, "manager_area") && index >= 0 &&
+        index < SCRMAN_MAX_AREAS) {
+        area_t *area = &g_manager.areas[index];
+
+        if (!strcmp(which, "saved")) return &area->saved;
+        if (!strcmp(which, "scrollbar")) return &area->scrollbar.saved;
+    }
     if (!strcmp(kind, "widget") && index >= 0 && index < SCENE_WIDGETS) {
         if (!strcmp(which, "saved")) return &g_widgets[index].saved;
         if (!strcmp(which, "picture")) return &g_widgets[index].picture;
@@ -240,6 +302,46 @@ static bool capture_to(const char *args)
     return true;
 }
 
+/* Reads "-1" for no table, or a count and that many weights. */
+static const u8 *read_weights(const char **args, u8 *table)
+{
+    char *end;
+    long count = strtol(*args, &end, 10);
+
+    *args = end;
+    if (count < 0) return NULL;
+    for (long i = 0; i < count; i++) {
+        long weight = strtol(*args, &end, 10);
+
+        *args = end;
+        if (i < 256) table[i] = (u8)weight;
+    }
+    return table;
+}
+
+/* "manager_area x1 y1 x2 y2 columns rows flags colour owner", then two weight tables. */
+static bool manager_area(const char *args)
+{
+    static u8 column_table[256], row_table[256];
+    long long v[9];
+    int used;
+
+    if (sscanf(args, "%lld %lld %lld %lld %lld %lld %lld %lld %lld%n", &v[0],
+               &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8],
+               &used) != 9) {
+        return false;
+    }
+    args += used;
+    const u8 *columns = read_weights(&args, column_table);
+    const u8 *rows = read_weights(&args, row_table);
+
+    printf("%d\n", scrman_area_create(&g_manager, (s32)v[0], (s32)v[1],
+                                      (s32)v[2], (s32)v[3], (u8)v[4], columns,
+                                      (u8)v[5], rows, (u32)v[6], (u16)v[7],
+                                      (s16)v[8]));
+    return true;
+}
+
 bool scene_command(const char *cmd, const char *args)
 {
     int index = atoi(args);
@@ -251,6 +353,19 @@ bool scene_command(const char *cmd, const char *args)
         reset();
         return true;
     }
+    if (!strcmp(cmd, "manager_clear")) {
+        memset(&g_manager, 0, sizeof(g_manager));
+        return true;
+    }
+    if (!strcmp(cmd, "manager_new")) {
+        scrman_init(&g_manager, (u32)strtoll(args, NULL, 10));
+        return true;
+    }
+    if (!strcmp(cmd, "manager_reset")) {
+        scrman_reset(&g_manager, index != 0);
+        return true;
+    }
+    if (!strcmp(cmd, "manager_area")) return manager_area(args);
     if (!strcmp(cmd, "fields")) return list_fields(args);
     if (!strcmp(cmd, "set")) return set_field(args);
     if (!strcmp(cmd, "get")) return get_fields(args);
