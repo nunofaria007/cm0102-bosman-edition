@@ -110,7 +110,8 @@ class Original:
         self._replace(CRT_CALLOC, 2, lambda count, size: self.alloc(count * size))
         self._replace(CRT_MALLOC, 1, self.alloc)
         self._replace(CRT_NEW, 1, self.alloc)
-        self._replace(CRT_FREE, 1, lambda block: 0)
+        self.frees = 0
+        self._replace(CRT_FREE, 1, self._free)
         self._replace(CRT_DELETE, 1, lambda block: 0)
         self._replace(CRT_FOPEN, 2, self._fopen)
         self._replace(CRT_FREAD, 4, self._fread)
@@ -273,6 +274,10 @@ class Original:
             uc.reg_write(UC_X86_REG_EAX, host_function(*self._stack_args(arg_count)))
         self.uc.mem_write(addr, b"\xc3")
         self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
+
+    def _free(self, block):
+        self.frees += 1
+        return 0
 
     def _sprintf(self, buffer, text_format, *values):
         """Enough of sprintf for the formats the drawing code needs: plain text and %c."""

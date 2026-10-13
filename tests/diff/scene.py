@@ -47,9 +47,10 @@ WIDGET_FIELDS = [
 ]
 
 # The screen manager without its areas and widgets. Three pointers are not listed: the two images
-# in IMAGES and one at 0x12F529 that the test does not compare.
+# in IMAGES and one at 0x12F529.
 MANAGER_SIZE = 0x12F661
 OFFSET_MANAGER_AREAS, OFFSET_MANAGER_WIDGETS = 0x4, 0xBA95E
+OFFSET_MANAGER_POINTER = 0x12F529
 MANAGER_FIELDS = [
     ("mode", 0x0, "i", 1),
     ("area_slots", 0x12E99E, "h", 1), ("widget_slots", 0x12E9A0, "h", 1),
@@ -193,15 +194,54 @@ class ManagerScene(Scene):
         self.ctx.original.call(FUN_MANAGER_NEW, argument, this=self.manager)
         self.ctx.port.send("manager_new", argument)
 
-    def reset(self, release):
-        self.ctx.original.write_u32(G_NET_POSITION, 0)
+    def reset(self, release, net_room=True):
+        self._rewind_net(net_room)
         self.ctx.original.call(FUN_MANAGER_RESET, release, this=self.manager)
         self.ctx.port.send("manager_reset", release)
 
-    def area_create(self, case, box, columns, column_weights, rows, row_weights, flags, colour, owner):
+    def _rewind_net(self, room):
+        """Empties the network buffer. Without room, each write of the original shows its error box."""
+        self.ctx.original.write_u32(G_NET_POSITION, 0)
+        self.ctx.original.write_u32(G_NET_CAPACITY, NET_CAPACITY if room else 0)
+
+    def start_free_count(self):
+        self.ctx.original.frees = 0
+        self.ctx.port.send("frees")
+        self.ctx.port.reply()
+
+    def expect_same_frees(self, case):
+        """Both programs freed the same number of images. The original frees two blocks for each."""
+        self.ctx.port.send("frees")
+        self.ctx.expect_equal(f"{case}: images freed", self.ctx.original.frees / 2,
+                              int(self.ctx.port.reply()[0]))
+
+    def expect_links(self, case, index):
+        """The area points to the areas and widgets of its screen manager."""
+        original = self.ctx.original
+        area = self.addr("area", index)
+        links = struct.unpack("<2I", original.read(area + OFFSET_AREA_AREAS, 8))
+        self.ctx.port.send("manager_links", index)
+        self.ctx.expect_equal(f"{case}: area {index} links",
+                              [int(links[0] == self.base["area"]), int(links[1] == self.base["widget"])],
+                              [int(v) for v in self.ctx.port.reply()])
+
+    def set_pointer(self):
+        """Sets the pointer at 0x12F529, whose purpose is not known."""
+        self.ctx.original.write_u32(self.manager + OFFSET_MANAGER_POINTER, 0x12345678)
+        self.ctx.port.send("manager_pointer", 1)
+        self.ctx.port.reply()
+
+    def expect_same_pointer(self, case):
+        value = struct.unpack("<I", self.ctx.original.read(self.manager + OFFSET_MANAGER_POINTER, 4))[0]
+        self.ctx.port.send("manager_pointer", 0)
+        self.ctx.expect_equal(f"{case}: pointer at 0x12f529 is set", int(value != 0),
+                              int(self.ctx.port.reply()[0]))
+
+    def area_create(self, case, box, columns, column_weights, rows, row_weights, flags, colour, owner,
+                    net_room=True):
         """Creates an area in both programs and returns its index. A weight table is a list or None."""
         original = self.ctx.original
-        original.write_u32(G_NET_POSITION, 0)
+        self._rewind_net(net_room)
         tables = [original.alloc_bytes(bytes(table) + b"\0") if table is not None else 0
                   for table in (column_weights, row_weights)]
         result = original.call(FUN_AREA_CREATE, *box, columns, tables[0], rows, tables[1], flags, colour,

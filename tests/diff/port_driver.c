@@ -119,7 +119,8 @@ int main(void)
 
         if (sscanf(line, "%15s%n", cmd, &used) != 1) continue;
         const char *args = line + used;
-        if (strcmp(cmd, "glyph")) {
+        /* These two read their own arguments, which can be 32-bit values. */
+        if (strcmp(cmd, "glyph") && strncmp(cmd, "manager", 7)) {
             sscanf(args, "%d %d %d %d %d %d %d %d",
                    &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7]);
         }

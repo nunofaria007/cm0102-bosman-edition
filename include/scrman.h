@@ -55,8 +55,11 @@ typedef struct {
 void scrman_init(scrman_t *sm, u32 arg);
 
 /*
- * FUN_0055f7c0. Empties the screen manager. `release` frees the saved
- * screens of every area in use first.
+ * FUN_0055f7c0. Empties the screen manager and frees unknown_12f521.
+ * `release` frees the saved screens of every area in use first, unless
+ * unknown_12f555 is set. Without that, the next create that takes the slot
+ * of an area drops its saved screens without freeing them, as the original
+ * does.
  */
 void scrman_reset(scrman_t *sm, bool release);
 

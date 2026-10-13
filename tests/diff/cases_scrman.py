@@ -1,6 +1,7 @@
 """Screen manager: the constructor, the reset and area create."""
 from scene import KINDS, ManagerScene
 
+SPARE_AREAS = 3                  # areas past those in use that the reset test also fills
 MAX_AREAS = 249                  # the original never uses the last of its 250 slots
 LINE_ORDER_FULL = 0x302          # display.cpp: no room in the draw order
 
@@ -17,8 +18,11 @@ AREA_LEFTOVERS = ["first_row", "last_row", "column_weight", "row_weight", "shown
 
 
 def _box(ctx):
-    if ctx.rng.random() < 0.05:
+    roll = ctx.rng.random()
+    if roll < 0.05:
         return [ctx.rng.randint(-60, 1) for _ in range(4)]
+    if roll < 0.1:
+        return [ctx.rng.randint(-0x80000000, 0x7FFFFFFF) for _ in range(4)]
     return [ctx.x(), ctx.y(), ctx.x(), ctx.y()]
 
 
@@ -40,7 +44,7 @@ def _area_arguments(ctx, owner=None):
         if ctx.rng.random() < 0.2:
             flags |= bit
     if owner is None:
-        owner = -1 if ctx.rng.random() < 0.7 else ctx.rng.choice([0, 1199, ctx.rng.randint(0, 1199)])
+        owner = -1 if ctx.rng.random() < 0.7 else ctx.rng.choice([0, 1199, -2, -0x8000, ctx.rng.randint(0, 1199)])
     return [_box(ctx), columns, _weights(ctx, columns), rows, _weights(ctx, rows), flags, ctx.colour(), owner]
 
 
@@ -62,7 +66,12 @@ def test_manager_new(ctx):
         for which in ("unknown_12f521", "background"):
             if ctx.rng.random() < 0.7:
                 _capture(ctx, scene, "manager", 0, which)
+        if ctx.rng.random() < 0.7:
+            scene.set_pointer()
+        scene.start_free_count()
         scene.new(ctx.rng.choice([0, 1, ctx.rng.getrandbits(32)]))
+        scene.expect_same_frees(f"new {case}")
+        scene.expect_same_pointer(f"new {case}")
         scene.expect_same(f"new {case}", "manager", 0)
         for which in ("unknown_12f521", "background"):
             scene.expect_same_image(f"new {case}", "manager", 0, which)
@@ -70,7 +79,8 @@ def test_manager_new(ctx):
 
 
 def _reset(ctx, scene, case, slots):
-    """Resets after it gives some areas and the manager saved screens."""
+    """Resets after it gives saved screens to the screen manager and to some areas, in use or not."""
+    slots += SPARE_AREAS
     for index in range(slots):
         for which in ("saved", "scrollbar"):
             if ctx.rng.random() < 0.5:
@@ -80,7 +90,9 @@ def _reset(ctx, scene, case, slots):
                              "widget_count": ctx.rng.randint(0, 1200)})
     if ctx.rng.random() < 0.6:
         _capture(ctx, scene, "manager", 0, "unknown_12f521")
-    scene.reset(ctx.rng.choice([0, 1, 1, ctx.rng.getrandbits(31)]))
+    scene.start_free_count()
+    scene.reset(ctx.rng.choice([0, 1, 1, ctx.rng.getrandbits(31)]), net_room=ctx.rng.random() < 0.9)
+    scene.expect_same_frees(case)
     scene.expect_same(case, "manager", 0)
     scene.expect_same_image(case, "manager", 0, "unknown_12f521")
     for index in range(slots):
@@ -105,13 +117,18 @@ def test_manager_areas(ctx):
                 continue
             if ctx.rng.random() < 0.7:
                 scene.scramble("area", slots, AREA_LEFTOVERS)
-            index = scene.area_create(name, *_area_arguments(ctx))
+            if ctx.rng.random() < 0.5:
+                _scramble_manager(ctx, scene)
+            scene.start_free_count()
+            index = scene.area_create(name, *_area_arguments(ctx), net_room=ctx.rng.random() < 0.9)
+            scene.expect_same_frees(name)
             ctx.expect_equal(f"{name}: area index", slots, index, source="wanted")
             slots += 1
             most = max(most, slots)
             scene.expect_same(name, "manager", 0)
             scene.expect_same(name, "area", index)
-        for index in range(most + 1):
+            scene.expect_links(name, index)
+        for index in range(most + SPARE_AREAS):
             scene.expect_same(f"areas {case} at the end", "area", index)
     return calls
 

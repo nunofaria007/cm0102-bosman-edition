@@ -103,9 +103,13 @@ cm_image_t *rgn_load(const char *path)
     return img;
 }
 
+/* Counts the images freed, for the differential test. */
+u32 rgn_free_count;
+
 void rgn_free(cm_image_t *img)
 {
     if (!img) return;
+    rgn_free_count++;
     free(img->pixels);
     free(img);
 }

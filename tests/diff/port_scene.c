@@ -102,6 +102,8 @@ static area_t g_areas[SCENE_AREAS];
 static widget_t g_widgets[SCENE_WIDGETS];
 static scrman_t g_manager;
 
+extern u32 rgn_free_count;
+
 static void reset(void)
 {
     memset(g_areas, 0, sizeof(g_areas));
@@ -303,20 +305,22 @@ static bool capture_to(const char *args)
 }
 
 /* Reads "-1" for no table, or a count and that many weights. */
-static const u8 *read_weights(const char **args, u8 *table)
+static bool read_weights(const char **args, u8 *table, const u8 **weights)
 {
     char *end;
     long count = strtol(*args, &end, 10);
 
+    if (end == *args || count > 255) return false;
     *args = end;
-    if (count < 0) return NULL;
+    *weights = count < 0 ? NULL : table;
     for (long i = 0; i < count; i++) {
         long weight = strtol(*args, &end, 10);
 
+        if (end == *args) return false;
         *args = end;
-        if (i < 256) table[i] = (u8)weight;
+        table[i] = (u8)weight;
     }
-    return table;
+    return true;
 }
 
 /* "manager_area x1 y1 x2 y2 columns rows flags colour owner", then two weight tables. */
@@ -332,8 +336,10 @@ static bool manager_area(const char *args)
         return false;
     }
     args += used;
-    const u8 *columns = read_weights(&args, column_table);
-    const u8 *rows = read_weights(&args, row_table);
+    const u8 *columns, *rows;
+
+    if (!read_weights(&args, column_table, &columns)) return false;
+    if (!read_weights(&args, row_table, &rows)) return false;
 
     printf("%d\n", scrman_area_create(&g_manager, (s32)v[0], (s32)v[1],
                                       (s32)v[2], (s32)v[3], (u8)v[4], columns,
@@ -344,7 +350,7 @@ static bool manager_area(const char *args)
 
 bool scene_command(const char *cmd, const char *args)
 {
-    int index = atoi(args);
+    int index = (int)strtol(args, NULL, 10);
     int second = 0;
 
     sscanf(args, "%*d %d", &second);
@@ -366,6 +372,25 @@ bool scene_command(const char *cmd, const char *args)
         return true;
     }
     if (!strcmp(cmd, "manager_area")) return manager_area(args);
+    if (!strcmp(cmd, "manager_links")) {
+        if (index < 0 || index >= SCRMAN_MAX_AREAS) return false;
+        const area_t *area = &g_manager.areas[index];
+
+        printf("%d %d\n", area->areas == g_manager.areas,
+               area->widgets == g_manager.widgets);
+        return true;
+    }
+    if (!strcmp(cmd, "manager_pointer")) {
+        /* "manager_pointer 1" sets unknown_12f529. Prints whether it is set. */
+        if (index) g_manager.unknown_12f529 = &g_manager;
+        printf("%d\n", g_manager.unknown_12f529 != NULL);
+        return true;
+    }
+    if (!strcmp(cmd, "frees")) {
+        printf("%u\n", rgn_free_count);
+        rgn_free_count = 0;
+        return true;
+    }
     if (!strcmp(cmd, "fields")) return list_fields(args);
     if (!strcmp(cmd, "set")) return set_field(args);
     if (!strcmp(cmd, "get")) return get_fields(args);

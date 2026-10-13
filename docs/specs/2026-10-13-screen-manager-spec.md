@@ -36,7 +36,9 @@ Port the functions of the original that build, draw and empty one screen manager
 - A count above 30 makes the original write weights past its two tables, over the end of the area and into the next area. The port sets 30 weights and stops. No differential case uses a count above 30.
 - The constructor of the original leaves the two counts of the draw order as they are. A caller must run the reset before the first create. The port does the same.
 - Area init sets a field at 0x210 to -1. Its purpose is not known. The port stores it under an offset name.
-- The screen manager has a pointer at 0x12f529 that the constructor clears. The differential test does not compare it.
+- The screen manager has a pointer at 0x12f529 that the constructor clears. Its purpose is not known. The differential test checks only that it is clear.
+- After each error box the original sets `DAT_00b67a34` to 0. It looks like the state of the left mouse button. The port does not do this until it has mouse handling.
+- The image loader of the port counts the images it frees. The differential test compares that count with the frees of the original, because a pointer set to nothing looks the same with and without a free.
 - Widget create sets three fields whose purpose is not known: 0x08, 0x40 and 0x48. Widget init also stores the tick count of the original (`DAT_00b67a08`) at 0x50 and sets 0x7e to -1. The port stores them under offset names. The differential test compares them and sets the tick count to a fixed value.
 - The screen draw of the original takes the background file name from the screen stack (`FUN_007fee80`). The port's screen draw takes the name as an argument until the screen stack exists. The port passes the name to its RGN loader unchanged.
 - When the name differs from the last one, the screen draw loads that file. When the load fails, it loads `DEFAULT_PIC.RGN` from the data folder. When the name is empty, it captures the present screen as the background.

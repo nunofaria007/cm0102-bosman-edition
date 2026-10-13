@@ -19,7 +19,7 @@ void scrman_init(scrman_t *sm, u32 arg)
     sm->darken_once = 0;
     sm->laid_out = 0;
     sm->mode = 0;
-    /* No file has this name, so the first draw loads its background. */
+    /* Differs from every file name, so the first draw loads its background. */
     sm->background_name[0] = 1;
     sm->unknown_12f529 = NULL;
     sm->area_slots = 0;
