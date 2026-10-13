@@ -99,9 +99,11 @@ static void build_table(void)
 void demo_draw(const char *data_dir, const char *background)
 {
     char *default_path = os_find_file_ci(data_dir, "default_pic.rgn");
-    cm_image_t *picture = rgn_load(background ? background : default_path);
+    const char *path = background ? background : default_path;
+    cm_image_t *picture = path ? rgn_load(path) : NULL;
     widget_t *widget;
 
+    if (!picture) fprintf(stderr, "No background picture.\n");
     gui_blit(0, 0, picture);
     rgn_free(picture);
     free(default_path);

@@ -17,12 +17,14 @@
  * GUI_TEXT_WRAP the rest goes to the next line. `cursor` is the index of the
  * character that gets a cursor mark before it in each line, or -1.
  *
- * The original looks for the last space at the place of the character in the
- * whole text, not in the line. From the third line on, this can leave a line
- * too wide and repeat words of the first line. The port does the same. Where
- * the original then reads memory that it never set, the port reads zeros.
- * The port uses the first 251 characters of the text. The original writes
- * past its line buffer for a longer text.
+ * To find the last space, the original uses the place of the character in
+ * the whole text as an index into the current line. The two differ after a
+ * line break, a control character or an earlier cut. The search then starts
+ * past the end of the line, so it can leave the line too wide and repeat
+ * words of an earlier line. The port does the same. Where the original then
+ * reads memory that it never set, the port reads zeros. The port uses the
+ * first 251 characters of the text. The original writes past its line buffer
+ * for a longer text.
  */
 void gui_text(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, s16 font, u16 colour,
               const char *text, s32 cursor);

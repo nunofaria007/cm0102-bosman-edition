@@ -65,6 +65,10 @@ int main(int argc, char *argv[])
             g_demo = true;
         } else if (!strcmp(argv[i], "--data") && i + 1 < argc) {
             data_dir = argv[++i];
+        } else if (argv[i][0] == '-') {
+            fprintf(stderr, "Usage: cm0102 [--data <folder>] [--demo] "
+                            "[picture.rgn]\n");
+            return 2;
         } else {
             picture = argv[i];
         }

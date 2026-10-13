@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define LINE_SIZE 252
-#define REST_SIZE 250
+#define REST_SIZE LINE_SIZE
 #define MAX_LINES (2 * LINE_SIZE)
 
 typedef struct {
@@ -25,7 +25,6 @@ static void add_line(line_list_t *list, const char *line)
     list->lines[list->count++] = copy;
 }
 
-/* Moves the end of the line to `rest` and cuts the line there. */
 static void cut_line(char *line, s32 at, s32 rest_from, char *rest)
 {
     snprintf(rest, REST_SIZE, "%s", line + rest_from);
@@ -44,10 +43,10 @@ static void split_lines(line_list_t *list, const char *text, u32 flags,
         u8 c = (u8)text[i - 1];
 
         if (c >= ' ' && !cut) {
-            /* "#" and four more characters and "#" stay together, as a character code does. */
-            s32 piece = c == '#' && i < length - 4 && text[i + 4] == '#' ? 6 : 1;
+            /* "#", four more characters and "#" stay together, as a code. */
+            bool group = c == '#' && i < length - 4 && text[i + 4] == '#';
+            s32 piece = group ? 6 : 1;
 
-            if (strlen(line) + (size_t)piece >= LINE_SIZE) break;
             strncat(line, text + i - 1, (size_t)piece);
             i += piece - 1;
             if (gui_line_width(font, line) > box_width) {

@@ -149,11 +149,17 @@ int main(void)
         } else if (!strcmp(cmd, "fonts")) {
             sscanf(args, "%1023s", path);
             printf("%d\n", gui_fonts_load(path));
-        } else if (!strcmp(cmd, "font_load")) {
-            sscanf(args, "%*d %1023s", path);
-            printf("%d\n", gui_font_load(a[0], path));
-        } else if (!strcmp(cmd, "font_dump")) {
-            dump_font(a[0]);
+        } else if (!strcmp(cmd, "font_load") || !strcmp(cmd, "font_dump")) {
+            if (a[0] < 0 || a[0] >= GUI_FONT_COUNT) {
+                fprintf(stderr, "port_driver: bad font number\n");
+                return 1;
+            }
+            if (!strcmp(cmd, "font_dump")) {
+                dump_font(a[0]);
+            } else {
+                sscanf(args, "%*d %1023s", path);
+                printf("%d\n", gui_font_load(a[0], path));
+            }
         } else if (!strcmp(cmd, "line_width")) {
             printf("%d\n", gui_line_width((s16)a[0], read_text(args)));
         } else if (!strcmp(cmd, "draw_line")) {

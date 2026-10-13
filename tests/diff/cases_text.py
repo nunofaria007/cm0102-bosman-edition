@@ -12,6 +12,24 @@ LEFT, TOP, EMBOSS, RIGHT, PASSWORD, WRAP = 0x1, 0x2, 0x20, 0x40, 0x80, 0x100
 FONTS = [1, 2, 3, 4, 5, 6, 7]
 CODE = re.compile(rb"#([0-9a-fA-F]{4})#")
 
+# Bytes above 0x7f that the digit test of the original accepts in a character code, and some it does not.
+ALSO_DIGITS = [0x83, 0x87, 0x8B, 0x9F, 0xAF, 0xB5, 0xC1, 0xD7, 0xE7, 0xEA, 0xFC, 0xFE]
+NOT_DIGITS = [0x80, 0x84, 0xA0, 0xE9, 0xFF]
+
+
+def odd_code(ctx):
+    """A code group with a byte above 0x7f in it. The code is then the hex digits before that byte."""
+    digits = b"0123456789abcdefABCDEF"
+    place = ctx.rng.randint(1, 4)
+    high = ctx.rng.choice(ALSO_DIGITS + ALSO_DIGITS + NOT_DIGITS)
+    group = bytearray(ctx.rng.choice(digits) for _ in range(4))
+    for later in range(place, 4):
+        group[later] = ctx.rng.choice(list(digits) + ALSO_DIGITS)
+    group[place - 1] = high
+    if place == 4:
+        group[0] = ord("0")
+    return b"#" + bytes(group) + b"#"
+
 
 def random_text(ctx, max_length):
     """Printable and accented characters, bars, control characters and character codes.
@@ -32,8 +50,10 @@ def random_text(ctx, max_length):
                 parts.append(b"|")
             elif roll < 0.91:
                 parts.append(bytes([ctx.rng.randint(1, 0x1F)]))
-            elif roll < 0.96:
+            elif roll < 0.95:
                 parts.append(ctx.rng.choice([b"#%04x#", b"#%04X#"]) % ctx.rng.choice([0, 0x41, ctx.rng.randint(1, 0xFF)]))
+            elif roll < 0.97:
+                parts.append(odd_code(ctx))
             else:
                 parts.append(ctx.rng.choice([b"#", b"#12#", b"#zz00#", b"##", b"#12345#"]))
         text = b"".join(parts)
@@ -49,7 +69,7 @@ def as_word(text):
 def test_line_width(ctx):
     for case in range(3000):
         font = ctx.rng.choice(FONTS + [-1])
-        text = random_text(ctx, 40)
+        text = random_text(ctx, 40 if case % 50 else 3000)
         expected = ctx.original.call(FUN_LINE_WIDTH, font, ctx.original.alloc_bytes(text + b"\0"))
         ctx.port.send("line_width", font, as_word(text))
         ctx.expect_equal(f"width of {text!r} in font {font}", expected, int(ctx.port.reply()[0]))
@@ -71,7 +91,7 @@ def test_draw_line(ctx):
         text = random_text(ctx, 24)
         x = ctx.rng.choice([ctx.rng.randint(0, 600), ctx.rng.randint(0, 600), ctx.x()])
         y = ctx.rng.choice([ctx.rng.randint(0, 540), ctx.rng.randint(0, 540), ctx.y()])
-        cursor = ctx.rng.choice([-1, -1, ctx.rng.randint(0, len(text) + 2)])
+        cursor = ctx.rng.choice([-1, -1, -2, ctx.rng.randint(0, len(text) + 2)])
         _draw_line(ctx, x, y, font, ctx.colour(), text, cursor)
         ctx.expect_same_framebuffer(f"line {text!r} at ({x}, {y}) font {font} cursor {cursor}")
     return case + 1
@@ -124,7 +144,7 @@ def random_words(ctx, max_words):
         elif roll < 0.16:
             word += b"|"
         words.append(word)
-    return ctx.rng.choice([b" ", b" ", b" ", b"  "]).join(words)[:240]
+    return ctx.rng.choice([b" ", b" ", b" ", b"  "]).join(words)[:251]
 
 
 def _flags(ctx):
@@ -142,13 +162,41 @@ def test_text_box(ctx):
         box = (x1, y1, x1 + ctx.rng.choice([ctx.rng.randint(20, 290), ctx.rng.randint(1, 60)]),
                y1 + ctx.rng.randint(5, 170))
         font = ctx.rng.choice(FONTS + FONTS + [-1])
-        text = ctx.rng.choice([random_words(ctx, 14), random_words(ctx, 40), random_text(ctx, 30)])
+        text = ctx.rng.choice([random_words(ctx, 14), random_words(ctx, 40), random_text(ctx, 30),
+                               random_words(ctx, 90)])
         flags, colour = _flags(ctx), ctx.colour()
-        cursor = ctx.rng.choice([-1, -1, -1, ctx.rng.randint(0, 20)])
+        cursor = ctx.rng.choice([-1, -1, -1, -2, -9, ctx.rng.randint(0, 20)])
         ctx.original.call(FUN_TEXT, *box, flags, font, colour, ctx.original.alloc_bytes(text + b"\0"), cursor)
         ctx.port.send("text", *box, flags, font, colour, cursor, as_word(text))
         ctx.expect_same_framebuffer(f"text {text!r} in {box} flags {flags:#x} font {font} cursor {cursor}")
     return case + 1
+
+
+def test_text_box_long_text(ctx):
+    """Texts at the limit of 251 characters, with and without spaces, in boxes that the end of the text
+    crosses. A longer text writes past the line buffer of the original, so no case has one."""
+    ctx.sync_framebuffer(24)
+    count = 0
+    for length in (240, 249, 250, 251):
+        for spaced in (False, True):
+            # Narrow characters, so that the whole line fits on the screen and its last character shows.
+            text = (b"!. !. " * 50 if spaced else b"!" * 300)[:length]
+            for font in (1,):
+                width = ctx.original.call(FUN_LINE_WIDTH, font, ctx.original.alloc_bytes(text + b"\0"))
+                ctx.expect_equal(f"{length} characters in font {font} fit on the screen", True, width < 780,
+                                 source="wanted")
+                # A box of width + slack + 1 pixels. At -2 only the last character does not fit.
+                for slack in (-40, -3, -2, -1, 0):
+                    for flags in (LEFT | TOP, LEFT | TOP | WRAP):
+                        box = (5, 100 + 60 * (count % 6), 5 + width + slack, 150 + 60 * (count % 6))
+                        ctx.original.reset_heap()
+                        ctx.original.call(FUN_TEXT, *box, flags, font, 0xFFFF,
+                                          ctx.original.alloc_bytes(text + b"\0"), -1)
+                        ctx.port.send("text", *box, flags, font, 0xFFFF, -1, as_word(text))
+                        ctx.expect_same_framebuffer(f"{length} characters, spaced {spaced}, font {font}, "
+                                                    f"box {slack} wider than the text, flags {flags:#x}")
+                        count += 1
+    return count
 
 
 def test_text_box_wrap_quirk(ctx):
@@ -176,6 +224,7 @@ def test_text_box_wrap_quirk(ctx):
 
 TESTS = [
     ("text_box", test_text_box),
+    ("text_box_long_text", test_text_box_long_text),
     ("text_box_wrap_quirk", test_text_box_wrap_quirk),
     ("line_width", test_line_width),
     ("draw_line", test_draw_line),

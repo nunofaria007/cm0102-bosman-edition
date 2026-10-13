@@ -35,8 +35,8 @@ extern gui_font_t g_fonts[GUI_FONT_COUNT];
 
 /*
  * FUN_005e4ba0. Loads one .fnt file. The original trusts the file. The port
- * also rejects a height outside 1 to 255 and a glyph whose row does not hold
- * its width.
+ * also rejects a height outside 1 to 255, a width or gap above 255, and a
+ * glyph whose row does not hold its width.
  */
 bool gui_font_load(s32 font, const char *path);
 
@@ -47,7 +47,8 @@ bool gui_fonts_load(const char *data_dir);
  * Text rules of the original, for both functions below. "#xxxx#" with four
  * hex digits stands for the character with that code. "|" counts as a space.
  * A character below 0x20 has no width. A code above 0xff reads past the font
- * in the original. The port gives it no glyph. Font -1 means no text.
+ * in the original. The port gives it no glyph. Font -1 means no text, and
+ * so does a font with no glyphs, such as font 0.
  */
 
 /* FUN_005e5ad0. Width of the text in pixels. */

@@ -44,8 +44,9 @@ G_FONTS = 0xAE1DAC
 FONT_SIZE = 0x1404
 FUN_FONT_LOAD = 0x5E4BA0     # (font number, path)
 
-# The text function reads parts of its stack frame that it never set, when a text wraps to three
-# or more lines. What it finds there is whatever its callers left. The test makes it zeros.
+# The text function reads parts of its stack frame that it never set, when it cuts a line after
+# a line break, a control character or an earlier cut. What it finds there is whatever earlier
+# calls left. The test makes it zeros.
 FUN_TEXT = 0x5E6D80
 TEXT_FRAME = 0x400
 FONT_FILES = {1: "arial_narrow_10.fnt", 2: "arial_narrow_11.fnt", 3: "arial_14.fnt", 4: "arial_16.fnt",

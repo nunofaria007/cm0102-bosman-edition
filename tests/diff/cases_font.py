@@ -64,7 +64,55 @@ def test_font_load_fails(ctx):
     return len(paths) + 1
 
 
+def _font_file(height, glyphs):
+    """A .fnt file. `glyphs` maps a character code to (width, bytes in a row, left gap, right gap)."""
+    content = struct.pack("<i", height)
+    for code in range(0x20, 0x100):
+        width, row_bytes, left, right = glyphs.get(code, (2, 1, 0, 0))
+        content += struct.pack("<4i", width, row_bytes, left, right) + bytes(max(row_bytes, 0) * max(height, 0))
+    return content
+
+
+def test_font_load_rejects_bad_values(ctx):
+    """Port only. The original trusts every value in the file."""
+    font = 7
+    good = os.path.join(ctx.data_dir, FONT_FILES[font])
+    files = {
+        "sound": (10, {}, 1),
+        "height_0": (0, {}, 0), "height_256": (256, {}, 0), "height_below_0": (-1, {}, 0),
+        "row_too_short": (10, {0x41: (5, 2, 0, 0)}, 0), "row_too_long": (10, {0x41: (5, 4, 0, 0)}, 0),
+        "rows_but_no_width": (10, {0x41: (0, 1, 0, 0)}, 0), "width_256": (10, {0x41: (256, 0, 0, 0)}, 0),
+        "width_below_0": (10, {0x41: (-1, 0, 0, 0)}, 0), "left_gap_256": (10, {0x41: (2, 1, 256, 0)}, 0),
+        "right_gap_far_below_0": (10, {0x41: (2, 1, 0, -256)}, 0),
+    }
+    with tempfile.TemporaryDirectory() as folder:
+        for name, (height, glyphs, wanted) in files.items():
+            path = os.path.join(folder, name + ".fnt")
+            with open(path, "wb") as target:
+                target.write(_font_file(height, glyphs))
+            ctx.port.send("font_load", font, path)
+            ctx.expect_equal(f"load {name}", wanted, int(ctx.port.reply()[0]), source="wanted")
+    ctx.port.send("font_load", font, good)
+    ctx.expect_equal("load the real font again", 1, int(ctx.port.reply()[0]), source="wanted")
+    _expect_same_font(ctx, font)
+    return len(files) + 1
+
+
+def test_font_0_draws_nothing(ctx):
+    """Port only. The original has no font 0, and the port gives text in font 0 no pixels at all."""
+    ctx.port.send("fill", 30)
+    before = ctx.port.framebuffer()
+    ctx.port.send("draw_line", 100, 100, 0, 0xFFFF, 0, "-" + b"Text".hex())
+    ctx.port.send("text", 100, 200, 400, 260, 0, 0, 0xFFFF, 0, "-" + b"Text".hex())
+    ctx.expect_equal("the picture after text in font 0", before == ctx.port.framebuffer(), True, source="wanted")
+    ctx.port.send("line_width", 0, "-" + b"Text".hex())
+    ctx.expect_equal("width of text in font 0", 0, int(ctx.port.reply()[0]), source="wanted")
+    return 3
+
+
 TESTS = [
+    ("font_load_rejects_bad_values", test_font_load_rejects_bad_values),
+    ("font_0_draws_nothing", test_font_0_draws_nothing),
     ("font_tables", test_font_tables),
     ("font_load_fails", test_font_load_fails),
 ]

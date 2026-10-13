@@ -1,12 +1,24 @@
 #include "gui_font.h"
 #include "display.h"
 #include "gui_utils.h"
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 extern char *os_find_file_ci(const char *dir, const char *name);
+
+#define MAX_CODES 4096
+#define MAX_WIDTH 255
+
+typedef struct {
+    u32 r, g, b;
+} rgb_t;
+
+typedef struct {
+    rgb_t text;
+    rgb_t under;
+    u32 last;
+} blend_t;
 
 gui_font_t g_fonts[GUI_FONT_COUNT];
 
@@ -46,6 +58,10 @@ static bool read_glyph(FILE *f, gui_glyph_t *glyph, s32 height)
     glyph->row_bytes = header[1];
     glyph->left = header[2];
     glyph->right = header[3];
+    if (glyph->width < 0 || glyph->width > MAX_WIDTH ||
+        abs(glyph->left) > MAX_WIDTH || abs(glyph->right) > MAX_WIDTH) {
+        return false;
+    }
     if (glyph->row_bytes == 0) return true;
     if (glyph->width < 1 || glyph->row_bytes != (glyph->width + 1) / 2) {
         return false;
@@ -112,19 +128,26 @@ bool gui_fonts_load(const char *data_dir)
     return true;
 }
 
-#define MAX_CODES 4096
+static s32 hex_value(u8 c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if ((c | 0x20) >= 'a' && (c | 0x20) <= 'f') return (c | 0x20) - 'a' + 10;
+    return -1;
+}
 
-typedef struct {
-    u32 r, g, b;
-} rgb_t;
+/* The digit test of the original reads before its table for a byte above 0x7f. */
+static bool passes_digit_test(u8 c)
+{
+    static const u8 also[] = {
+        0x83, 0x87, 0x8b, 0x8f, 0x93, 0x97, 0x9b, 0x9f, 0xaf, 0xb4, 0xb5, 0xb6,
+        0xb7, 0xbd, 0xbf, 0xc1, 0xc2, 0xc3, 0xc7, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9,
+        0xda, 0xdb, 0xdc, 0xe7, 0xea, 0xec, 0xf0, 0xfb, 0xfc, 0xfd, 0xfe,
+    };
 
-typedef struct {
-    rgb_t text;
-    rgb_t under;
-    u32 last;
-} blend_t;
+    return hex_value(c) >= 0 || memchr(also, c, sizeof(also)) != NULL;
+}
 
-/* FUN_005e5060 */
+/* FUN_005e5060. The code is the run of hex digits at the start of the four. */
 static void text_codes(u16 *codes, const char *text)
 {
     size_t length = strlen(text);
@@ -134,12 +157,13 @@ static void text_codes(u16 *codes, const char *text)
         const u8 *at = (const u8 *)text + i;
         u32 code = at[0];
 
-        if (code == '#' && i + 5 < length && at[5] == '#' && isxdigit(at[1]) &&
-            isxdigit(at[2]) && isxdigit(at[3]) && isxdigit(at[4])) {
-            char digits[5] = { (char)at[1], (char)at[2], (char)at[3],
-                               (char)at[4], '\0' };
-
-            code = (u32)strtoul(digits, NULL, 16);
+        if (code == '#' && i + 5 < length && at[5] == '#' &&
+            hex_value(at[1]) >= 0 && passes_digit_test(at[2]) &&
+            passes_digit_test(at[3]) && passes_digit_test(at[4])) {
+            code = 0;
+            for (s32 k = 1; k <= 4 && hex_value(at[k]) >= 0; k++) {
+                code = code * 16 + (u32)hex_value(at[k]);
+            }
             i += 5;
         }
         codes[count++] = (u16)code;
@@ -149,7 +173,8 @@ static void text_codes(u16 *codes, const char *text)
 
 static const gui_font_t *font_of(s16 font)
 {
-    return font >= 0 && font < GUI_FONT_COUNT ? &g_fonts[font] : NULL;
+    if (font < 0 || font >= GUI_FONT_COUNT) return NULL;
+    return g_fonts[font].height > 0 ? &g_fonts[font] : NULL;
 }
 
 static u16 shown_code(u16 code)

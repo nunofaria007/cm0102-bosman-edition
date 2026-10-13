@@ -115,7 +115,8 @@ def test_widget_popup_arrows(ctx):
                 for style in (0x30, 0x70):
                     scene = Scene(ctx)
                     scene.set("widget", 0, {"x1": box[0], "y1": box[1], "x2": box[2], "y2": box[3], "style": style,
-                                            "colour": colour, "text": _text(text), "area": -1, "popup_area": 2})
+                                            "colour": colour, "text": _text(text), "area": -1, "popup_area": 2,
+                                            "font": 2, "text_colour": 0xFFFF, "cursor": -1})
                     scene.set("area", 2, {"x1": 0, "y1": 0, "x2": 120, "y2": height, "owner_widget": 0, "flags": flags})
                     _draw(ctx, scene, 0, 1, f"popup arrow {side}, text {text!r}, colour {colour:#06x}, style {style:#x}")
                     count += 1
@@ -139,16 +140,18 @@ def test_widget_picture(ctx):
     popup_areas = [-1, 2, -1, -1, 3, -1]
     scene.set("area", 2, {"x1": 0, "y1": 0, "x2": 90, "y2": 70, "owner_widget": 1})
     scene.set("area", 3, {"x1": 0, "y1": 0, "x2": 90, "y2": 70, "owner_widget": 4, "flags": 0x100})
-    with tempfile.TemporaryDirectory() as folder:
+    # A short folder name, so that the file name fits in the widget and would show if it were drawn as text.
+    with tempfile.TemporaryDirectory(dir="/tmp") as folder:
         first = _write(folder, "first.rgn", _rgn(40, 30, _pixels(ctx, 40, 30)))
         second = _write(folder, "second.rgn", _rgn(25, 25, _pixels(ctx, 25, 25)))
         names = [first, first, second, os.path.join(folder, "missing.rgn"), second, first]
         for index, name in enumerate(names):
-            x, y = 50 + index % 4 * 150, 100 + index // 4 * 100
-            scene.set("widget", index, {"x1": x, "y1": y, "x2": x + 100, "y2": y + 60,
+            x, y = 5 + index % 4 * 197, 100 + index // 4 * 100
+            scene.set("widget", index, {"x1": x, "y1": y, "x2": x + 190, "y2": y + 60,
                                         "flags": PICTURE | extra_flags[index], "style": 0x20, "colour": 0x8410,
                                         "highlight_colour": 0xF81F, "text_colour": 0x4321,
                                         "highlighted": highlighted[index], "text": _text(name.encode()),
+                                        "font": 1, "cursor": -1, "text_flags": 0,
                                         "popup_area": popup_areas[index], "area": -1})
         for step, index in enumerate([0, 1, 2, 3, 4, 5, 0, 2]):
             case = f"picture step {step}, widget {index}"
