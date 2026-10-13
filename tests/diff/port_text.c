@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_CALLS 64
+#define MAX_CALLS 256
 
 static char calls[MAX_CALLS][1024];
 static int call_count;

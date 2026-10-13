@@ -24,7 +24,8 @@
  *   [11] unused          (0)
  *
  * Pixel data: row-major, 16-bit, either RGB565 or RGB555.
- * The loader converts RGB555 to RGB565 so the framebuffer stays RGB565.
+ * The loader converts to RGB565 whenever the green mask of the file is not
+ * that of RGB565, as the original does for an RGB565 display.
  */
 
 static void convert_rgb555_to_rgb565(u16 *pixels, s32 count)
@@ -75,7 +76,7 @@ cm_image_t *rgn_load(const char *path)
     fclose(f);
 
     u32 g_mask = (u32)raw_header[9];
-    if (g_mask == CM_COLOUR_RGB555) {
+    if (g_mask != CM_COLOUR_RGB565) {
         convert_rgb555_to_rgb565(pixels, w * h);
         g_mask = CM_COLOUR_RGB565;
     }

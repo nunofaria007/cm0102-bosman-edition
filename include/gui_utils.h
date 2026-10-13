@@ -28,6 +28,7 @@ typedef struct {
 #define GUI_COLOUR_LIGHT_GREY 0xe71c /* DAT_00ae3184 */
 #define GUI_COLOUR_ORANGE     0xfc00 /* DAT_00aebdd4 */
 #define GUI_COLOUR_RED        0xf800 /* DAT_00ae31a8 */
+#define GUI_COLOUR_GREY       0x8410 /* DAT_00ae317e */
 
 /* Glyph tables of the original, in gui_glyphs.c. */
 extern const u8 gui_glyph_left[];       /* DAT_009cd67c */

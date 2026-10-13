@@ -2,6 +2,11 @@
 #include "gui_utils.h"
 #include <stddef.h>
 
+extern void rgn_free(cm_image_t *img);
+
+#define BUTTON_RAISED  (GUI_PANEL_FILL | GUI_PANEL_BORDER)
+#define BUTTON_PRESSED (BUTTON_RAISED | GUI_PANEL_SUNKEN)
+
 /* FUN_00403600. The original also stores the scrollbar address in DAT_00ad9c58. */
 static void setup_scrollbar(area_t *area, s32 margin_x, s32 margin_y)
 {
@@ -49,6 +54,7 @@ static void split(s32 *start, s32 *end, const u8 *weight, s32 count,
     s32 total = 0, sum = 0;
 
     for (s32 i = 0; i < count; i++) total += weight[i];
+    if (total == 0) total = 1; /* the original faults */
     for (s32 i = 0; i < count; i++) {
         sum += weight[i];
         start[i] = i == 0 ? margin : end[i - 1] + 2;
@@ -90,6 +96,106 @@ void area_layout(area_t *area)
           margin_x, width);
     split(area->row_y1, area->row_y2, area->row_weight, rows, margin_y,
           height);
+}
+
+static void draw_scrollbar(area_t *area)
+{
+    area_scrollbar_t *bar = &area->scrollbar;
+    s32 up = bar->pressed == 1 ? 2 : 0;
+    s32 down = bar->pressed == 2 ? 2 : 0;
+    s32 glyph_x = bar->x1 + (20 - gui_glyph_up[0]) / 2;
+    s32 glyph_y = (20 - gui_glyph_up[1]) / 2;
+
+    /* The original shows an error box here (Area.cpp 870). */
+    if (!area->has_scrollbar) return;
+    if (!bar->saved) {
+        bar->saved = gui_capture(bar->x1, bar->y1, bar->x2, bar->y2, NULL);
+    }
+
+    gui_panel(bar->x1, bar->y1, bar->x2, bar->track_y1 - 1,
+              up ? BUTTON_PRESSED : BUTTON_RAISED, GUI_COLOUR_GREY);
+    gui_draw_glyph(glyph_x + up, bar->y1 + glyph_y + up, GUI_COLOUR_BLACK,
+                   gui_glyph_up);
+    gui_panel(bar->x1, bar->track_y1, bar->x2, bar->track_y2, GUI_PANEL_DARKEN,
+              GUI_COLOUR_BLACK);
+    gui_panel(bar->x1, bar->thumb_y1, bar->x2, bar->thumb_y2, BUTTON_RAISED,
+              GUI_COLOUR_GREY);
+    gui_panel(bar->x1, bar->track_y2 + 1, bar->x2, bar->y2,
+              down ? BUTTON_PRESSED : BUTTON_RAISED, GUI_COLOUR_GREY);
+    gui_draw_glyph(glyph_x + down, bar->track_y2 + 1 + glyph_y + down,
+                   GUI_COLOUR_BLACK, gui_glyph_down);
+}
+
+static void draw_grid(const area_t *area)
+{
+    s32 width = area->x2 - area->x1 + 1;
+    s32 height = area->y2 - area->y1 + 1;
+
+    for (s32 i = 1; i < area->row_count; i++) {
+        s32 y = height * i / area->row_count + area->y1;
+
+        gui_line(area->x1, y, area->x2, y, GUI_LINE_SOLID, GUI_COLOUR_GREY);
+    }
+    for (s32 i = 1; i < area->column_count; i++) {
+        s32 x = width * i / area->column_count + area->x1;
+
+        gui_line(x, area->y1, x, area->y2, GUI_LINE_SOLID, GUI_COLOUR_GREY);
+    }
+}
+
+/* Gives the widget its place on screen: a fixed place, or its grid cell. */
+static void place_widget(const area_t *area, widget_t *widget, s32 shown_row)
+{
+    s32 row = area->first_row + shown_row;
+
+    widget->x1 = widget->fixed_x1;
+    widget->x2 = widget->fixed_x2;
+    widget->y1 = widget->fixed_y1;
+    widget->y2 = widget->fixed_y2;
+    if (widget->fixed_x1 == 0) {
+        widget->x1 = area->column_x1[widget->column] + area->x1;
+        widget->x2 = area->column_x2[widget->column] + area->x1;
+    }
+    if (widget->fixed_y1 == 0) {
+        widget->y1 = area->row_y1[row] + area->y1;
+        widget->y2 = area->row_y2[row] + area->y1;
+    }
+}
+
+void area_draw(area_t *area, bool redraw)
+{
+    /* The original shows an error box first (Area.cpp 245). */
+    if (area->first_visible == -1) area_layout(area);
+
+    if (redraw && area->saved) {
+        rgn_free(area->saved);
+        area->saved = NULL;
+    }
+    if (area->owner_widget != -1 && !area->saved) {
+        area->saved = gui_capture(area->x1, area->y1, area->x2, area->y2, NULL);
+    }
+    gui_panel(area->x1, area->y1, area->x2, area->y2, area->flags,
+              area->colour);
+
+    if (area->flags & AREA_GRID_ONLY) {
+        draw_grid(area);
+        return;
+    }
+    if (area->has_scrollbar && !area->saved) {
+        area->saved = gui_capture(area->x1, area->y1, area->x2 - 22, area->y2,
+                                  NULL);
+    }
+
+    for (s16 i = area->first_visible; i < area->widget_count; i++) {
+        widget_t *first = &area->widgets[area->widget_index[area->first_visible]];
+        widget_t *widget = &area->widgets[area->widget_index[i]];
+        s32 shown_row = widget->row - first->row;
+
+        if (shown_row > area->row_count - 1) break;
+        place_widget(area, widget, shown_row);
+        widget_draw(widget, redraw);
+    }
+    if (area->has_scrollbar) draw_scrollbar(area);
 }
 
 void area_popup_position(const area_t *area, s32 *x, s32 *y)

@@ -100,9 +100,9 @@ int main(void)
         } else if (!strcmp(cmd, "rect")) {
             gui_rect(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
         } else if (!strcmp(cmd, "palette")) {
-            printf("%u %u %u %u %u %u\n", GUI_COLOUR_NAVY, GUI_COLOUR_YELLOW,
-                   GUI_COLOUR_BLACK, GUI_COLOUR_LIGHT_GREY, GUI_COLOUR_ORANGE,
-                   GUI_COLOUR_RED);
+            printf("%u %u %u %u %u %u %u\n", GUI_COLOUR_NAVY,
+                   GUI_COLOUR_YELLOW, GUI_COLOUR_BLACK, GUI_COLOUR_LIGHT_GREY,
+                   GUI_COLOUR_ORANGE, GUI_COLOUR_RED, GUI_COLOUR_GREY);
         } else if (!strcmp(cmd, "panel")) {
             gui_panel(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
         } else if (!strcmp(cmd, "text_calls")) {

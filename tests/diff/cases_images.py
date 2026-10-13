@@ -37,20 +37,27 @@ def _original_load(ctx, path):
     return ctx.original.call(FUN_LOAD_RGN, ctx.original.alloc_c_string(path), 0)
 
 
+GREEN_MASK = 8  # place in the header fields below
+
+
 def _original_image(ctx, addr):
     if not addr:
         return None
-    width, height, size, pixels = struct.unpack("<4I", ctx.original.read(addr, 16))
-    return [width, height, size], ctx.original.read(pixels, size)
+    header = struct.unpack("<12I", ctx.original.read(addr, 48))
+    fields = [*header[:3], *header[4:]]
+    fields[GREEN_MASK] = RGB565
+    return fields, ctx.original.read(header[3], header[2])
 
 
 def _port_image(ctx):
-    """The original leaves the colour masks of the file in the image. The port records RGB565."""
+    """Every header field but the pixel pointer. The original keeps the green mask of the file
+    after it converts the pixels. The port records RGB565, so the test does not compare that field."""
     words = ctx.port.reply()
     if words == [b"0"]:
         return None
     fields = [int(v) for v in words]
-    return fields[:3], ctx.port.read(fields[2])
+    fields[GREEN_MASK] = RGB565
+    return fields, ctx.port.read(fields[2])
 
 
 def test_load(ctx):
@@ -58,7 +65,9 @@ def test_load(ctx):
         files = [os.path.join(folder, "missing.rgn"), _write(folder, "short_header.rgn", bytes(40))]
         for case in range(60):
             width, height = ctx.rng.randint(1, 120), ctx.rng.randint(1, 90)
-            content = _rgn(width, height, _pixels(ctx, width, height), ctx.rng.choice([RGB565, RGB555]))
+            # The original converts for any green mask but that of the display.
+            g_mask = ctx.rng.choice([RGB565, RGB565, RGB555, 0, 0x07C0])
+            content = _rgn(width, height, _pixels(ctx, width, height), g_mask)
             if case % 10 == 9:
                 content = content[:-ctx.rng.randint(1, width * 2)]
             files.append(_write(folder, f"{case}.rgn", content))

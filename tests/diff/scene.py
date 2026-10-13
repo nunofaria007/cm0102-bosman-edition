@@ -14,7 +14,7 @@ OFFSET_WIDGET_AREAS = 0x00
 
 AREA_FIELDS = [
     ("x1", 0x000, "i", 1), ("y1", 0x004, "i", 1), ("x2", 0x008, "i", 1), ("y2", 0x00C, "i", 1),
-    ("row_offset", 0x010, "i", 1), ("last_row", 0x014, "i", 1), ("flags", 0x018, "I", 1),
+    ("first_row", 0x010, "i", 1), ("last_row", 0x014, "i", 1), ("flags", 0x018, "I", 1),
     ("column_x1", 0x01C, "i", 30), ("row_y1", 0x094, "i", 30),
     ("column_x2", 0x10C, "i", 30), ("row_y2", 0x184, "i", 30),
     ("scroll_to", 0x1FC, "i", 1), ("colour", 0x20C, "H", 1), ("owner_widget", 0x20E, "h", 1),
@@ -46,7 +46,10 @@ WIDGET_FIELDS = [
 ]
 
 # Offsets of image pointers in the structs of the original.
-IMAGES = {("widget", "saved"): 0x4C, ("widget", "picture"): 0x5C}
+IMAGES = {("widget", "saved"): 0x4C, ("widget", "picture"): 0x5C,
+          ("area", "saved"): 0x200, ("area", "scrollbar"): 0xBA6}
+
+FUN_CAPTURE = 0x5E3DD0
 
 KINDS = {"area": (AREA_FIELDS, AREA_SIZE), "widget": (WIDGET_FIELDS, WIDGET_SIZE)}
 
@@ -86,6 +89,12 @@ class Scene:
                 continue
             self.ctx.original.write(self.addr(kind, index) + offset, struct.pack(f"<{len(items)}{fmt}", *items))
             self.ctx.port.send("set", kind, index, name, *items)
+
+    def capture_to(self, kind, index, which, box):
+        """Points an image pointer of a struct at a new capture of the screen, in both programs."""
+        original = self.ctx.original
+        original.write_u32(self.addr(kind, index) + IMAGES[kind, which], original.call(FUN_CAPTURE, *box, 0))
+        self.ctx.port.send("capture_to", kind, index, which, *box)
 
     def expect_same_image(self, case, kind, index, which):
         """Compares one image that a struct points to: size and pixels, or none on both sides."""

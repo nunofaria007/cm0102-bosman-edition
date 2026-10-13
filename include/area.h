@@ -34,7 +34,7 @@ typedef struct {
  */
 typedef struct area {
     s32 x1, y1, x2, y2;                   /* 0x000, on screen */
-    s32 row_offset;                       /* 0x010, added to a shown row */
+    s32 first_row;                        /* 0x010, lowest row of a widget */
     s32 last_row;                         /* 0x014, highest row of a widget */
     u32 flags;                            /* 0x018 */
     s32 column_x1[AREA_MAX_COLUMNS];      /* 0x01c, relative to x1 */
@@ -62,10 +62,17 @@ typedef struct area {
 
 /*
  * FUN_00403350. Splits the area into columns and rows by weight and sets up
- * the scrollbar when there are more rows than fit. The weights of two or
- * more columns or rows must not all be 0: the original divides by their sum.
+ * the scrollbar when there are more rows than fit. The original faults when
+ * the weights of two or more columns or rows are all 0.
  */
 void area_layout(area_t *area);
+
+/*
+ * FUN_00402e70. Draws the panel, then each widget that is in view at its
+ * place in the grid, then the scrollbar (FUN_00403c80). `redraw` drops the
+ * saved screens and captures them again.
+ */
+void area_draw(area_t *area, bool redraw);
 
 /* FUN_00403760. Top-left corner at which a popup area opens. */
 void area_popup_position(const area_t *area, s32 *x, s32 *y);

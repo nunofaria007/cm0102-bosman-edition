@@ -8,7 +8,7 @@ ELLIPSE = 0x10000        # not ported
 SHRINK, INSET = 0x20000, 0x40000
 
 # Colour globals of the original, in the order the port driver prints its constants.
-PALETTE = [0xAEBE04, 0xAEBDEC, 0xAEBDEA, 0xAE3184, 0xAEBDD4, 0xAE31A8]
+PALETTE = [0xAEBE04, 0xAEBDEC, 0xAEBDEA, 0xAE3184, 0xAEBDD4, 0xAE31A8, 0xAE317E]
 
 
 def test_palette(ctx):
@@ -62,9 +62,12 @@ def test_panel_bevel_limits(ctx):
         for height in (49, 50):
             for bottom in (99, 100):
                 for flags in (BORDER, FILL | BORDER, FILL | BORDER | 0x40):
-                    box = (200, bottom - height, 200 + width, bottom)
-                    _draw(ctx, box, flags, ctx.rng.randint(1, 0xFFFF))
-                    count += 1
+                    for moved in (0, SHRINK, INSET, SHRINK | INSET):
+                        # The rule applies to the box after the two flags move its sides.
+                        far, near = (2 if moved & SHRINK else 0), (2 if moved & INSET else 0)
+                        box = (200 - near, bottom - height - near, 200 + width + far, bottom + far)
+                        _draw(ctx, box, flags | moved, ctx.rng.randint(1, 0xFFFF))
+                        count += 1
     return count
 
 

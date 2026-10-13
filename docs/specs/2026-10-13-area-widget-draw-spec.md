@@ -31,7 +31,7 @@ Text stays out of this work. The widget calls a text function that does nothing 
 - Picture widgets share one cached image per file name, as the original does.
 - The colours that the original sets up at start (`FUN_005e4560`) are constants in the port, because they depend only on the pixel format. The differential test checks each constant against the original.
 - The ported primitives go in a new module named after gui_utils.cpp. The function addresses sit next to that file's asserts in the original, so the name is an inference from link order.
-- The existing drawing functions in the display module stay as they are in this work.
+- A separate fix, made between slices 1 and 2, replaced the image blit of the display module with a port of the original blit and made the RGN loader check the data size. An image that is partly off screen now draws nothing, as in the original, so the app no longer shows the 1280x800 background file.
 - Unicorn runs in a virtual environment outside the repo. The original stays outside the repo. The test takes its path as an argument.
 - Commits are local. Nothing is pushed.
 
@@ -49,7 +49,6 @@ The repo has no other tests.
 - The ellipse panel style, flag 0x10000 (`FUN_005e7840` and `FUN_005e7aa0`).
 - Mouse and keyboard handling for areas, widgets and scrollbars.
 - The screen manager's own functions in scrman.cpp.
-- Any change to the RGN display path of the current app.
 
 ## Open decisions
 
@@ -57,7 +56,7 @@ The repo has no other tests.
 ### 1. Test harness and basic primitives
 Blocked by: none
 Delivers: clip, colour scale, line, rectangle, darken, glyph table draw and screen capture in the port, each checked against the original.
-Merge danger: two-way door. Blast radius: none for the current app, because the RGN display path does not change.
+Merge danger: two-way door. Blast radius: none for the current app, because the slice adds code that the app does not call yet.
 - [x] The differential test passes for each primitive with random cases, including shapes that are partly off screen.
 - [x] The app still builds.
 
@@ -86,5 +85,5 @@ Merge danger: two-way door. Blast radius: limited to widget appearance.
 Blocked by: 4
 Delivers: a complete area on screen with panel, widgets, grid lines and scrollbar.
 Merge danger: two-way door. Blast radius: limited to area appearance.
-- [ ] Pixel-exact match for a scrolled area with widgets.
-- [ ] The app still builds and shows an RGN image.
+- [x] Pixel-exact match for a scrolled area with widgets.
+- [x] The app still builds and shows an RGN image.

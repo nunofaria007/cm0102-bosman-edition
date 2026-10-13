@@ -42,10 +42,11 @@ def _random_area(ctx):
             flags |= flag
     return {
         "x1": x1, "y1": y1,
-        "x2": x1 + ctx.rng.randint(30, 700), "y2": y1 + ctx.rng.randint(30, 500),
-        "row_offset": ctx.rng.randint(0, 5), "last_row": last_row, "flags": flags,
+        "x2": x1 + ctx.rng.choice([ctx.rng.randint(30, 700), ctx.rng.randint(0, 30)]),
+        "y2": y1 + ctx.rng.choice([ctx.rng.randint(30, 500), ctx.rng.randint(0, 50)]),
+        "first_row": ctx.rng.randint(0, 5), "last_row": last_row, "flags": flags,
         "scroll_to": ctx.rng.choice([-1, -1, ctx.rng.randint(-3, max(last_row, 0) + 3)]),
-        "index": 1, "first_visible": ctx.rng.randint(0, 9), "shown": 1,
+        "index": ctx.rng.randint(0, 249), "first_visible": ctx.rng.randint(0, 9), "shown": 1,
         "has_scrollbar": ctx.rng.randint(0, 1), "scrollbar.pressed": ctx.rng.randint(0, 2),
         **{f"scrollbar.{name}": ctx.rng.randint(-50, 900) for name in STALE_SCROLLBAR_FIELDS},
         "column_count": columns, "row_count": rows,
@@ -67,12 +68,18 @@ def test_area_layout(ctx):
         area["widget_count"] = len(members)
         area["owner_widget"] = ctx.rng.choice([-1, -1, ctx.rng.randrange(24)])
         scene.set("area", 1, area)
+        # The layout clears the saved screen of the scrollbar and leaves that of the area.
+        for which in ("saved", "scrollbar"):
+            if ctx.rng.random() < 0.5:
+                scene.capture_to("area", 1, which, (0, 0, 7, 5))
 
         ctx.original.error_lines.clear()
         ctx.original.call(FUN_AREA_LAYOUT, this=scene.addr("area", 1))
         ctx.port.send("layout", 1)
         errors.update(ctx.original.error_lines)
         scene.expect_same(f"layout case {case}", "area", 1)
+        for which in ("saved", "scrollbar"):
+            scene.expect_same_image(f"layout case {case}", "area", 1, which)
         if area["owner_widget"] != -1:
             scene.expect_same(f"layout case {case}", "widget", area["owner_widget"])
     ctx.expect_equal("error boxes seen in the original", {LINE_TOO_MANY_COLUMNS, LINE_TOO_MANY_ROWS},
