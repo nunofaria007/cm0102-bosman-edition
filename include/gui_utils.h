@@ -7,8 +7,8 @@
  * Basic drawing primitives of the original, ported from the functions at
  * 0x5e3680..0x5e4890 (gui_utils.cpp, inferred from link order).
  *
- * All coordinates are inclusive. A line, fill, darken, glyph table or
- * capture that is partly off screen does nothing. An outline rectangle
+ * All coordinates are inclusive. A line, fill, darken, glyph table, image
+ * or capture that is partly off screen does nothing. An outline rectangle
  * applies that rule to each side on its own.
  */
 
@@ -40,6 +40,9 @@ void gui_darken(s32 x1, s32 y1, s32 x2, s32 y2);
  * per pixel in row order. Non-zero bytes take the colour.
  */
 void gui_draw_glyph(s32 x, s32 y, u16 colour, const u8 *glyph);
+
+/* FUN_005e3fd0. Copies the whole image. Zero pixels are not transparent. */
+void gui_blit(s32 x, s32 y, const cm_image_t *img);
 
 /*
  * FUN_005e3dd0. Copies a screen box to an image. Fills `reuse` when it has

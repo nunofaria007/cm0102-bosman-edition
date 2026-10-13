@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern cm_image_t *rgn_load(const char *path);
 extern void rgn_free(cm_image_t *img);
 
 #define FB_PIXELS (CM_INTERNAL_WIDTH * CM_INTERNAL_HEIGHT)
@@ -72,6 +73,7 @@ int main(void)
 
     while (fgets(line, sizeof(line), stdin)) {
         char cmd[16];
+        char path[1024] = "";
         int used = 0;
         int a[8] = {0};
 
@@ -105,6 +107,16 @@ int main(void)
                 fprintf(stderr, "port_driver: bad glyph command\n");
                 return 1;
             }
+        } else if (!strcmp(cmd, "load")) {
+            sscanf(args, "%1023s", path);
+            cm_image_t *img = rgn_load(path);
+            print_image(img);
+            rgn_free(img);
+        } else if (!strcmp(cmd, "blit")) {
+            sscanf(args, "%*d %*d %1023s", path);
+            cm_image_t *img = rgn_load(path);
+            gui_blit(a[0], a[1], img);
+            rgn_free(img);
         } else if (!strcmp(cmd, "capture")) {
             cm_image_t *img = gui_capture(a[0], a[1], a[2], a[3], NULL);
             print_image(img);

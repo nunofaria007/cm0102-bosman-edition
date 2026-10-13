@@ -180,6 +180,20 @@ void gui_draw_glyph(s32 x, s32 y, u16 colour, const u8 *glyph)
     g_display.dirty = true;
 }
 
+void gui_blit(s32 x, s32 y, const cm_image_t *img)
+{
+    gui_rect_t c;
+
+    if (!img) return;
+    if (!gui_clip(x, y, x + img->width - 1, y + img->height - 1, &c)) return;
+
+    for (s32 row = 0; row < img->height; row++) {
+        memcpy(pixel_at(x, y + row), img->pixels + row * img->width,
+               (size_t)img->width * 2);
+    }
+    g_display.dirty = true;
+}
+
 cm_image_t *gui_capture(s32 x1, s32 y1, s32 x2, s32 y2, cm_image_t *reuse)
 {
     gui_rect_t c;

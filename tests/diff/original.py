@@ -32,8 +32,12 @@ G_SCREEN_W = 0xAEBE08
 G_SCREEN_H = 0xAEBDD0
 G_PIXEL_FORMAT = 0xAE3158    # DDPIXELFORMAT, 32 bytes
 
-# CRT function replaced with a host-side version.
+# CRT functions replaced with host-side versions.
+CRT_FREE = 0x9452CA
 CRT_CALLOC = 0x945501
+CRT_FCLOSE = 0x945A09
+CRT_FOPEN = 0x945B00
+CRT_FREAD = 0x945BFE
 
 # IDirectDrawSurface vtable slots used by the drawing code: slot -> stdcall argument bytes.
 SLOT_BLT, SLOT_LOCK, SLOT_UNLOCK = 0x14 // 4, 0x64 // 4, 0x80 // 4
@@ -69,8 +73,12 @@ class Original:
             uc.mem_write(stub, code)
         uc.hook_add(UC_HOOK_CODE, self._on_surface_call, begin=STUBS, end=STUBS + PAGE - 1)
 
-        uc.mem_write(CRT_CALLOC, b"\xc3")
-        uc.hook_add(UC_HOOK_CODE, self._on_calloc, begin=CRT_CALLOC, end=CRT_CALLOC)
+        self.files = {}
+        self._replace(CRT_CALLOC, 2, lambda count, size: self.alloc(count * size))
+        self._replace(CRT_FREE, 1, lambda block: 0)
+        self._replace(CRT_FOPEN, 2, self._fopen)
+        self._replace(CRT_FREAD, 4, self._fread)
+        self._replace(CRT_FCLOSE, 1, self._fclose)
 
         self.write_u32(G_DISPLAY_OFF, 0)
         self.write_u32(G_BACK_BUFFER, SURFACE)
@@ -105,6 +113,18 @@ class Original:
 
     def write_u32(self, addr, value):
         self.write(addr, struct.pack("<I", value & 0xFFFFFFFF))
+
+    def read_c_string(self, addr):
+        text = bytearray()
+        while (byte := self.read(addr + len(text), 1)) != b"\0":
+            text += byte
+        return text.decode()
+
+    def alloc_c_string(self, text):
+        data = text.encode() + b"\0"
+        addr = self.alloc(len(data))
+        self.write(addr, data)
+        return addr
 
     def alloc(self, size):
         addr = self.heap_top
@@ -178,6 +198,28 @@ class Original:
             return self._fail(f"unexpected IDirectDrawSurface call, vtable offset {slot * 4:#x}")
         uc.reg_write(UC_X86_REG_EAX, 0)
 
-    def _on_calloc(self, uc, address, size, user_data):
-        count, item_size = self._stack_args(2)
-        uc.reg_write(UC_X86_REG_EAX, self.alloc(count * item_size))
+    def _replace(self, addr, arg_count, host_function):
+        """Makes a cdecl function of the original return the result of a host function."""
+        def on_call(uc, address, size, user_data):
+            uc.reg_write(UC_X86_REG_EAX, host_function(*self._stack_args(arg_count)))
+        self.uc.mem_write(addr, b"\xc3")
+        self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
+
+    def _fopen(self, path, mode):
+        name = self.read_c_string(path)
+        try:
+            handle = open(name, "rb")
+        except OSError:
+            return 0
+        stream = self.alloc(4)
+        self.files[stream] = handle
+        return stream
+
+    def _fread(self, buffer, size, count, stream):
+        data = self.files[stream].read(size * count)
+        self.write(buffer, data)
+        return len(data) // size if size else 0
+
+    def _fclose(self, stream):
+        self.files.pop(stream).close()
+        return 0

@@ -55,7 +55,8 @@ cm_image_t *rgn_load(const char *path)
         return NULL;
     }
 
-    if (data_size <= 0 || data_size > w * h * 2) {
+    /* The original trusts data_size. Every shipped file has exactly this size. */
+    if (data_size != w * h * 2) {
         fclose(f);
         return NULL;
     }

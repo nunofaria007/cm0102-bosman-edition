@@ -90,13 +90,6 @@ def test_darken(ctx):
     return len(boxes)
 
 
-def _glyph_origin(ctx, size, limit):
-    """Often puts the glyph table flush with the far screen edge, or one pixel either side."""
-    if ctx.rng.random() < 0.3:
-        return limit - size + ctx.rng.choice([-1, 0, 1])
-    return ctx.coord(limit)
-
-
 def test_draw_glyph(ctx):
     ctx.sync_framebuffer(4)
     tables = []
@@ -109,8 +102,8 @@ def test_draw_glyph(ctx):
         tables.append(bytes([width, height]) + body)
     scratch = ctx.original.alloc(2 + 24 * 24)
     for table in tables:
-        x = _glyph_origin(ctx, table[0], WIDTH)
-        y = _glyph_origin(ctx, table[1], HEIGHT)
+        x = ctx.origin(table[0], WIDTH)
+        y = ctx.origin(table[1], HEIGHT)
         colour = ctx.colour()
         ctx.original.write(scratch, table)
         ctx.original.call(FUN_DRAW_GLYPH, x, y, colour, scratch)

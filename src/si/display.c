@@ -127,27 +127,6 @@ void display_fill_rect(s32 x, s32 y, s32 w, s32 h, u16 colour)
     g_display.dirty = true;
 }
 
-void display_blit_image(s32 dest_x, s32 dest_y, const cm_image_t *img)
-{
-    if (!img || !img->pixels) return;
-
-    for (s32 row = 0; row < img->height; row++) {
-        s32 dy = dest_y + row;
-        if (dy < 0 || dy >= CM_INTERNAL_HEIGHT) continue;
-
-        for (s32 col = 0; col < img->width; col++) {
-            s32 dx = dest_x + col;
-            if (dx < 0 || dx >= CM_INTERNAL_WIDTH) continue;
-
-            u16 pixel = img->pixels[row * img->width + col];
-            if (pixel != 0) {
-                g_display.framebuffer[dy * CM_INTERNAL_WIDTH + dx] = pixel;
-            }
-        }
-    }
-    g_display.dirty = true;
-}
-
 void display_blit_region(s32 dx, s32 dy, s32 sx, s32 sy,
                          s32 w, s32 h, const cm_image_t *img)
 {

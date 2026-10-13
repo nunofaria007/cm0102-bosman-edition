@@ -1,5 +1,6 @@
 #include "cm_types.h"
 #include "display.h"
+#include "gui_utils.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
         if (bg) {
             printf("Loaded RGN: %dx%d, data_size=%d, g_mask=0x%04x\n",
                    bg->width, bg->height, bg->data_size, bg->g_mask);
-            display_blit_image(0, 0, bg);
+            gui_blit(0, 0, bg);
         } else {
             fprintf(stderr, "Failed to load: %s\n", argv[1]);
         }

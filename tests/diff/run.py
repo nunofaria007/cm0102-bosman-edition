@@ -9,10 +9,11 @@ import random
 import subprocess
 import sys
 
+import cases_images
 import cases_primitives
 from original import FB_SIZE, HEIGHT, WIDTH, Original
 
-SUITES = [cases_primitives]
+SUITES = [cases_primitives, cases_images]
 
 
 class Mismatch(Exception):
@@ -71,6 +72,12 @@ class Context:
     def y(self):
         return self.coord(HEIGHT)
 
+    def origin(self, size, limit):
+        """Often puts a shape of this size flush with the far screen edge, or one pixel either side."""
+        if self.rng.random() < 0.3:
+            return limit - size + self.rng.choice([-1, 0, 1])
+        return self.coord(limit)
+
     def colour(self):
         return self.rng.choice([0x0000, 0xFFFF, self.rng.randint(0, 0xFFFF)])
 
@@ -79,9 +86,9 @@ class Context:
         self.port.send("fill", seed)
         self.original.set_framebuffer(self.port.framebuffer())
 
-    def expect_equal(self, case, original_value, port_value):
-        if original_value != port_value:
-            raise Mismatch(f"{case}: original {repr(original_value)[:200]}, port {repr(port_value)[:200]}")
+    def expect_equal(self, case, wanted, port_value, source="original"):
+        if wanted != port_value:
+            raise Mismatch(f"{case}: {source} {repr(wanted)[:200]}, port {repr(port_value)[:200]}")
 
     def expect_same_framebuffer(self, case):
         a = self.original.framebuffer()
