@@ -100,6 +100,10 @@ int main(void)
             gui_line(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
         } else if (!strcmp(cmd, "rect")) {
             gui_rect(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
+        } else if (!strcmp(cmd, "palette")) {
+            printf("%u %u\n", GUI_COLOUR_NAVY, GUI_COLOUR_YELLOW);
+        } else if (!strcmp(cmd, "panel")) {
+            gui_panel(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
         } else if (!strcmp(cmd, "darken")) {
             gui_darken(a[0], a[1], a[2], a[3]);
         } else if (!strcmp(cmd, "glyph")) {

@@ -160,6 +160,116 @@ void gui_darken(s32 x1, s32 y1, s32 x2, s32 y2)
     g_display.dirty = true;
 }
 
+static u16 or_navy(u16 colour)
+{
+    return colour ? colour : GUI_COLOUR_NAVY;
+}
+
+/* The original divides by the span, so it faults when the span is 0. */
+static void panel_gradient(s32 x1, s32 y1, s32 x2, s32 y2, bool across,
+                           u16 colour)
+{
+    s32 span = across ? x2 - x1 : y2 - y1;
+
+    for (s32 i = 0; span > 0 && i <= span; i++) {
+        u16 shade = gui_scale_colour(colour, (u8)(100 - 100 * i / span));
+
+        if (across) {
+            gui_line(x1 + i, y1, x1 + i, y2, GUI_LINE_SOLID, shade);
+        } else {
+            gui_line(x1, y1 + i, x2, y1 + i, GUI_LINE_SOLID, shade);
+        }
+    }
+}
+
+static void panel_bevel(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, u16 colour)
+{
+    bool thick = x2 - x1 >= 50 && y2 - y1 >= 50 && y2 <= 99 &&
+                 (flags & GUI_PANEL_FILL);
+    s32 rings = thick ? 4 : 2;
+
+    for (s32 ring = 1; ring <= rings; ring++) {
+        s32 inset = rings - ring;
+        s32 left = x1 + inset, top = y1 + inset;
+        s32 right = x2 - inset, bottom = y2 - inset;
+        s32 step = 66 * ring / rings;
+        u16 lit = gui_scale_colour(or_navy(colour), (u8)(100 + step));
+        u16 shaded = gui_scale_colour(colour, (u8)(100 - step));
+
+        if (flags & GUI_PANEL_SUNKEN) {
+            u16 t = lit;
+            lit = shaded;
+            shaded = t;
+        }
+        gui_line(left, top, right, top, GUI_LINE_SOLID, lit);
+        gui_line(left, top, left, bottom, GUI_LINE_SOLID, lit);
+        gui_line(right, bottom, left + 1, bottom, GUI_LINE_SOLID, shaded);
+        gui_line(right, bottom, right, top + 1, GUI_LINE_SOLID, shaded);
+    }
+}
+
+void gui_panel(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, u16 colour)
+{
+    gui_rect_t c;
+    u32 pen = flags & GUI_PANEL_DASHED ? GUI_LINE_DASHED : GUI_LINE_SOLID;
+    bool ellipse = (flags & GUI_PANEL_ELLIPSE) != 0;
+
+    if (flags & GUI_PANEL_SHRINK) {
+        x2 -= 2;
+        y2 -= 2;
+    }
+    if (flags & GUI_PANEL_INSET) {
+        x1 += 2;
+        y1 += 2;
+    }
+    if (flags & GUI_PANEL_SAMPLE_COLOUR) {
+        colour = gui_clip(x1, y1, x1, y1, &c) ? *pixel_at(x1, y1) : 0;
+    }
+
+    if (flags & GUI_PANEL_DARKEN) {
+        gui_darken(x1, y1, x2, y2);
+    } else if (flags & GUI_PANEL_FILL) {
+        if (!ellipse) gui_rect(x1, y1, x2, y2, GUI_RECT_FILL, colour);
+    } else if (flags & GUI_PANEL_GRADIENT_H) {
+        panel_gradient(x1, y1, x2, y2, true, colour);
+    } else if (flags & GUI_PANEL_GRADIENT_V) {
+        panel_gradient(x1, y1, x2, y2, false, colour);
+    }
+
+    if (flags & GUI_PANEL_BORDER) {
+        if (ellipse) {
+            /* Not ported. */
+        } else if (flags & GUI_PANEL_FLAT) {
+            gui_rect(x1, y1, x2, y2, pen, colour);
+        } else {
+            panel_bevel(x1, y1, x2, y2, flags, colour);
+        }
+    } else if (flags & GUI_PANEL_UNDERLINE) {
+        gui_line(x1 + 2, y2, x2 - 2, y2, GUI_LINE_DASHED,
+                 gui_scale_colour(or_navy(colour), 90));
+    } else if (flags & GUI_PANEL_LINE) {
+        if (!(flags & GUI_PANEL_LINE_H)) {
+            gui_line(x1, y1, x2, y2, pen, colour);
+        } else {
+            s32 y = flags & GUI_PANEL_LINE_TOP ? y1 : (y2 - y1) / 2 + y1;
+            gui_line(x1, y, x2, y, pen, colour);
+        }
+    }
+
+    if (flags & GUI_PANEL_GROOVE) {
+        s32 y = (y2 - y1) / 2 + y1;
+
+        gui_line(x1 + 2, y, x2 - 2, y, GUI_LINE_SOLID,
+                 gui_scale_colour(colour, 66));
+        gui_line(x1 + 2, y + 1, x2 - 2, y + 1, GUI_LINE_SOLID,
+                 gui_scale_colour(or_navy(colour), 133));
+    }
+    if (flags & GUI_PANEL_OUTER_OUTLINE) {
+        gui_rect(x1 - 1, y1 - 1, x2 + 1, y2 + 1, GUI_LINE_SOLID,
+                 GUI_COLOUR_YELLOW);
+    }
+}
+
 void gui_draw_glyph(s32 x, s32 y, u16 colour, const u8 *glyph)
 {
     gui_rect_t c;

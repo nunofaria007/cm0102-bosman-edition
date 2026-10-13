@@ -10,10 +10,11 @@ import subprocess
 import sys
 
 import cases_images
+import cases_panel
 import cases_primitives
 from original import FB_SIZE, HEIGHT, WIDTH, Original
 
-SUITES = [cases_primitives, cases_images]
+SUITES = [cases_primitives, cases_images, cases_panel]
 
 
 class Mismatch(Exception):

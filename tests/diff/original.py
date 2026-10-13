@@ -32,6 +32,8 @@ G_SCREEN_W = 0xAEBE08
 G_SCREEN_H = 0xAEBDD0
 G_PIXEL_FORMAT = 0xAE3158    # DDPIXELFORMAT, 32 bytes
 
+FUN_INIT_PALETTE = 0x5E4560  # sets the colour globals from the pixel format
+
 # CRT functions replaced with host-side versions.
 CRT_FREE = 0x9452CA
 CRT_CALLOC = 0x945501
@@ -85,6 +87,7 @@ class Original:
         self.write_u32(G_SCREEN_W, WIDTH)
         self.write_u32(G_SCREEN_H, HEIGHT)
         uc.mem_write(G_PIXEL_FORMAT, struct.pack("<8I", 32, 0x40, 0, 16, 0xF800, 0x07E0, 0x001F, 0))
+        self.call(FUN_INIT_PALETTE)
 
     def _load_pe(self, path):
         with open(path, "rb") as exe:

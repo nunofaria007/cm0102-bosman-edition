@@ -26,6 +26,7 @@ Text stays out of this work. The widget calls a text function that does nothing 
 - The port keeps the clip rule of the original. A line, fill, darken, glyph table or capture does nothing when any part of it is off screen. An outline rectangle applies that rule to each side on its own, so the sides that are fully on screen still draw.
 - The port always uses RGB565. The original also supports RGB555 at run time. The port drops that branch, because the RGN loader already converts images to RGB565.
 - The eight glyph tables for scroll arrows and popup arrows are copied from the original into the source.
+- The colours that the original sets up at start (`FUN_005e4560`) are constants in the port, because they depend only on the pixel format. The differential test checks each constant against the original.
 - The ported primitives go in a new module named after gui_utils.cpp. The function addresses sit next to that file's asserts in the original, so the name is an inference from link order.
 - The existing drawing functions in the display module stay as they are in this work.
 - Unicorn runs in a virtual environment outside the repo. The original stays outside the repo. The test takes its path as an argument.
@@ -62,8 +63,8 @@ Merge danger: two-way door. Blast radius: none for the current app, because the 
 Blocked by: 1
 Delivers: panel draw for every style flag except the ellipse flag 0x10000.
 Merge danger: two-way door. Blast radius: a wrong reading of a flag gives wrong borders on every later screen.
-- [ ] Pixel-exact match for each flag alone.
-- [ ] Pixel-exact match for random sets of flags.
+- [x] Pixel-exact match for each flag alone.
+- [x] Pixel-exact match for random sets of flags.
 
 ### 3. Area structs and layout
 Blocked by: none

@@ -19,6 +19,31 @@ typedef struct {
 /* gui_line tests GUI_LINE_SOLID only. Without it the line is dashed. */
 #define GUI_LINE_DASHED 1
 #define GUI_LINE_SOLID  2
+#define GUI_RECT_FILL   4
+
+/* Colours that FUN_005e4560 sets up for an RGB565 display. */
+#define GUI_COLOUR_NAVY   0x0010 /* DAT_00aebe04, stands in for colour 0 */
+#define GUI_COLOUR_YELLOW 0xffe0 /* DAT_00aebdec */
+
+/* Panel flags. An area and a widget pass their style word straight through. */
+#define GUI_PANEL_DARKEN        0x00000002 /* background to 60 percent */
+#define GUI_PANEL_GRADIENT_H    0x00000004 /* fades to black, left to right */
+#define GUI_PANEL_GRADIENT_V    0x00000008 /* fades to black, top to bottom */
+#define GUI_PANEL_FILL          0x00000010
+#define GUI_PANEL_BORDER        0x00000020 /* bevel, or outline if flat */
+#define GUI_PANEL_SUNKEN        0x00000040 /* swaps the bevel shades */
+#define GUI_PANEL_UNDERLINE     0x00000080
+#define GUI_PANEL_FLAT          0x00000200
+#define GUI_PANEL_LINE          0x00000400 /* corner to corner */
+#define GUI_PANEL_OUTER_OUTLINE 0x00000800 /* yellow, one pixel outside */
+#define GUI_PANEL_SAMPLE_COLOUR 0x00001000 /* colour of the top-left pixel */
+#define GUI_PANEL_DASHED        0x00002000 /* for the outline and the line */
+#define GUI_PANEL_LINE_H        0x00004000 /* the line runs across the middle */
+#define GUI_PANEL_LINE_TOP      0x00008000 /* the line runs across the top */
+#define GUI_PANEL_ELLIPSE       0x00010000 /* FUN_005e7840, not ported */
+#define GUI_PANEL_SHRINK        0x00020000 /* right and bottom move in by 2 */
+#define GUI_PANEL_INSET         0x00040000 /* left and top move in by 2 */
+#define GUI_PANEL_GROOVE        0x01000000 /* two-tone line across the middle */
 
 /* FUN_005e3680. Orders and clamps the box. Returns false if it clamped. */
 bool gui_clip(s32 x1, s32 y1, s32 x2, s32 y2, gui_rect_t *out);
@@ -34,6 +59,9 @@ void gui_rect(s32 x1, s32 y1, s32 x2, s32 y2, u32 style, u16 colour);
 
 /* FUN_005e42e0. Scales every pixel in the box to 60 percent. */
 void gui_darken(s32 x1, s32 y1, s32 x2, s32 y2);
+
+/* FUN_005e5df0. Draws the background first, then the border or line. */
+void gui_panel(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, u16 colour);
 
 /*
  * FUN_005e3ce0. A glyph table is a width byte, a height byte, then one byte
