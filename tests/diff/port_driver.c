@@ -4,10 +4,10 @@
  */
 #include "display.h"
 #include "gui_font.h"
+#include "gui_text.h"
 #include "gui_utils.h"
 #include "port_driver.h"
 #include "port_scene.h"
-#include "port_text.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -161,8 +161,9 @@ int main(void)
                           a[4]);
         } else if (!strcmp(cmd, "put")) {
             display_put_pixel(a[0], a[1], (u16)a[2]);
-        } else if (!strcmp(cmd, "text_calls")) {
-            text_print_calls();
+        } else if (!strcmp(cmd, "text")) {
+            gui_text(a[0], a[1], a[2], a[3], (u32)a[4], (s16)a[5], (u16)a[6],
+                     read_text(args), a[7]);
         } else if (!strcmp(cmd, "darken")) {
             gui_darken(a[0], a[1], a[2], a[3]);
         } else if (!strcmp(cmd, "glyph")) {

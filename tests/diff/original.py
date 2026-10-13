@@ -18,6 +18,7 @@ EXPECTED_SHA256 = "0c78e7da6d0bcb4603fa179449bbe6d1b6b5e1c627a22c445d14d489bd9bf
 
 PAGE = 0x1000
 STACK_BASE, STACK_SIZE = 0x20000000, 0x100000
+CLEAN_STACK = 0x10000        # zeroed below the stack top before each call
 HEAP_BASE, HEAP_SIZE = 0x30000000, 0x1000000
 RETURN_ADDR = 0x40000000
 FB_BASE = 0x50000000
@@ -42,6 +43,11 @@ G_FONT_MODE = 0x9CC2C4
 G_FONTS = 0xAE1DAC
 FONT_SIZE = 0x1404
 FUN_FONT_LOAD = 0x5E4BA0     # (font number, path)
+
+# The text function reads parts of its stack frame that it never set, when a text wraps to three
+# or more lines. What it finds there is whatever its callers left. The test makes it zeros.
+FUN_TEXT = 0x5E6D80
+TEXT_FRAME = 0x400
 FONT_FILES = {1: "arial_narrow_10.fnt", 2: "arial_narrow_11.fnt", 3: "arial_14.fnt", 4: "arial_16.fnt",
               5: "arial_18.fnt", 6: "trade_cond_24_bold.fnt", 7: "trade_cond_28_bold.fnt"}
 
@@ -61,9 +67,6 @@ CRT_SPRINTF = 0x944C9F
 # place, FUN_005e8290(title, message, 0) shows it.
 FUN_ERROR_PLACE = 0x90D130
 FUN_ERROR_BOX = 0x5E8290
-
-# Text draw is not ported. The test records the calls on both sides.
-FUN_TEXT = 0x5E6D80
 
 # IDirectDrawSurface vtable slots used by the drawing code: slot -> stdcall argument bytes.
 SLOT_BLT, SLOT_LOCK, SLOT_UNLOCK = 0x14 // 4, 0x64 // 4, 0x80 // 4
@@ -112,9 +115,8 @@ class Original:
         self._replace(CRT_FREAD, 4, self._fread)
         self._replace(CRT_FCLOSE, 1, self._fclose)
         self._replace(CRT_SPLITPATH, 0, lambda: 0)
-        self._replace(CRT_SPRINTF, 3, self._sprintf)
-        self.text_calls = []
-        self._replace(FUN_TEXT, 9, self._text)
+        self._replace(CRT_SPRINTF, 8, self._sprintf)
+        uc.hook_add(UC_HOOK_CODE, self._on_text_entry, begin=FUN_TEXT, end=FUN_TEXT)
         self.error_lines = []
         self._replace(FUN_ERROR_PLACE, 3, lambda name, ext, line: self.error_lines.append(line) or 0)
         self._replace(FUN_ERROR_BOX, 0, lambda: 0)
@@ -208,6 +210,8 @@ class Original:
     def call(self, addr, *args, this=0):
         """Calls a cdecl function, or a thiscall function with `this`. Returns EAX as a signed number."""
         sp = STACK_BASE + STACK_SIZE - 0x1000
+        # Some functions of the original read stack memory that they never set.
+        self.write(sp - CLEAN_STACK, bytes(CLEAN_STACK))
         for arg in reversed(args):
             sp -= 4
             self.write_u32(sp, arg)
@@ -259,6 +263,9 @@ class Original:
             return self._fail(f"unexpected IDirectDrawSurface call, vtable offset {slot * 4:#x}")
         uc.reg_write(UC_X86_REG_EAX, 0)
 
+    def _on_text_entry(self, uc, address, size, user_data):
+        self.write(uc.reg_read(UC_X86_REG_ESP) - TEXT_FRAME, bytes(TEXT_FRAME))
+
     def _replace(self, addr, arg_count, host_function):
         """Makes a cdecl function of the original return the result of a host function."""
         def on_call(uc, address, size, user_data):
@@ -266,17 +273,17 @@ class Original:
         self.uc.mem_write(addr, b"\xc3")
         self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
 
-    def _sprintf(self, buffer, text_format, value):
-        """Enough of sprintf for the one format the drawing code needs."""
-        one_char = self.read_c_string(text_format) == "%c"
-        self.write(buffer, bytes([value & 0xFF, 0]) if one_char else b"\0")
-        return 1 if one_char else 0
-
-    def _text(self, x1, y1, x2, y2, flags, colour, second_colour, text, param):
-        signed = struct.unpack("<5i", struct.pack("<5I", x1, y1, x2, y2, param))
-        self.text_calls.append((*signed[:4], flags, colour & 0xFFFF, second_colour & 0xFFFF, signed[4],
-                                self.read_c_string(text).encode("latin-1")))
-        return 0
+    def _sprintf(self, buffer, text_format, *values):
+        """Enough of sprintf for the formats the drawing code needs: plain text and %c."""
+        pieces = self.read_c_string(text_format).split("%c")
+        if any("%" in piece for piece in pieces):
+            self.write(buffer, b"\0")
+            return 0
+        text = pieces[0]
+        for value, piece in zip(values, pieces[1:]):
+            text += chr(value & 0xFF) + piece
+        self.write(buffer, text.encode("latin-1") + b"\0")
+        return len(text)
 
     def _fopen(self, path, mode):
         name = self.read_c_string(path)

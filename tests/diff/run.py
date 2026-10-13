@@ -55,15 +55,6 @@ class Port:
         self.send("dump")
         return self.read(FB_SIZE)
 
-    def text_calls(self):
-        """The calls to the text function since the last time, in the form original.py records."""
-        self.send("text_calls")
-        calls = []
-        for _ in range(int(self.reply()[0])):
-            *numbers, text = self.reply()
-            calls.append((*[int(v) for v in numbers], bytes.fromhex(text[1:].decode())))
-        return calls
-
     def close(self):
         self.proc.stdin.close()
         self.proc.wait()

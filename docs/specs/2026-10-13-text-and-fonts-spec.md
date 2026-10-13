@@ -29,6 +29,9 @@ The original has a second text path through the T2K font engine, and it is the d
 - The original loads the seven files into fonts 1 to 7. It has no font 0: the place that its code works out for font 0 holds the pixel format and the palette, so text in font 0 is undefined there. The port keeps font 0 empty, and text in font 0 draws nothing. The differential test leaves font 0 out of text cases.
 - The two Trade Condensed fonts copy some glyphs to other character codes after the load, as the original does.
 - A character code above 0xff, which a `#xxxx#` code can give, reads past the glyphs of the font in the original. The port gives such a character no glyph and no width.
+- The text function of the original has a fault in its wrap. To find the last space, it uses the place of the character in the whole text as an index into the current line. The first line is right. For a later line, the search starts past the end of the line, so it can find a space left over from the first line. The line then stays too wide and words of the first line appear again. The port does the same, and a test covers it.
+- Past those left-over bytes, the search of the original reads stack memory that the function never set. What is there depends on the functions that ran before. The port reads zeros there. The differential test sets that part of the stack to zeros when the original enters its text function. Without this, 10 of 2400 random widget draws differ from the port. All ten wrap to three or more lines.
+- The port uses the first 251 characters of a text. The line buffer of the original has 252 bytes, and a longer text writes past it.
 - The app takes the game data folder from a `--data <folder>` argument. The default is `./Data`.
 - The app gets a `--demo` argument that draws one area with widgets and text. It is a developer aid and not part of the original.
 - The differential test sets the font global of the original to -1 and loads the fonts with the loader of the original.
@@ -72,8 +75,8 @@ Merge danger: two-way door. Blast radius: wrong widths move all centred, right-a
 Blocked by: 2
 Delivers: wrap, line breaks, alignment, password stars and the embossed style. Replaces the empty text function. The widget and area tests draw real text.
 Merge danger: two-way door. Blast radius: limited to text.
-- [ ] Pixel-exact match for random text and flags.
-- [ ] The widget and area tests compare pixels with real text, with no recorder.
+- [x] Pixel-exact match for random text and flags.
+- [x] The widget and area tests compare pixels with real text, with no recorder.
 
 ### 4. Demo screen
 Blocked by: 3

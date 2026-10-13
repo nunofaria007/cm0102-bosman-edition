@@ -17,6 +17,20 @@ POPUP_FLAGS = [0x100, 0x100000, 0x200000, 0x400000, 0x800000]
 OFFSET_PICTURE = 0x5C
 
 
+# The original has no font 0, so no case uses it.
+TEXT_FONTS = [-1, 1, 2, 3, 4, 5, 6, 7]
+TEXTS = [b"", b"Arsenal", b"1\x01hidden", b"\x01", b"a\x01b\x01c", b"Manchester United v Liverpool",
+         b"Yes\nNo", b"Caf#00e9# au lait", b"Goals|For", b"the quick brown fox jumps over the lazy dog"]
+
+
+def text_flags(ctx):
+    """Any flags, with the ones the text function knows more often set than not."""
+    flags = ctx.rng.getrandbits(32) & ctx.rng.getrandbits(32)
+    for flag in (0x1, 0x2, 0x20, 0x40, 0x80, 0x100):
+        flags = flags | flag if ctx.rng.random() < 0.3 else flags & ~flag
+    return flags
+
+
 def _text(value):
     return list(value) + [0]
 
@@ -42,23 +56,20 @@ def _random_widget(ctx):
         "x1": box[0], "y1": box[1], "x2": box[2], "y2": box[3],
         "flags": _some(ctx, OTHER_FLAGS, 0.25), "style": _style(ctx, box),
         "colour": ctx.colour(), "highlight_colour": ctx.colour(),
-        "font": ctx.rng.randint(-1, 7), "text_colour": ctx.colour(),
-        "text_flags": ctx.rng.getrandbits(32), "cursor": ctx.rng.randint(-5, 500),
-        "text": _text(ctx.rng.choice([b"", b"Arsenal", b"1\x01hidden", b"\x01", b"a\x01b\x01c"])),
+        "font": ctx.rng.choice(TEXT_FONTS), "text_colour": ctx.colour(),
+        "text_flags": text_flags(ctx), "cursor": ctx.rng.choice([-1, -1, ctx.rng.randint(0, 12)]),
+        "text": _text(ctx.rng.choice(TEXTS)),
         "lighten_once": ctx.rng.choice([0, 0, 1]), "highlighted": ctx.rng.choice([0, 0, 1]),
         "area": ctx.rng.choice([0, -1]), "popup_area": -1,
     }
 
 
 def _draw(ctx, scene, index, redraw, case):
-    ctx.original.text_calls.clear()
-    ctx.port.text_calls()
     ctx.original.call(FUN_WIDGET_DRAW, redraw, this=scene.addr("widget", index))
     ctx.port.send("draw_widget", index, redraw)
     ctx.expect_same_framebuffer(case)
     scene.expect_same(case, "widget", index)
     scene.expect_same_image(case, "widget", index, "saved")
-    ctx.expect_equal(f"{case}: text calls", ctx.original.text_calls, ctx.port.text_calls())
 
 
 def test_widget_draw(ctx):

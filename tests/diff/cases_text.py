@@ -5,6 +5,9 @@ from original import HEIGHT, WIDTH
 
 FUN_LINE_WIDTH = 0x5E5AD0   # (font, text)
 FUN_DRAW_LINE = 0x5E5160    # (x, y, font, colour, text, cursor)
+FUN_TEXT = 0x5E6D80         # (x1, y1, x2, y2, flags, font, colour, text, cursor)
+
+LEFT, TOP, EMBOSS, RIGHT, PASSWORD, WRAP = 0x1, 0x2, 0x20, 0x40, 0x80, 0x100
 
 FONTS = [1, 2, 3, 4, 5, 6, 7]
 CODE = re.compile(rb"#([0-9a-fA-F]{4})#")
@@ -105,7 +108,75 @@ def test_draw_line_blend_reuse(ctx):
     return count
 
 
+def random_words(ctx, max_words):
+    """Words with spaces between them, and now and then a line break, a bar, a hash or a character code."""
+    letters = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPW il.,'-0123456789"
+    words = []
+    for _ in range(ctx.rng.randint(0, max_words)):
+        word = bytes(ctx.rng.choice(letters) for _ in range(ctx.rng.randint(1, 9)))
+        roll = ctx.rng.random()
+        if roll < 0.06:
+            word += b"\n"
+        elif roll < 0.10:
+            word += b"#00e9#"
+        elif roll < 0.13:
+            word = b"#" + word
+        elif roll < 0.16:
+            word += b"|"
+        words.append(word)
+    return ctx.rng.choice([b" ", b" ", b" ", b"  "]).join(words)[:240]
+
+
+def _flags(ctx):
+    flags = ctx.rng.getrandbits(32) & ctx.rng.getrandbits(32)
+    for flag, chance in ((LEFT, 0.3), (TOP, 0.3), (EMBOSS, 0.15), (RIGHT, 0.3), (PASSWORD, 0.1), (WRAP, 0.6)):
+        flags = flags | flag if ctx.rng.random() < chance else flags & ~flag
+    return flags
+
+
+def test_text_box(ctx):
+    ctx.sync_framebuffer(22)
+    for case in range(2500):
+        ctx.original.reset_heap()
+        x1, y1 = ctx.rng.randint(0, 500), ctx.rng.randint(0, 420)
+        box = (x1, y1, x1 + ctx.rng.choice([ctx.rng.randint(20, 290), ctx.rng.randint(1, 60)]),
+               y1 + ctx.rng.randint(5, 170))
+        font = ctx.rng.choice(FONTS + FONTS + [-1])
+        text = ctx.rng.choice([random_words(ctx, 14), random_words(ctx, 40), random_text(ctx, 30)])
+        flags, colour = _flags(ctx), ctx.colour()
+        cursor = ctx.rng.choice([-1, -1, -1, ctx.rng.randint(0, 20)])
+        ctx.original.call(FUN_TEXT, *box, flags, font, colour, ctx.original.alloc_bytes(text + b"\0"), cursor)
+        ctx.port.send("text", *box, flags, font, colour, cursor, as_word(text))
+        ctx.expect_same_framebuffer(f"text {text!r} in {box} flags {flags:#x} font {font} cursor {cursor}")
+    return case + 1
+
+
+def test_text_box_wrap_quirk(ctx):
+    """A third line whose text is shorter than the first. The original then finds a space of the first
+    line beyond the end of the current line, leaves the line too wide and repeats words."""
+    ctx.sync_framebuffer(23)
+    texts = [b"iiii iiii iiii iiii iiii WWWWWW WWWWWW WWWWWW WWWWWW ii ii ii",
+             b"one two three four five six SEVENSEVEN EIGHTEIGHT NINENINE ten eleven twelve",
+             b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+             b"a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R",
+             b"word #00e9##00e9##00e9##00e9##00e9##00e9##00e9##00e9##00e9##00e9##00e9##00e9# end of it"]
+    count = 0
+    for text in texts:
+        for font in (1, 3, 5):
+            for width in (60, 110, 170):
+                box = (100, 50, 100 + width, 450)
+                ctx.sync_framebuffer(23)
+                ctx.original.call(FUN_TEXT, *box, WRAP | TOP | LEFT, font, 0xFFFF,
+                                  ctx.original.alloc_bytes(text + b"\0"), -1)
+                ctx.port.send("text", *box, WRAP | TOP | LEFT, font, 0xFFFF, -1, as_word(text))
+                ctx.expect_same_framebuffer(f"wrap of {text[:20]!r} in font {font}, width {width}")
+                count += 1
+    return count
+
+
 TESTS = [
+    ("text_box", test_text_box),
+    ("text_box_wrap_quirk", test_text_box_wrap_quirk),
     ("line_width", test_line_width),
     ("draw_line", test_draw_line),
     ("draw_line_blend_reuse", test_draw_line_blend_reuse),

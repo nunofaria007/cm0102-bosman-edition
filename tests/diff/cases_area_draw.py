@@ -1,7 +1,7 @@
 """Cases for area draw and scrollbar draw."""
 from cases_area import FUN_AREA_LAYOUT, _weights
 from cases_panel import ELLIPSE, divides_by_zero
-from cases_widget import OTHER_FLAGS, _some, _text
+from cases_widget import OTHER_FLAGS, TEXT_FONTS, TEXTS, _some, _text, text_flags
 from scene import Scene
 
 FUN_AREA_DRAW = 0x402E70
@@ -31,9 +31,9 @@ def _member(ctx, columns, total_rows):
         "column": ctx.rng.randrange(columns), "row": ctx.rng.randrange(total_rows),
         "flags": _some(ctx, OTHER_FLAGS, 0.2), "style": style | ctx.rng.choice([0, 0x20, 0x30]),
         "colour": ctx.colour(), "highlight_colour": ctx.colour(),
-        "font": ctx.rng.randint(-1, 7), "text_colour": ctx.colour(),
-        "text_flags": ctx.rng.getrandbits(32), "cursor": ctx.rng.randint(-5, 500),
-        "text": _text(ctx.rng.choice([b"", b"Arsenal", b"1\x01hidden"])),
+        "font": ctx.rng.choice(TEXT_FONTS), "text_colour": ctx.colour(),
+        "text_flags": text_flags(ctx), "cursor": ctx.rng.choice([-1, -1, ctx.rng.randint(0, 12)]),
+        "text": _text(ctx.rng.choice(TEXTS)),
         "lighten_once": ctx.rng.choice([0, 0, 0, 1]), "highlighted": ctx.rng.choice([0, 0, 0, 1]),
         "area": AREA, "popup_area": -1,
     }
@@ -58,8 +58,6 @@ def _layout(ctx, scene):
 
 
 def _draw(ctx, scene, members, redraw, case):
-    ctx.original.text_calls.clear()
-    ctx.port.text_calls()
     ctx.original.call(FUN_AREA_DRAW, redraw, this=scene.addr("area", AREA))
     ctx.port.send("draw_area", AREA, redraw)
     ctx.expect_same_framebuffer(case)
@@ -69,7 +67,6 @@ def _draw(ctx, scene, members, redraw, case):
     for widget in members:
         scene.expect_same(case, "widget", widget)
         scene.expect_same_image(case, "widget", widget, "saved")
-    ctx.expect_equal(f"{case}: text calls", ctx.original.text_calls, ctx.port.text_calls())
 
 
 def test_area_draw(ctx):

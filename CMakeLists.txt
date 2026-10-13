@@ -28,12 +28,12 @@ target_link_libraries(cm0102 PRIVATE ${SDL2_LIBRARIES})
 add_executable(port_driver
     tests/diff/port_driver.c
     tests/diff/port_scene.c
-    tests/diff/port_text.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
     src/si/gui_glyphs.c
     src/si/gui_font.c
+    src/si/gui_text.c
     src/si/os_compat.c
     src/si/guio.c
     src/si/area.c
