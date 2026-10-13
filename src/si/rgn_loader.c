@@ -4,60 +4,99 @@
 #include <string.h>
 
 /*
- * RGN is SI's proprietary image format.
- * Header layout (from RE of FUN_005e3fd0 and related blitters):
- *   offset 0x00: u32 width
- *   offset 0x04: u32 height
- *   offset 0x08: u32 reserved (often 0)
- *   offset 0x0c: pixel data, row-major, RGB565 16-bit
+ * RGN is SI's image format for CM 01/02.
  *
- * TODO: Verify with REA whether compression or palette variants exist
- *       in the shipped data files.
+ * File layout (verified against shipped .RGN files and FUN_005e40d0):
+ *   48-byte header (12 x s32), then raw 16-bit pixel data.
+ *
+ * Header fields:
+ *   [0]  width
+ *   [1]  height
+ *   [2]  data_size       (width * height * 2)
+ *   [3]  placeholder     (overwritten at runtime with pixel pointer)
+ *   [4]  bits_per_pixel  (32)
+ *   [5]  bytes_per_pixel (64)
+ *   [6]  unused          (0)
+ *   [7]  significant_bits(16)
+ *   [8]  r_mask          (0xf800 for RGB565)
+ *   [9]  g_mask / colour format (0x07e0 = RGB565, 0x03e0 = RGB555)
+ *   [10] b_mask          (0x001f)
+ *   [11] unused          (0)
+ *
+ * Pixel data: row-major, 16-bit, either RGB565 or RGB555.
+ * The loader converts RGB555 to RGB565 so the framebuffer stays RGB565.
  */
+
+static void convert_rgb555_to_rgb565(u16 *pixels, s32 count)
+{
+    for (s32 i = 0; i < count; i++) {
+        u16 p = pixels[i];
+        pixels[i] = (u16)(((p & 0xffe0) << 1) | (p & 0x1f));
+    }
+}
 
 cm_image_t *rgn_load(const char *path)
 {
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;
 
-    u32 header[3];
-    if (fread(header, sizeof(u32), 3, f) != 3) {
+    s32 raw_header[12];
+    if (fread(raw_header, 4, 12, f) != 12) {
         fclose(f);
         return NULL;
     }
 
-    s32 w = (s32)header[0];
-    s32 h = (s32)header[1];
+    s32 w         = raw_header[0];
+    s32 h         = raw_header[1];
+    s32 data_size = raw_header[2];
 
     if (w <= 0 || w > 4096 || h <= 0 || h > 4096) {
         fclose(f);
         return NULL;
     }
 
-    u32 pixel_count = (u32)(w * h);
-    u16 *pixels = malloc(pixel_count * sizeof(u16));
+    if (data_size <= 0 || data_size > w * h * 2) {
+        fclose(f);
+        return NULL;
+    }
+
+    u16 *pixels = malloc((size_t)data_size);
     if (!pixels) {
         fclose(f);
         return NULL;
     }
 
-    if (fread(pixels, sizeof(u16), pixel_count, f) != pixel_count) {
+    if (fread(pixels, 1, (size_t)data_size, f) != (size_t)data_size) {
         free(pixels);
         fclose(f);
         return NULL;
     }
     fclose(f);
 
-    cm_image_t *img = malloc(sizeof(cm_image_t));
+    u32 g_mask = (u32)raw_header[9];
+    if (g_mask == CM_COLOUR_RGB555) {
+        convert_rgb555_to_rgb565(pixels, w * h);
+        g_mask = CM_COLOUR_RGB565;
+    }
+
+    cm_image_t *img = calloc(1, sizeof(cm_image_t));
     if (!img) {
         free(pixels);
         return NULL;
     }
 
-    img->width    = w;
-    img->height   = h;
-    img->reserved = (s32)header[2];
-    img->pixels   = pixels;
+    img->width           = w;
+    img->height          = h;
+    img->data_size       = data_size;
+    img->pixels          = pixels;
+    img->bits_per_pixel  = raw_header[4];
+    img->bytes_per_pixel = raw_header[5];
+    img->field_18        = raw_header[6];
+    img->significant_bits= raw_header[7];
+    img->r_mask          = (u32)raw_header[8];
+    img->g_mask          = g_mask;
+    img->b_mask          = (u32)raw_header[10];
+    img->field_2c        = raw_header[11];
 
     return img;
 }

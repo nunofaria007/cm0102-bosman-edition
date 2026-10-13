@@ -9,6 +9,8 @@ extern void sound_init(void);
 extern void sound_shutdown(void);
 extern void input_init(void);
 extern void input_poll(SDL_Event *e);
+extern cm_image_t *rgn_load(const char *path);
+extern void rgn_free(cm_image_t *img);
 
 static bool g_running = true;
 
@@ -60,6 +62,17 @@ int main(int argc, char *argv[])
     input_init();
 
     display_clear(0x0000);
+
+    if (argc > 1) {
+        cm_image_t *bg = rgn_load(argv[1]);
+        if (bg) {
+            printf("Loaded RGN: %dx%d, data_size=%d, g_mask=0x%04x\n",
+                   bg->width, bg->height, bg->data_size, bg->g_mask);
+            display_blit_image(0, 0, bg);
+        } else {
+            fprintf(stderr, "Failed to load: %s\n", argv[1]);
+        }
+    }
 
     while (g_running) {
         SDL_Event e;
