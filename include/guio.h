@@ -5,7 +5,6 @@
 
 struct area;
 
-/* Widget flags. */
 #define WIDGET_STAYS_RAISED   0x00000004 /* no sunken bevel when highlighted */
 #define WIDGET_NO_POPUP_ARROW 0x00000080
 #define WIDGET_PICTURE        0x00000400 /* the text is an RGN file name */
@@ -46,8 +45,11 @@ typedef struct widget {
     s32 highlighted;       /* 0x188 */
 } widget_t;
 
-/* DAT_009cc2c4. At -1 a widget draws its marks from glyph tables, not as text. */
-extern s32 guio_symbol_font;
+/*
+ * DAT_009cc2c4. At -1 a widget draws its three marks from glyph tables. At
+ * any other value it draws them as text characters. The original starts at -2.
+ */
+extern s32 g_mark_mode;
 
 /* FUN_005ee590. `redraw` drops the saved screen and captures it again. */
 void widget_draw(widget_t *widget, bool redraw);

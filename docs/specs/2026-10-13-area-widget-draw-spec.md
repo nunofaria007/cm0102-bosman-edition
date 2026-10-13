@@ -23,8 +23,10 @@ Text stays out of this work. The widget calls a text function that does nothing 
 ## Decisions
 - The structs for the area, the widget and the screen manager are native C structs. Each field records its offset in the original. The structs are not byte-exact, because pointers are 8 bytes on macOS.
 - The original packs these structs to 1 byte. An area is 0xBF1 bytes and a widget is 0x18C bytes. The screen manager holds 250 areas and 1200 widgets.
-- Where the original shows its error box (`FUN_005e8290`), the port returns without drawing or writing. The error box is not ported.
-- The port keeps the clip rule of the original. A line, fill, darken, glyph table or capture does nothing when any part of it is off screen. An outline rectangle applies that rule to each side on its own, so the sides that are fully on screen still draw.
+- Where the original shows its error box (`FUN_005e8290`), the port returns without drawing or writing. The error box is not ported. Area draw is the exception: the original shows the box, lays the area out and draws it, and the port does the same without the box.
+- For a popup area with no owner, the original shows the error box and then places the widget's arrow from two values it never set. The port uses 0 for both. This is the one known difference in drawing.
+- A widget's column and row index the 30-entry tables of its area with no check, as in the original.
+- The port keeps the clip rule of the original. A line, fill, darken, glyph table, image or capture does nothing when any part of it is off screen. An outline rectangle applies that rule to each side on its own, so the sides that are fully on screen still draw.
 - The port always uses RGB565. The original also supports RGB555 at run time. The port drops that branch, because the RGN loader already converts images to RGB565.
 - The eight glyph tables for scroll arrows and popup arrows are copied from the original into the source.
 - A widget draws its three marks as text characters unless the global at `DAT_009cc2c4` is -1. Only then does it use the glyph tables. The original starts with -2. Nothing in this work sets the global.
@@ -46,7 +48,9 @@ The repo has no other tests.
 
 ## Out of scope
 - Text and fonts. The widget's text call is a stub.
-- The ellipse panel style, flag 0x10000 (`FUN_005e7840` and `FUN_005e7aa0`).
+- The ellipse panel style, flag 0x10000 (`FUN_005e7840` and `FUN_005e7aa0`). The seventh argument of the panel function of the original is the second colour of the widget. Only the ellipse uses it, so the port's panel function does not take it.
+- The functions that add a widget to an area (`FUN_00403200`) and that release a widget's picture.
+- A screen in the app. No code outside the test calls the area or widget functions yet.
 - Mouse and keyboard handling for areas, widgets and scrollbars.
 - The screen manager's own functions in scrman.cpp.
 

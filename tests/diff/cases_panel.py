@@ -39,7 +39,7 @@ def _draw(ctx, box, flags, colour):
 
 
 def test_panel_each_flag(ctx):
-    """Each flag alone and with fill and border, on a box that gets a thick bevel and on two that do not."""
+    """Each flag alone and with fill and border, on a panel that gets a thick bevel and on two that do not."""
     ctx.sync_framebuffer(8)
     boxes = [(100, 20, 300, 90), (350, 150, 600, 400), (20, 500, 50, 520)]
     count = 0
@@ -55,7 +55,7 @@ def test_panel_each_flag(ctx):
 
 
 def test_panel_bevel_limits(ctx):
-    """The bevel is thick only for a filled box of 50 or more each way that ends at or above y 99."""
+    """The bevel is thick only for a filled panel of 50 or more each way that ends at or above y 99."""
     ctx.sync_framebuffer(10)
     count = 0
     for width in (49, 50):

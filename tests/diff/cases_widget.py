@@ -9,8 +9,9 @@ from scene import Scene
 
 FUN_WIDGET_DRAW = 0x5EE590
 
-G_SYMBOL_FONT = 0x9CC2C4
-G_PICTURE_USERS, G_PICTURE_NAME, G_PICTURE = 0xAE291C, 0xAE2920, 0xAE2A24
+G_MARK_MODE = 0x9CC2C4
+MARK_MODE_AT_START = -2
+G_PICTURE_CACHE = 0xAE291C  # use count, then the file name (260 bytes), then the image
 
 PICTURE = 0x400
 OTHER_FLAGS = [0x4, 0x80, 0x800, 0x2000, 0x4000, 0x20000, 0x40000]
@@ -62,9 +63,21 @@ def _draw(ctx, scene, index, redraw, case):
     ctx.expect_equal(f"{case}: text calls", ctx.original.text_calls, ctx.port.text_calls())
 
 
-def _set_symbol_font(ctx, value):
-    ctx.original.write(G_SYMBOL_FONT, struct.pack("<i", value))
-    ctx.port.send("symbol_font", value)
+def set_mark_mode(ctx, value):
+    ctx.original.write(G_MARK_MODE, struct.pack("<i", value))
+    ctx.port.send("mark_mode", value)
+
+
+def test_widget_marks_at_start(ctx):
+    """The three marks before any test sets the mark mode, so the start value of the port counts."""
+    ctx.sync_framebuffer(15)
+    ctx.expect_equal("mark mode of the original", MARK_MODE_AT_START,
+                     struct.unpack("<i", ctx.original.read(G_MARK_MODE, 4))[0], source="wanted")
+    scene = Scene(ctx)
+    scene.set("widget", 0, {"x1": 100, "y1": 100, "x2": 260, "y2": 130, "flags": 0x4000 | 0x20000 | 0x40000,
+                            "style": 0x30, "colour": 0x8410, "second_colour": 0x1234, "area": -1, "popup_area": -1})
+    _draw(ctx, scene, 0, 1, "marks at start")
+    return 1
 
 
 def test_widget_draw(ctx):
@@ -72,20 +85,22 @@ def test_widget_draw(ctx):
     ctx.sync_framebuffer(11)
     for case in range(1200):
         scene = Scene(ctx)
-        _set_symbol_font(ctx, ctx.rng.choice([-2, -1]))
+        set_mark_mode(ctx, ctx.rng.choice([-2, -1, -1, 0, 7]))
         widget = _random_widget(ctx)
         scene.set("area", 0, {"x1": 10, "y1": 10, "x2": 500, "y2": 400, "owner_widget": -1})
         if ctx.rng.random() < 0.5:
             widget["popup_area"] = 2
+            # A popup area with its sides the wrong way round makes more than one arrow rule true.
             x1, y1 = ctx.rng.randint(0, 700), ctx.rng.randint(0, 550)
-            scene.set("area", 2, {"x1": x1, "y1": y1, "x2": x1 + ctx.rng.randint(5, 300),
-                                  "y2": y1 + ctx.rng.randint(5, 300), "owner_widget": 0,
+            width = ctx.rng.choice([ctx.rng.randint(5, 300), ctx.rng.randint(5, 300), ctx.rng.randint(-200, -1)])
+            height = ctx.rng.choice([ctx.rng.randint(5, 300), ctx.rng.randint(5, 300), ctx.rng.randint(-200, -1)])
+            scene.set("area", 2, {"x1": x1, "y1": y1, "x2": x1 + width, "y2": y1 + height, "owner_widget": 0,
                                   "flags": _some(ctx, POPUP_FLAGS, 0.3)})
         scene.set("widget", 0, widget)
         _draw(ctx, scene, 0, ctx.rng.randint(0, 1), f"widget case {case}")
         scene.set("widget", 0, {"highlighted": ctx.rng.randint(0, 1), "lighten_once": ctx.rng.choice([0, 1])})
         _draw(ctx, scene, 0, ctx.rng.randint(0, 1), f"widget case {case}, second draw")
-    _set_symbol_font(ctx, -2)
+    set_mark_mode(ctx, MARK_MODE_AT_START)
     return (case + 1) * 2
 
 
@@ -119,11 +134,21 @@ def test_widget_popup_arrows(ctx):
 
 def test_widget_picture(ctx):
     """Widgets that name the first file share its image. Each widget that names the second file loads its own,
-    because the one shared image stays with the first file while widgets use it."""
+    because the one shared image stays with the first file while widgets use it.
+
+    The test clears the picture cache of the original. The port has no way to clear its own, so this test
+    can run once for each start of the port driver.
+    """
     ctx.sync_framebuffer(13)
     original = ctx.original
     scene = Scene(ctx)
-    original.write(G_PICTURE_USERS, bytes(4 + 260 + 4))
+    original.write(G_PICTURE_CACHE, bytes(4 + 260 + 4))
+    # A picture widget still gets its tick, marks, highlight and popup arrow.
+    extra_flags = [0x2000 | 0x4000, 0x20000 | 0x40000, 0x2000, 0x4000, 0, 0x20000]
+    highlighted = [1, 0, 0, 1, 0, 1]
+    popup_areas = [-1, 2, -1, -1, 3, -1]
+    scene.set("area", 2, {"x1": 0, "y1": 0, "x2": 90, "y2": 70, "owner_widget": 1})
+    scene.set("area", 3, {"x1": 0, "y1": 0, "x2": 90, "y2": 70, "owner_widget": 4, "flags": 0x100})
     with tempfile.TemporaryDirectory() as folder:
         first = _write(folder, "first.rgn", _rgn(40, 30, _pixels(ctx, 40, 30)))
         second = _write(folder, "second.rgn", _rgn(25, 25, _pixels(ctx, 25, 25)))
@@ -131,10 +156,13 @@ def test_widget_picture(ctx):
         for index, name in enumerate(names):
             x, y = 50 + index % 4 * 150, 100 + index // 4 * 100
             scene.set("widget", index, {"x1": x, "y1": y, "x2": x + 100, "y2": y + 60,
-                                        "flags": PICTURE, "style": 0x20, "colour": 0x8410,
-                                        "text": _text(name.encode()), "popup_area": -1, "area": -1})
+                                        "flags": PICTURE | extra_flags[index], "style": 0x20, "colour": 0x8410,
+                                        "highlight_colour": 0xF81F, "second_colour": 0x4321,
+                                        "highlighted": highlighted[index], "text": _text(name.encode()),
+                                        "popup_area": popup_areas[index], "area": -1})
         for step, index in enumerate([0, 1, 2, 3, 4, 5, 0, 2]):
             case = f"picture step {step}, widget {index}"
+            set_mark_mode(ctx, -1 if step % 2 else MARK_MODE_AT_START)
             _draw(ctx, scene, index, 1, case)
             scene.expect_same_image(case, "widget", index, "picture")
             pointers = [struct.unpack("<I", original.read(scene.addr("widget", i) + OFFSET_PICTURE, 4))[0]
@@ -143,10 +171,12 @@ def test_widget_picture(ctx):
                 ctx.port.send("same_picture", index, other)
                 ctx.expect_equal(f"{case}: shares its image with widget {other}",
                                  int(pointers[index] == pointers[other]), int(ctx.port.reply()[0]))
+    set_mark_mode(ctx, MARK_MODE_AT_START)
     return step + 1
 
 
 TESTS = [
+    ("widget_marks_at_start", test_widget_marks_at_start),
     ("widget_draw", test_widget_draw),
     ("widget_popup_arrows", test_widget_popup_arrows),
     ("widget_picture", test_widget_picture),

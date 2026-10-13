@@ -3,6 +3,7 @@ import struct
 
 from scene import Scene
 
+FUN_AREA_RELEASE = 0x4031A0
 FUN_AREA_LAYOUT = 0x403350
 FUN_POPUP_POSITION = 0x403760
 
@@ -123,7 +124,6 @@ def _popup_flags(ctx):
 
 def test_popup_position(ctx):
     """Area 1 is a popup area of widget 0. Area 2 is a popup area of widget 1, which sits in area 1."""
-    out = None
     for case in range(1500):
         scene = Scene(ctx)
         out = ctx.original.alloc(8)
@@ -153,7 +153,29 @@ def test_popup_position(ctx):
     return (case + 1) * 3
 
 
+def test_area_release(ctx):
+    """Release frees both saved screens, whichever of them the area has."""
+    ctx.sync_framebuffer(16)
+    count = 0
+    for has_saved in (False, True):
+        for has_scrollbar_saved in (False, True):
+            scene = Scene(ctx)
+            if has_saved:
+                scene.capture_to("area", 1, "saved", (10, 10, 40, 30))
+            if has_scrollbar_saved:
+                scene.capture_to("area", 1, "scrollbar", (50, 10, 69, 90))
+            ctx.original.call(FUN_AREA_RELEASE, this=scene.addr("area", 1))
+            ctx.port.send("release_area", 1)
+            for which in ("saved", "scrollbar"):
+                scene.expect_same_image(f"release, saved {has_saved}, scrollbar {has_scrollbar_saved}",
+                                        "area", 1, which)
+            scene.expect_same("release", "area", 1)
+            count += 1
+    return count
+
+
 TESTS = [
+    ("area_release", test_area_release),
     ("area_layout", test_area_layout),
     ("popup_position", test_popup_position),
 ]

@@ -63,7 +63,9 @@ typedef struct area {
 /*
  * FUN_00403350. Splits the area into columns and rows by weight and sets up
  * the scrollbar when there are more rows than fit. The original faults when
- * the weights of two or more columns or rows are all 0.
+ * the weights of two or more columns or rows are all 0. The scrollbar setup
+ * drops the saved screen of the scrollbar without freeing it, as the
+ * original does, so call area_release first when the area was drawn.
  */
 void area_layout(area_t *area);
 
@@ -73,6 +75,9 @@ void area_layout(area_t *area);
  * saved screens and captures them again.
  */
 void area_draw(area_t *area, bool redraw);
+
+/* FUN_004031a0. Frees the saved screen of the area and of its scrollbar. */
+void area_release(area_t *area);
 
 /* FUN_00403760. Top-left corner at which a popup area opens. */
 void area_popup_position(const area_t *area, s32 *x, s32 *y);

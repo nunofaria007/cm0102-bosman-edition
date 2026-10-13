@@ -7,27 +7,27 @@
 extern cm_image_t *rgn_load(const char *path);
 extern void rgn_free(cm_image_t *img);
 
-s32 guio_symbol_font = -2;
+s32 g_mark_mode = -2;
 
-/* The last picture loaded. Widgets that name the same file share it. */
-static char cached_name[sizeof(((widget_t *)0)->text)]; /* DAT_00ae2920 */
-static cm_image_t *cached_picture;                       /* DAT_00ae2a24 */
-static s32 cached_users;                                 /* DAT_00ae291c */
+/* One picture stays cached while widgets use it. Its file name shares it. */
+static char g_cached_name[sizeof(((widget_t *)0)->text)]; /* DAT_00ae2920 */
+static cm_image_t *g_cached_picture;                       /* DAT_00ae2a24 */
+static s32 g_cached_users;                                 /* DAT_00ae291c */
 
 static void load_picture(widget_t *widget)
 {
-    if (cached_picture && !strcmp(cached_name, widget->text)) {
-        widget->picture = cached_picture;
-        cached_users++;
+    if (g_cached_picture && !strcmp(g_cached_name, widget->text)) {
+        widget->picture = g_cached_picture;
+        g_cached_users++;
         return;
     }
 
     widget->picture = rgn_load(widget->text);
-    if (widget->picture && cached_users == 0) {
-        rgn_free(cached_picture);
-        cached_picture = widget->picture;
-        strcpy(cached_name, widget->text);
-        cached_users = 1;
+    if (widget->picture && g_cached_users == 0) {
+        rgn_free(g_cached_picture);
+        g_cached_picture = widget->picture;
+        strcpy(g_cached_name, widget->text);
+        g_cached_users = 1;
     }
 }
 
@@ -50,6 +50,7 @@ static void draw_popup_arrow(const widget_t *widget, s32 dx, s32 dy)
     s32 popup_x = 0, popup_y = 0;
     s32 x;
 
+    /* For a popup area with no owner, the original reads two unset values. */
     area_popup_position(popup, &popup_x, &popup_y);
     if (popup->y2 - popup->y1 + popup_y < widget->y1) {
         glyph = gui_glyph_up;
@@ -77,7 +78,7 @@ static void draw_popup_arrow(const widget_t *widget, s32 dx, s32 dy)
 static void draw_mark(const widget_t *widget, s32 dx, s32 dy, const u8 *glyph,
                       u16 colour, char symbol)
 {
-    if (guio_symbol_font == -1) {
+    if (g_mark_mode == -1) {
         gui_draw_glyph(widget->x2 - glyph[0] - 4 + dx,
                        centred(widget->y1, widget->y2, glyph[1]) + dy, colour,
                        glyph);

@@ -1,9 +1,7 @@
 """Cases for area draw and scrollbar draw."""
-import struct
-
 from cases_area import FUN_AREA_LAYOUT, _weights
 from cases_panel import ELLIPSE, divides_by_zero
-from cases_widget import G_SYMBOL_FONT, OTHER_FLAGS, _some, _text
+from cases_widget import MARK_MODE_AT_START, OTHER_FLAGS, _some, _text, set_mark_mode
 from scene import Scene
 
 FUN_AREA_DRAW = 0x402E70
@@ -39,12 +37,19 @@ def _member(ctx, columns, total_rows):
         "lighten_once": ctx.rng.choice([0, 0, 0, 1]), "highlighted": ctx.rng.choice([0, 0, 0, 1]),
         "area": AREA, "popup_area": -1,
     }
+    x1, y1 = ctx.rng.randint(1, 700), ctx.rng.randint(1, 550)
     if ctx.rng.random() < 0.15:
-        x1, y1 = ctx.rng.randint(1, 700), ctx.rng.randint(1, 550)
         widget.update({"fixed_x1": x1, "fixed_x2": x1 + ctx.rng.randint(5, 90)})
-        if ctx.rng.random() < 0.5:
-            widget.update({"fixed_y1": y1, "fixed_y2": y1 + ctx.rng.randint(5, 40)})
+    if ctx.rng.random() < 0.15:
+        widget.update({"fixed_y1": y1, "fixed_y2": y1 + ctx.rng.randint(5, 40)})
     return widget
+
+
+def _out_of_order(ctx, columns, total_rows):
+    """A widget for the end of the list whose row can be above the rows before it. Its y place is fixed,
+    because a row above the first row in view has no entry in the row table."""
+    y1 = ctx.rng.randint(1, 550)
+    return {**_member(ctx, columns, total_rows), "fixed_y1": y1, "fixed_y2": y1 + ctx.rng.randint(5, 40)}
 
 
 def _layout(ctx, scene):
@@ -73,16 +78,17 @@ def test_area_draw(ctx):
     errors = []
     for case in range(500):
         scene = Scene(ctx)
-        symbol_font = ctx.rng.choice([-2, -1])
-        ctx.original.write(G_SYMBOL_FONT, struct.pack("<i", symbol_font))
-        ctx.port.send("symbol_font", symbol_font)
+        set_mark_mode(ctx, ctx.rng.choice([MARK_MODE_AT_START, -1]))
 
         columns, rows = ctx.rng.randint(1, 6), ctx.rng.randint(1, 10)
         total_rows = rows + (ctx.rng.randint(1, 12) if ctx.rng.random() < 0.5 else 0)
         x1, y1 = ctx.rng.randint(0, 250), ctx.rng.randint(0, 150)
         box = (x1, y1, x1 + ctx.rng.randint(200, 500), y1 + ctx.rng.randint(120, 400))
-        members = list(range(ctx.rng.randint(0, 20)))
-        widgets = sorted((_member(ctx, columns, total_rows) for _ in members), key=lambda w: w["row"])
+        widgets = sorted((_member(ctx, columns, total_rows) for _ in range(ctx.rng.randint(0, 20))),
+                         key=lambda w: w["row"])
+        if ctx.rng.random() < 0.4:
+            widgets.append(_out_of_order(ctx, columns, total_rows))
+        members = list(range(len(widgets)))
         for index, widget in zip(members, widgets):
             scene.set("widget", index, widget)
         scene.set("area", AREA, {
@@ -110,11 +116,14 @@ def test_area_draw(ctx):
         _layout(ctx, scene)
         scene.set("area", AREA, {"scrollbar.pressed": ctx.rng.choice([0, 1, 2])})
         _draw(ctx, scene, members, ctx.rng.randint(0, 1), f"area case {case}, after a scroll")
+
+        # No layout before this draw, so the saved screen of the scrollbar stays in use.
+        scene.set("area", AREA, {"scrollbar.pressed": ctx.rng.choice([0, 1, 2])})
+        _draw(ctx, scene, members, ctx.rng.randint(0, 1), f"area case {case}, drawn again")
     ctx.expect_equal("the original met an area with no first widget", True,
                      LINE_NO_FIRST_WIDGET in errors, source="wanted")
-    ctx.original.write(G_SYMBOL_FONT, struct.pack("<i", -2))
-    ctx.port.send("symbol_font", -2)
-    return (case + 1) * 2
+    set_mark_mode(ctx, MARK_MODE_AT_START)
+    return (case + 1) * 3
 
 
 TESTS = [

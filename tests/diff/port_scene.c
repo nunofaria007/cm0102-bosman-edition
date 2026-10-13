@@ -5,6 +5,7 @@
  */
 #include "port_scene.h"
 #include "area.h"
+#include "port_driver.h"
 #include "gui_utils.h"
 #include <stddef.h>
 #include <stdio.h>
@@ -74,37 +75,40 @@ static const field_t widget_fields[] = {
 
 #define COUNT(table) (sizeof(table) / sizeof((table)[0]))
 
-static area_t areas[SCENE_AREAS];
-static widget_t widgets[SCENE_WIDGETS];
+static area_t g_areas[SCENE_AREAS];
+static widget_t g_widgets[SCENE_WIDGETS];
 
 static void reset(void)
 {
-    memset(areas, 0, sizeof(areas));
-    memset(widgets, 0, sizeof(widgets));
-    for (int i = 0; i < SCENE_AREAS; i++) {
-        areas[i].areas = areas;
-        areas[i].widgets = widgets;
+    memset(g_areas, 0, sizeof(g_areas));
+    memset(g_widgets, 0, sizeof(g_widgets));
+    for (s32 i = 0; i < SCENE_AREAS; i++) {
+        g_areas[i].areas = g_areas;
+        g_areas[i].widgets = g_widgets;
     }
-    for (int i = 0; i < SCENE_WIDGETS; i++) widgets[i].areas = areas;
+    for (s32 i = 0; i < SCENE_WIDGETS; i++) {
+        g_widgets[i].areas = g_areas;
+    }
 }
 
+/* The tables hold fields of 1, 2 and 4 bytes only. */
 static long long read_value(const void *at, const field_t *field)
 {
-    switch (field->size + (field->is_signed ? 100 : 0)) {
-    case 1:   return *(const u8 *)at;
-    case 2:   return *(const u16 *)at;
-    case 4:   return *(const u32 *)at;
-    case 102: return *(const s16 *)at;
-    default:  return *(const s32 *)at;
-    }
+    if (field->size == 1) return *(const u8 *)at;
+    if (field->size == 2 && field->is_signed) return *(const s16 *)at;
+    if (field->size == 2) return *(const u16 *)at;
+    if (field->is_signed) return *(const s32 *)at;
+    return *(const u32 *)at;
 }
 
 static void write_value(void *at, const field_t *field, long long value)
 {
-    switch (field->size) {
-    case 1:  *(u8 *)at = (u8)value; break;
-    case 2:  *(u16 *)at = (u16)value; break;
-    default: *(u32 *)at = (u32)value; break;
+    if (field->size == 1) {
+        *(u8 *)at = (u8)value;
+    } else if (field->size == 2) {
+        *(u16 *)at = (u16)value;
+    } else {
+        *(u32 *)at = (u32)value;
     }
 }
 
@@ -120,13 +124,13 @@ static bool select_struct(const char **args, const field_t **fields,
     if (!strcmp(kind, "area") && index >= 0 && index < SCENE_AREAS) {
         *fields = area_fields;
         *field_count = COUNT(area_fields);
-        *base = &areas[index];
+        *base = &g_areas[index];
         return true;
     }
     if (!strcmp(kind, "widget") && index >= 0 && index < SCENE_WIDGETS) {
         *fields = widget_fields;
         *field_count = COUNT(widget_fields);
-        *base = &widgets[index];
+        *base = &g_widgets[index];
         return true;
     }
     return false;
@@ -204,12 +208,12 @@ static cm_image_t **select_image(const char **args)
     }
     *args += used;
     if (!strcmp(kind, "widget") && index >= 0 && index < SCENE_WIDGETS) {
-        return !strcmp(which, "saved") ? &widgets[index].saved
-                                       : &widgets[index].picture;
+        if (!strcmp(which, "saved")) return &g_widgets[index].saved;
+        if (!strcmp(which, "picture")) return &g_widgets[index].picture;
     }
     if (!strcmp(kind, "area") && index >= 0 && index < SCENE_AREAS) {
-        return !strcmp(which, "saved") ? &areas[index].saved
-                                       : &areas[index].scrollbar.saved;
+        if (!strcmp(which, "saved")) return &g_areas[index].saved;
+        if (!strcmp(which, "scrollbar")) return &g_areas[index].scrollbar.saved;
     }
     return NULL;
 }
@@ -252,35 +256,39 @@ bool scene_command(const char *cmd, const char *args)
     if (!strcmp(cmd, "get")) return get_fields(args);
     if (!strcmp(cmd, "image")) return show_image(args);
     if (!strcmp(cmd, "capture_to")) return capture_to(args);
-    if (!strcmp(cmd, "symbol_font")) {
-        guio_symbol_font = index;
+    if (!strcmp(cmd, "mark_mode")) {
+        g_mark_mode = index;
         return true;
     }
     if (!strcmp(cmd, "draw_widget")) {
         if (index < 0 || index >= SCENE_WIDGETS) return false;
-        widget_draw(&widgets[index], second != 0);
+        widget_draw(&g_widgets[index], second != 0);
         return true;
     }
     if (!strcmp(cmd, "same_picture")) {
         if (index < 0 || index >= SCENE_WIDGETS) return false;
         if (second < 0 || second >= SCENE_WIDGETS) return false;
-        printf("%d\n", widgets[index].picture == widgets[second].picture);
+        printf("%d\n", g_widgets[index].picture == g_widgets[second].picture);
         return true;
     }
     if (index < 0 || index >= SCENE_AREAS) return false;
 
     if (!strcmp(cmd, "layout")) {
-        area_layout(&areas[index]);
+        area_layout(&g_areas[index]);
         return true;
     }
     if (!strcmp(cmd, "draw_area")) {
-        area_draw(&areas[index], second != 0);
+        area_draw(&g_areas[index], second != 0);
+        return true;
+    }
+    if (!strcmp(cmd, "release_area")) {
+        area_release(&g_areas[index]);
         return true;
     }
     if (!strcmp(cmd, "popup")) {
         s32 x = -9999, y = -9999;
 
-        area_popup_position(&areas[index], &x, &y);
+        area_popup_position(&g_areas[index], &x, &y);
         printf("%d %d\n", x, y);
         return true;
     }

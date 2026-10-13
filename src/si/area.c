@@ -53,7 +53,9 @@ static void split(s32 *start, s32 *end, const u8 *weight, s32 count,
 {
     s32 total = 0, sum = 0;
 
-    for (s32 i = 0; i < count; i++) total += weight[i];
+    for (s32 i = 0; i < count; i++) {
+        total += weight[i];
+    }
     if (total == 0) total = 1; /* the original faults */
     for (s32 i = 0; i < count; i++) {
         sum += weight[i];
@@ -74,8 +76,8 @@ void area_layout(area_t *area)
     }
     area->first_visible = 0;
 
-    /* The original shows an error box for more than 30 (Area.cpp 497, 507). */
     if ((area->flags & AREA_GRID_ONLY) || columns == 0) return;
+    /* The original shows an error box for more than 30 (Area.cpp 497, 507). */
     if (columns > AREA_MAX_COLUMNS || rows == 0 || rows > AREA_MAX_ROWS) return;
 
     if (area->flags & AREA_NO_MARGIN) {
@@ -98,6 +100,7 @@ void area_layout(area_t *area)
           height);
 }
 
+/* FUN_00403c80 */
 static void draw_scrollbar(area_t *area)
 {
     area_scrollbar_t *bar = &area->scrollbar;
@@ -106,8 +109,6 @@ static void draw_scrollbar(area_t *area)
     s32 glyph_x = bar->x1 + (20 - gui_glyph_up[0]) / 2;
     s32 glyph_y = (20 - gui_glyph_up[1]) / 2;
 
-    /* The original shows an error box here (Area.cpp 870). */
-    if (!area->has_scrollbar) return;
     if (!bar->saved) {
         bar->saved = gui_capture(bar->x1, bar->y1, bar->x2, bar->y2, NULL);
     }
@@ -143,7 +144,6 @@ static void draw_grid(const area_t *area)
     }
 }
 
-/* Gives the widget its place on screen: a fixed place, or its grid cell. */
 static void place_widget(const area_t *area, widget_t *widget, s32 shown_row)
 {
     s32 row = area->first_row + shown_row;
@@ -196,6 +196,14 @@ void area_draw(area_t *area, bool redraw)
         widget_draw(widget, redraw);
     }
     if (area->has_scrollbar) draw_scrollbar(area);
+}
+
+void area_release(area_t *area)
+{
+    rgn_free(area->scrollbar.saved);
+    area->scrollbar.saved = NULL;
+    rgn_free(area->saved);
+    area->saved = NULL;
 }
 
 void area_popup_position(const area_t *area, s32 *x, s32 *y)

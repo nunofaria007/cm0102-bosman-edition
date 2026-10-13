@@ -4,11 +4,15 @@
  */
 #include "display.h"
 #include "gui_utils.h"
+#include "port_driver.h"
 #include "port_scene.h"
 #include "port_text.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+extern cm_image_t *rgn_load(const char *path);
+extern void rgn_free(cm_image_t *img);
 
 #define FB_PIXELS (CM_INTERNAL_WIDTH * CM_INTERNAL_HEIGHT)
 #define MAX_GLYPH (2 + 255 * 255)
@@ -69,6 +73,7 @@ int main(void)
 
     g_display.framebuffer = calloc(FB_PIXELS, sizeof(u16));
     if (!g_display.framebuffer) return 1;
+    scene_command("scene_reset", "");
 
     while (fgets(line, sizeof(line), stdin)) {
         char cmd[16];

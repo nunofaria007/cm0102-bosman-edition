@@ -10,16 +10,16 @@
 
 #define MAX_CALLS 256
 
-static char calls[MAX_CALLS][1024];
-static int call_count;
+static char g_calls[MAX_CALLS][1024];
+static s32 g_call_count;
 
 void gui_text(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, u16 colour,
               u16 second_colour, const char *text, s32 param)
 {
     char *out;
 
-    if (call_count == MAX_CALLS) return;
-    out = calls[call_count++];
+    if (g_call_count == MAX_CALLS) return;
+    out = g_calls[g_call_count++];
     out += sprintf(out, "%d %d %d %d %u %u %u %d -", x1, y1, x2, y2, flags,
                    colour, second_colour, param);
     for (size_t i = 0; i < strlen(text) && i < 400; i++) {
@@ -30,7 +30,9 @@ void gui_text(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, u16 colour,
 /* "text_calls": the number of calls since the last time, then one line each. */
 void text_print_calls(void)
 {
-    printf("%d\n", call_count);
-    for (int i = 0; i < call_count; i++) printf("%s\n", calls[i]);
-    call_count = 0;
+    printf("%d\n", g_call_count);
+    for (s32 i = 0; i < g_call_count; i++) {
+        printf("%s\n", g_calls[i]);
+    }
+    g_call_count = 0;
 }
