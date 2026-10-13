@@ -13,6 +13,9 @@ add_executable(cm0102
     src/si/input.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
+    src/si/gui_glyphs.c
+    src/si/gui_text.c
+    src/si/guio.c
     src/si/area.c
     src/cm3/database.c
 )
@@ -24,9 +27,12 @@ target_link_libraries(cm0102 PRIVATE ${SDL2_LIBRARIES})
 add_executable(port_driver
     tests/diff/port_driver.c
     tests/diff/port_scene.c
+    tests/diff/port_text.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
+    src/si/gui_glyphs.c
+    src/si/guio.c
     src/si/area.c
 )
 target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})

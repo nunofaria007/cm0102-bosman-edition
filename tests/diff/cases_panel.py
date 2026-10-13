@@ -8,7 +8,7 @@ ELLIPSE = 0x10000        # not ported
 SHRINK, INSET = 0x20000, 0x40000
 
 # Colour globals of the original, in the order the port driver prints its constants.
-PALETTE = [0xAEBE04, 0xAEBDEC]
+PALETTE = [0xAEBE04, 0xAEBDEC, 0xAEBDEA, 0xAE3184, 0xAEBDD4, 0xAE31A8]
 
 
 def test_palette(ctx):
@@ -18,7 +18,7 @@ def test_palette(ctx):
     return len(PALETTE)
 
 
-def _divides_by_zero(x1, y1, x2, y2, flags):
+def divides_by_zero(x1, y1, x2, y2, flags):
     """The original divides by the gradient span, so a one-pixel gradient faults."""
     if flags & SHRINK:
         x2, y2 = x2 - 2, y2 - 2
@@ -77,7 +77,7 @@ def test_panel_random(ctx):
             flags &= ctx.rng.getrandbits(31)
         flags &= ~ELLIPSE
         box = (ctx.x(), ctx.y(), ctx.x(), ctx.y())
-        if _divides_by_zero(*box, flags):
+        if divides_by_zero(*box, flags):
             continue
         _draw(ctx, box, flags, ctx.colour())
         count += 1

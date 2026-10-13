@@ -39,7 +39,14 @@ WIDGET_FIELDS = [
     ("fixed_y1", 0x30, "i", 1), ("fixed_y2", 0x34, "i", 1),
     ("style", 0x38, "I", 1), ("colour", 0x72, "H", 1),
     ("area", 0x7A, "h", 1), ("popup_area", 0x7C, "h", 1),
+    ("text_flags", 0x3C, "I", 1), ("text_param", 0x44, "i", 1),
+    ("highlight_colour", 0x74, "H", 1), ("text_colour", 0x76, "H", 1),
+    ("second_colour", 0x78, "H", 1), ("text", 0x80, "B", 260),
+    ("lighten_once", 0x184, "i", 1), ("highlighted", 0x188, "i", 1),
 ]
+
+# Offsets of image pointers in the structs of the original.
+IMAGES = {("widget", "saved"): 0x4C, ("widget", "picture"): 0x5C}
 
 KINDS = {"area": (AREA_FIELDS, AREA_SIZE), "widget": (WIDGET_FIELDS, WIDGET_SIZE)}
 
@@ -79,6 +86,22 @@ class Scene:
                 continue
             self.ctx.original.write(self.addr(kind, index) + offset, struct.pack(f"<{len(items)}{fmt}", *items))
             self.ctx.port.send("set", kind, index, name, *items)
+
+    def expect_same_image(self, case, kind, index, which):
+        """Compares one image that a struct points to: size and pixels, or none on both sides."""
+        original = self.ctx.original
+        pointer = struct.unpack("<I", original.read(self.addr(kind, index) + IMAGES[kind, which], 4))[0]
+        expected = None
+        if pointer:
+            width, height, size, pixels = struct.unpack("<4I", original.read(pointer, 16))
+            expected = ([width, height, size], original.read(pixels, size))
+        self.ctx.port.send("image", kind, index, which)
+        words = self.ctx.port.reply()
+        got = None
+        if words != [b"0"]:
+            fields = [int(v) for v in words]
+            got = (fields[:3], self.ctx.port.read(fields[2]))
+        self.ctx.expect_equal(f"{case}: {kind} {index} {which} image", expected, got)
 
     def expect_same(self, case, kind, index):
         """Compares every field of one struct."""

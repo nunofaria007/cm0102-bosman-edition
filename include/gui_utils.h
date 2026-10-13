@@ -22,8 +22,22 @@ typedef struct {
 #define GUI_RECT_FILL   4
 
 /* Colours that FUN_005e4560 sets up for an RGB565 display. */
-#define GUI_COLOUR_NAVY   0x0010 /* DAT_00aebe04, stands in for colour 0 */
-#define GUI_COLOUR_YELLOW 0xffe0 /* DAT_00aebdec */
+#define GUI_COLOUR_NAVY       0x0010 /* DAT_00aebe04, stands in for colour 0 */
+#define GUI_COLOUR_YELLOW     0xffe0 /* DAT_00aebdec */
+#define GUI_COLOUR_BLACK      0x0000 /* DAT_00aebdea */
+#define GUI_COLOUR_LIGHT_GREY 0xe71c /* DAT_00ae3184 */
+#define GUI_COLOUR_ORANGE     0xfc00 /* DAT_00aebdd4 */
+#define GUI_COLOUR_RED        0xf800 /* DAT_00ae31a8 */
+
+/* Glyph tables of the original, in gui_glyphs.c. */
+extern const u8 gui_glyph_left[];       /* DAT_009cd67c */
+extern const u8 gui_glyph_right[];      /* DAT_009cd69c */
+extern const u8 gui_glyph_up[];         /* DAT_009cd6bc */
+extern const u8 gui_glyph_down[];       /* DAT_009cd6dc */
+extern const u8 gui_glyph_tick[];       /* DAT_009cd6fc */
+extern const u8 gui_glyph_mark_right[]; /* DAT_009cd730 */
+extern const u8 gui_glyph_mark_up[];    /* DAT_009cd774 */
+extern const u8 gui_glyph_mark_down[];  /* DAT_009cd7bc */
 
 /* Panel flags. An area and a widget pass their style word straight through. */
 #define GUI_PANEL_DARKEN        0x00000002 /* background to 60 percent */

@@ -13,9 +13,10 @@ import cases_area
 import cases_images
 import cases_panel
 import cases_primitives
+import cases_widget
 from original import FB_SIZE, HEIGHT, WIDTH, Original
 
-SUITES = [cases_primitives, cases_images, cases_panel, cases_area]
+SUITES = [cases_primitives, cases_images, cases_panel, cases_area, cases_widget]
 
 
 class Mismatch(Exception):
@@ -47,6 +48,15 @@ class Port:
     def framebuffer(self):
         self.send("dump")
         return self.read(FB_SIZE)
+
+    def text_calls(self):
+        """The calls to the text function since the last time, in the form original.py records."""
+        self.send("text_calls")
+        calls = []
+        for _ in range(int(self.reply()[0])):
+            *numbers, text = self.reply()
+            calls.append((*[int(v) for v in numbers], bytes.fromhex(text[1:].decode())))
+        return calls
 
     def close(self):
         self.proc.stdin.close()

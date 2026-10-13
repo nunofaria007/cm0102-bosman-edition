@@ -48,6 +48,9 @@ CRT_SPRINTF = 0x944C9F
 FUN_ERROR_PLACE = 0x90D130
 FUN_ERROR_BOX = 0x5E8290
 
+# Text draw is not ported. The test records the calls on both sides.
+FUN_TEXT = 0x5E6D80
+
 # IDirectDrawSurface vtable slots used by the drawing code: slot -> stdcall argument bytes.
 SLOT_BLT, SLOT_LOCK, SLOT_UNLOCK = 0x14 // 4, 0x64 // 4, 0x80 // 4
 SLOT_ARG_BYTES = {SLOT_BLT: 0x18, SLOT_LOCK: 0x14, SLOT_UNLOCK: 0x08}
@@ -89,7 +92,9 @@ class Original:
         self._replace(CRT_FREAD, 4, self._fread)
         self._replace(CRT_FCLOSE, 1, self._fclose)
         self._replace(CRT_SPLITPATH, 0, lambda: 0)
-        self._replace(CRT_SPRINTF, 0, lambda: 0)
+        self._replace(CRT_SPRINTF, 3, self._sprintf)
+        self.text_calls = []
+        self._replace(FUN_TEXT, 9, self._text)
         self.error_lines = []
         self._replace(FUN_ERROR_PLACE, 3, lambda name, ext, line: self.error_lines.append(line) or 0)
         self._replace(FUN_ERROR_BOX, 0, lambda: 0)
@@ -133,10 +138,10 @@ class Original:
         text = bytearray()
         while (byte := self.read(addr + len(text), 1)) != b"\0":
             text += byte
-        return text.decode()
+        return text.decode("latin-1")
 
     def alloc_c_string(self, text):
-        data = text.encode() + b"\0"
+        data = text.encode("latin-1") + b"\0"
         addr = self.alloc(len(data))
         self.write(addr, data)
         return addr
@@ -220,6 +225,18 @@ class Original:
             uc.reg_write(UC_X86_REG_EAX, host_function(*self._stack_args(arg_count)))
         self.uc.mem_write(addr, b"\xc3")
         self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
+
+    def _sprintf(self, buffer, text_format, value):
+        """Enough of sprintf for the one format the drawing code needs."""
+        one_char = self.read_c_string(text_format) == "%c"
+        self.write(buffer, bytes([value & 0xFF, 0]) if one_char else b"\0")
+        return 1 if one_char else 0
+
+    def _text(self, x1, y1, x2, y2, flags, colour, second_colour, text, param):
+        signed = struct.unpack("<5i", struct.pack("<5I", x1, y1, x2, y2, param))
+        self.text_calls.append((*signed[:4], flags, colour & 0xFFFF, second_colour & 0xFFFF, signed[4],
+                                self.read_c_string(text).encode("latin-1")))
+        return 0
 
     def _fopen(self, path, mode):
         name = self.read_c_string(path)

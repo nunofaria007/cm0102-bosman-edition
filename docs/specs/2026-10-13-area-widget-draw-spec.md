@@ -7,7 +7,7 @@ The port shows a background image and nothing else. Every screen of the original
 ## Solution
 Port the drawing code that sits between the background image and a finished screen: the basic drawing primitives, the panel, the area and the widget. Check each ported function against the original with a differential test, so that a mismatch of one pixel fails the test.
 
-Text stays out of this work. The widget calls a text function that does nothing until the font system is ported.
+Text stays out of this work. The widget calls a text function that does nothing until the font system is ported. The differential test records each call to that function and compares its arguments with the calls the original makes.
 
 ## User stories
 1. As a developer of the port, I want each primitive to match the original pixel for pixel, so that later screens look the same as the original.
@@ -27,6 +27,8 @@ Text stays out of this work. The widget calls a text function that does nothing 
 - The port keeps the clip rule of the original. A line, fill, darken, glyph table or capture does nothing when any part of it is off screen. An outline rectangle applies that rule to each side on its own, so the sides that are fully on screen still draw.
 - The port always uses RGB565. The original also supports RGB555 at run time. The port drops that branch, because the RGN loader already converts images to RGB565.
 - The eight glyph tables for scroll arrows and popup arrows are copied from the original into the source.
+- A widget draws its three marks as text characters unless the global at `DAT_009cc2c4` is -1. Only then does it use the glyph tables. The original starts with -2. Nothing in this work sets the global.
+- Picture widgets share one cached image per file name, as the original does.
 - The colours that the original sets up at start (`FUN_005e4560`) are constants in the port, because they depend only on the pixel format. The differential test checks each constant against the original.
 - The ported primitives go in a new module named after gui_utils.cpp. The function addresses sit next to that file's asserts in the original, so the name is an inference from link order.
 - The existing drawing functions in the display module stay as they are in this work.
@@ -45,7 +47,6 @@ The repo has no other tests.
 ## Out of scope
 - Text and fonts. The widget's text call is a stub.
 - The ellipse panel style, flag 0x10000 (`FUN_005e7840` and `FUN_005e7aa0`).
-- Picture widgets that load an RGN file by name. The test covers widgets with no picture.
 - Mouse and keyboard handling for areas, widgets and scrollbars.
 - The screen manager's own functions in scrman.cpp.
 - Any change to the RGN display path of the current app.
@@ -78,8 +79,8 @@ Merge danger: two-way door. Blast radius: wrong edges move every widget on a scr
 Blocked by: 2, 3
 Delivers: widget draw with the text call as a stub, and the eight glyph tables.
 Merge danger: two-way door. Blast radius: limited to widget appearance.
-- [ ] Pixel-exact match for widgets with no text, for each widget flag.
-- [ ] Pixel-exact match for popup arrows on all four sides.
+- [x] Pixel-exact match for widgets with no text, for each widget flag.
+- [x] Pixel-exact match for popup arrows on all four sides.
 
 ### 5. Area draw and scrollbar draw
 Blocked by: 4

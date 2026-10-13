@@ -64,6 +64,11 @@ static const field_t widget_fields[] = {
     SCALAR(widget_t, fixed_y1, true), SCALAR(widget_t, fixed_y2, true),
     SCALAR(widget_t, style, false), SCALAR(widget_t, colour, false),
     SCALAR(widget_t, area, true), SCALAR(widget_t, popup_area, true),
+    SCALAR(widget_t, text_flags, false), SCALAR(widget_t, text_param, true),
+    SCALAR(widget_t, highlight_colour, false),
+    SCALAR(widget_t, text_colour, false),
+    SCALAR(widget_t, second_colour, false), ARRAY(widget_t, text, false),
+    SCALAR(widget_t, lighten_once, true), SCALAR(widget_t, highlighted, true),
 };
 
 #define COUNT(table) (sizeof(table) / sizeof((table)[0]))
@@ -187,9 +192,27 @@ static bool list_fields(const char *args)
     return true;
 }
 
+/* "image widget 3 saved": one image that a struct of the scene points to. */
+static bool show_image(const char *args)
+{
+    char kind[16], which[16];
+    int index;
+
+    if (sscanf(args, "%15s %d %15s", kind, &index, which) != 3) return false;
+    if (strcmp(kind, "widget") || index < 0 || index >= SCENE_WIDGETS) {
+        return false;
+    }
+    print_image(!strcmp(which, "saved") ? widgets[index].saved
+                                        : widgets[index].picture);
+    return true;
+}
+
 bool scene_command(const char *cmd, const char *args)
 {
     int index = atoi(args);
+    int second = 0;
+
+    sscanf(args, "%*d %d", &second);
 
     if (!strcmp(cmd, "scene_reset")) {
         reset();
@@ -198,6 +221,22 @@ bool scene_command(const char *cmd, const char *args)
     if (!strcmp(cmd, "fields")) return list_fields(args);
     if (!strcmp(cmd, "set")) return set_field(args);
     if (!strcmp(cmd, "get")) return get_fields(args);
+    if (!strcmp(cmd, "image")) return show_image(args);
+    if (!strcmp(cmd, "symbol_font")) {
+        guio_symbol_font = index;
+        return true;
+    }
+    if (!strcmp(cmd, "draw_widget")) {
+        if (index < 0 || index >= SCENE_WIDGETS) return false;
+        widget_draw(&widgets[index], second != 0);
+        return true;
+    }
+    if (!strcmp(cmd, "same_picture")) {
+        if (index < 0 || index >= SCENE_WIDGETS) return false;
+        if (second < 0 || second >= SCENE_WIDGETS) return false;
+        printf("%d\n", widgets[index].picture == widgets[second].picture);
+        return true;
+    }
     if (index < 0 || index >= SCENE_AREAS) return false;
 
     if (!strcmp(cmd, "layout")) {

@@ -5,12 +5,10 @@
 #include "display.h"
 #include "gui_utils.h"
 #include "port_scene.h"
+#include "port_text.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-extern cm_image_t *rgn_load(const char *path);
-extern void rgn_free(cm_image_t *img);
 
 #define FB_PIXELS (CM_INTERNAL_WIDTH * CM_INTERNAL_HEIGHT)
 #define MAX_GLYPH (2 + 255 * 255)
@@ -23,7 +21,7 @@ static void fill_noise(u32 seed)
     }
 }
 
-static void print_image(const cm_image_t *img)
+void print_image(const cm_image_t *img)
 {
     if (!img) {
         printf("0\n");
@@ -102,9 +100,13 @@ int main(void)
         } else if (!strcmp(cmd, "rect")) {
             gui_rect(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
         } else if (!strcmp(cmd, "palette")) {
-            printf("%u %u\n", GUI_COLOUR_NAVY, GUI_COLOUR_YELLOW);
+            printf("%u %u %u %u %u %u\n", GUI_COLOUR_NAVY, GUI_COLOUR_YELLOW,
+                   GUI_COLOUR_BLACK, GUI_COLOUR_LIGHT_GREY, GUI_COLOUR_ORANGE,
+                   GUI_COLOUR_RED);
         } else if (!strcmp(cmd, "panel")) {
             gui_panel(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
+        } else if (!strcmp(cmd, "text_calls")) {
+            text_print_calls();
         } else if (!strcmp(cmd, "darken")) {
             gui_darken(a[0], a[1], a[2], a[3]);
         } else if (!strcmp(cmd, "glyph")) {
