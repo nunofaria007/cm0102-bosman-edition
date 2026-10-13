@@ -43,4 +43,22 @@ bool gui_font_load(s32 font, const char *path);
 /* The bitmap font part of FUN_005e4a60: loads the seven files of the original. */
 bool gui_fonts_load(const char *data_dir);
 
+/*
+ * Text rules of the original, for both functions below. "#xxxx#" with four
+ * hex digits stands for the character with that code. "|" counts as a space.
+ * A character below 0x20 has no width. A code above 0xff reads past the font
+ * in the original. The port gives it no glyph. Font -1 means no text.
+ */
+
+/* FUN_005e5ad0. Width of the text in pixels. */
+s32 gui_line_width(s16 font, const char *text);
+
+/*
+ * FUN_005e5160. Draws the text with its top-left corner at (x, y). A glyph
+ * that is partly off screen is left out. `cursor` is the index of the
+ * character that gets a cursor mark before it, or -1.
+ */
+void gui_draw_line(s32 x, s32 y, s16 font, u16 colour, const char *text,
+                   s32 cursor);
+
 #endif

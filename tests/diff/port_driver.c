@@ -59,6 +59,22 @@ static void dump_font(s32 index)
     printf("\n");
 }
 
+/* Reads a text that the test sends as "-" and two hex digits for each byte. */
+static const char *read_text(const char *args)
+{
+    static char text[4096];
+    const char *hex = strrchr(args, '-');
+    size_t length = 0;
+    unsigned value;
+
+    for (hex = hex ? hex + 1 : ""; sscanf(hex, "%2x", &value) == 1; hex += 2) {
+        if (length == sizeof(text) - 1) break;
+        text[length++] = (char)value;
+    }
+    text[length] = '\0';
+    return text;
+}
+
 /* "glyph x y colour hex": the hex digits are a whole glyph table, or "null". */
 static bool run_glyph(const char *args)
 {
@@ -138,6 +154,13 @@ int main(void)
             printf("%d\n", gui_font_load(a[0], path));
         } else if (!strcmp(cmd, "font_dump")) {
             dump_font(a[0]);
+        } else if (!strcmp(cmd, "line_width")) {
+            printf("%d\n", gui_line_width((s16)a[0], read_text(args)));
+        } else if (!strcmp(cmd, "draw_line")) {
+            gui_draw_line(a[0], a[1], (s16)a[2], (u16)a[3], read_text(args),
+                          a[4]);
+        } else if (!strcmp(cmd, "put")) {
+            display_put_pixel(a[0], a[1], (u16)a[2]);
         } else if (!strcmp(cmd, "text_calls")) {
             text_print_calls();
         } else if (!strcmp(cmd, "darken")) {

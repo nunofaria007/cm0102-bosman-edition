@@ -164,6 +164,14 @@ class Original:
             text += byte
         return text.decode("latin-1")
 
+    def alloc_bytes(self, data):
+        addr = self.alloc(len(data))
+        self.write(addr, data)
+        return addr
+
+    def put_pixel(self, x, y, value):
+        self.write(FB_BASE + y * PITCH + x * 2, struct.pack("<H", value))
+
     def alloc_c_string(self, text):
         data = text.encode("latin-1") + b"\0"
         addr = self.alloc(len(data))
@@ -198,7 +206,7 @@ class Original:
     # Calls
 
     def call(self, addr, *args, this=0):
-        """Calls a cdecl function, or a thiscall function with `this`. Returns EAX."""
+        """Calls a cdecl function, or a thiscall function with `this`. Returns EAX as a signed number."""
         sp = STACK_BASE + STACK_SIZE - 0x1000
         for arg in reversed(args):
             sp -= 4
@@ -216,7 +224,8 @@ class Original:
             raise RuntimeError(f"emulation of {addr:#x} failed: {self.error}")
         if self.uc.reg_read(UC_X86_REG_EIP) != RETURN_ADDR:
             raise RuntimeError(f"emulation of {addr:#x} did not return in time")
-        return self.uc.reg_read(UC_X86_REG_EAX)
+        eax = self.uc.reg_read(UC_X86_REG_EAX)
+        return eax - (1 << 32) if eax & 0x80000000 else eax
 
     # Hooks
 

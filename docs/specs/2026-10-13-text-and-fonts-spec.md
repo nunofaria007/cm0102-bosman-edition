@@ -25,9 +25,10 @@ The original has a second text path through the T2K font engine, and it is the d
 - The port drops the mode switch that the widget draw had for that global. A widget always draws its three marks from glyph tables.
 - The widget field at 0x76 is the font number and the field at 0x78 is the text colour. The earlier names (text colour and second colour) were wrong. The field at 0x44 is the cursor place for the text function.
 - The text function takes its arguments in the order of the original: box, flags, font, colour, text, cursor.
-- A font has a height and 256 glyphs. Each glyph has a width, the bytes in one pixel row, a left gap, a right gap and its pixel rows. A pixel row holds two pixels per byte, 4 bits each: 0 leaves the screen as it is, 15 sets the text colour, and any other value blends the two.
+- A font has a height and 256 glyphs. Each glyph has a width, the bytes in one pixel row, a left gap, a right gap and its pixel rows. A pixel row holds two pixels per byte, 4 bits each: 0 leaves the screen as it is, 15 sets the text colour, and any other value blends the two. The original keeps the colours of the screen pixel under its last blended pixel and reads the screen again only when the next screen pixel differs from the last pixel it wrote. The port copies this, because it changes pixels.
 - The original loads the seven files into fonts 1 to 7. It has no font 0: the place that its code works out for font 0 holds the pixel format and the palette, so text in font 0 is undefined there. The port keeps font 0 empty, and text in font 0 draws nothing. The differential test leaves font 0 out of text cases.
 - The two Trade Condensed fonts copy some glyphs to other character codes after the load, as the original does.
+- A character code above 0xff, which a `#xxxx#` code can give, reads past the glyphs of the font in the original. The port gives such a character no glyph and no width.
 - The app takes the game data folder from a `--data <folder>` argument. The default is `./Data`.
 - The app gets a `--demo` argument that draws one area with widgets and text. It is a developer aid and not part of the original.
 - The differential test sets the font global of the original to -1 and loads the fonts with the loader of the original.
@@ -64,8 +65,8 @@ Merge danger: two-way door. Blast radius: a wrong glyph field shifts or corrupts
 Blocked by: 1
 Delivers: text conversion with `#xxxx#` codes, the gap between two glyphs, the width of a line, and the draw of one line with the cursor mark.
 Merge danger: two-way door. Blast radius: wrong widths move all centred, right-aligned and wrapped text.
-- [ ] Equal widths for random strings in every font.
-- [ ] Equal pixels for random strings, fonts, colours, places and cursor places, on a noise picture.
+- [x] Equal widths for random strings in every font.
+- [x] Equal pixels for random strings, fonts, colours, places and cursor places, on a noise picture.
 
 ### 3. Text in a box
 Blocked by: 2
