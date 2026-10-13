@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.20)
+project(cm0102-mac C)
+
+set(CMAKE_C_STANDARD 11)
+
+find_package(SDL2 REQUIRED)
+
+add_executable(cm0102
+    src/main.c
+    src/si/display.c
+    src/si/os_compat.c
+    src/si/sound.c
+    src/si/input.c
+    src/si/rgn_loader.c
+    src/cm3/database.c
+)
+
+target_include_directories(cm0102 PRIVATE include ${SDL2_INCLUDE_DIRS})
+target_link_libraries(cm0102 PRIVATE ${SDL2_LIBRARIES})
+
+if(APPLE)
+    set_target_properties(cm0102 PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "Championship Manager 01/02"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "uk.co.sigames.cm0102"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+    )
+endif()
