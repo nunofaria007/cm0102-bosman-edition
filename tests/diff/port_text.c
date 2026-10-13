@@ -13,15 +13,15 @@
 static char g_calls[MAX_CALLS][1024];
 static s32 g_call_count;
 
-void gui_text(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, u16 colour,
-              u16 second_colour, const char *text, s32 param)
+void gui_text(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, s16 font, u16 colour,
+              const char *text, s32 cursor)
 {
     char *out;
 
     if (g_call_count == MAX_CALLS) return;
     out = g_calls[g_call_count++];
     out += sprintf(out, "%d %d %d %d %u %u %u %d -", x1, y1, x2, y2, flags,
-                   colour, second_colour, param);
+                   (u16)font, colour, cursor);
     for (size_t i = 0; i < strlen(text) && i < 400; i++) {
         out += sprintf(out, "%02x", (unsigned char)text[i]);
     }

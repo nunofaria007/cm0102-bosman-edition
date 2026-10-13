@@ -9,8 +9,6 @@ from scene import Scene
 
 FUN_WIDGET_DRAW = 0x5EE590
 
-G_MARK_MODE = 0x9CC2C4
-MARK_MODE_AT_START = -2
 G_PICTURE_CACHE = 0xAE291C  # use count, then the file name (260 bytes), then the image
 
 PICTURE = 0x400
@@ -44,8 +42,8 @@ def _random_widget(ctx):
         "x1": box[0], "y1": box[1], "x2": box[2], "y2": box[3],
         "flags": _some(ctx, OTHER_FLAGS, 0.25), "style": _style(ctx, box),
         "colour": ctx.colour(), "highlight_colour": ctx.colour(),
-        "text_colour": ctx.colour(), "second_colour": ctx.colour(),
-        "text_flags": ctx.rng.getrandbits(32), "text_param": ctx.rng.randint(-5, 500),
+        "font": ctx.rng.randint(-1, 7), "text_colour": ctx.colour(),
+        "text_flags": ctx.rng.getrandbits(32), "cursor": ctx.rng.randint(-5, 500),
         "text": _text(ctx.rng.choice([b"", b"Arsenal", b"1\x01hidden", b"\x01", b"a\x01b\x01c"])),
         "lighten_once": ctx.rng.choice([0, 0, 1]), "highlighted": ctx.rng.choice([0, 0, 1]),
         "area": ctx.rng.choice([0, -1]), "popup_area": -1,
@@ -63,29 +61,11 @@ def _draw(ctx, scene, index, redraw, case):
     ctx.expect_equal(f"{case}: text calls", ctx.original.text_calls, ctx.port.text_calls())
 
 
-def set_mark_mode(ctx, value):
-    ctx.original.write(G_MARK_MODE, struct.pack("<i", value))
-    ctx.port.send("mark_mode", value)
-
-
-def test_widget_marks_at_start(ctx):
-    """The three marks before any test sets the mark mode, so the start value of the port counts."""
-    ctx.sync_framebuffer(15)
-    ctx.expect_equal("mark mode of the original", MARK_MODE_AT_START,
-                     struct.unpack("<i", ctx.original.read(G_MARK_MODE, 4))[0], source="wanted")
-    scene = Scene(ctx)
-    scene.set("widget", 0, {"x1": 100, "y1": 100, "x2": 260, "y2": 130, "flags": 0x4000 | 0x20000 | 0x40000,
-                            "style": 0x30, "colour": 0x8410, "second_colour": 0x1234, "area": -1, "popup_area": -1})
-    _draw(ctx, scene, 0, 1, "marks at start")
-    return 1
-
-
 def test_widget_draw(ctx):
     """Widget 0, drawn twice. Half the time it opens area 2 as a popup area."""
     ctx.sync_framebuffer(11)
     for case in range(1200):
         scene = Scene(ctx)
-        set_mark_mode(ctx, ctx.rng.choice([-2, -1, -1, 0, 7]))
         widget = _random_widget(ctx)
         scene.set("area", 0, {"x1": 10, "y1": 10, "x2": 500, "y2": 400, "owner_widget": -1})
         if ctx.rng.random() < 0.5:
@@ -100,7 +80,6 @@ def test_widget_draw(ctx):
         _draw(ctx, scene, 0, ctx.rng.randint(0, 1), f"widget case {case}")
         scene.set("widget", 0, {"highlighted": ctx.rng.randint(0, 1), "lighten_once": ctx.rng.choice([0, 1])})
         _draw(ctx, scene, 0, ctx.rng.randint(0, 1), f"widget case {case}, second draw")
-    set_mark_mode(ctx, MARK_MODE_AT_START)
     return (case + 1) * 2
 
 
@@ -157,12 +136,11 @@ def test_widget_picture(ctx):
             x, y = 50 + index % 4 * 150, 100 + index // 4 * 100
             scene.set("widget", index, {"x1": x, "y1": y, "x2": x + 100, "y2": y + 60,
                                         "flags": PICTURE | extra_flags[index], "style": 0x20, "colour": 0x8410,
-                                        "highlight_colour": 0xF81F, "second_colour": 0x4321,
+                                        "highlight_colour": 0xF81F, "text_colour": 0x4321,
                                         "highlighted": highlighted[index], "text": _text(name.encode()),
                                         "popup_area": popup_areas[index], "area": -1})
         for step, index in enumerate([0, 1, 2, 3, 4, 5, 0, 2]):
             case = f"picture step {step}, widget {index}"
-            set_mark_mode(ctx, -1 if step % 2 else MARK_MODE_AT_START)
             _draw(ctx, scene, index, 1, case)
             scene.expect_same_image(case, "widget", index, "picture")
             pointers = [struct.unpack("<I", original.read(scene.addr("widget", i) + OFFSET_PICTURE, 4))[0]
@@ -171,12 +149,10 @@ def test_widget_picture(ctx):
                 ctx.port.send("same_picture", index, other)
                 ctx.expect_equal(f"{case}: shares its image with widget {other}",
                                  int(pointers[index] == pointers[other]), int(ctx.port.reply()[0]))
-    set_mark_mode(ctx, MARK_MODE_AT_START)
     return step + 1
 
 
 TESTS = [
-    ("widget_marks_at_start", test_widget_marks_at_start),
     ("widget_draw", test_widget_draw),
     ("widget_popup_arrows", test_widget_popup_arrows),
     ("widget_picture", test_widget_picture),

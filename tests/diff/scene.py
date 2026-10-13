@@ -39,9 +39,9 @@ WIDGET_FIELDS = [
     ("fixed_y1", 0x30, "i", 1), ("fixed_y2", 0x34, "i", 1),
     ("style", 0x38, "I", 1), ("colour", 0x72, "H", 1),
     ("area", 0x7A, "h", 1), ("popup_area", 0x7C, "h", 1),
-    ("text_flags", 0x3C, "I", 1), ("text_param", 0x44, "i", 1),
-    ("highlight_colour", 0x74, "H", 1), ("text_colour", 0x76, "H", 1),
-    ("second_colour", 0x78, "H", 1), ("text", 0x80, "B", 260),
+    ("text_flags", 0x3C, "I", 1), ("cursor", 0x44, "i", 1),
+    ("highlight_colour", 0x74, "H", 1), ("font", 0x76, "h", 1),
+    ("text_colour", 0x78, "H", 1), ("text", 0x80, "B", 260),
     ("lighten_once", 0x184, "i", 1), ("highlighted", 0x188, "i", 1),
 ]
 

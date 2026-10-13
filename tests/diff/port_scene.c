@@ -66,10 +66,10 @@ static const field_t widget_fields[] = {
     SCALAR(widget_t, fixed_y1, true), SCALAR(widget_t, fixed_y2, true),
     SCALAR(widget_t, style, false), SCALAR(widget_t, colour, false),
     SCALAR(widget_t, area, true), SCALAR(widget_t, popup_area, true),
-    SCALAR(widget_t, text_flags, false), SCALAR(widget_t, text_param, true),
+    SCALAR(widget_t, text_flags, false), SCALAR(widget_t, cursor, true),
     SCALAR(widget_t, highlight_colour, false),
-    SCALAR(widget_t, text_colour, false),
-    SCALAR(widget_t, second_colour, false), ARRAY(widget_t, text, false),
+    SCALAR(widget_t, font, true), SCALAR(widget_t, text_colour, false),
+    ARRAY(widget_t, text, false),
     SCALAR(widget_t, lighten_once, true), SCALAR(widget_t, highlighted, true),
 };
 
@@ -256,10 +256,6 @@ bool scene_command(const char *cmd, const char *args)
     if (!strcmp(cmd, "get")) return get_fields(args);
     if (!strcmp(cmd, "image")) return show_image(args);
     if (!strcmp(cmd, "capture_to")) return capture_to(args);
-    if (!strcmp(cmd, "mark_mode")) {
-        g_mark_mode = index;
-        return true;
-    }
     if (!strcmp(cmd, "draw_widget")) {
         if (index < 0 || index >= SCENE_WIDGETS) return false;
         widget_draw(&g_widgets[index], second != 0);

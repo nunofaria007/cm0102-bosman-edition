@@ -14,6 +14,7 @@ add_executable(cm0102
     src/si/rgn_loader.c
     src/si/gui_utils.c
     src/si/gui_glyphs.c
+    src/si/gui_font.c
     src/si/gui_text.c
     src/si/guio.c
     src/si/area.c
@@ -32,6 +33,8 @@ add_executable(port_driver
     src/si/rgn_loader.c
     src/si/gui_utils.c
     src/si/gui_glyphs.c
+    src/si/gui_font.c
+    src/si/os_compat.c
     src/si/guio.c
     src/si/area.c
 )

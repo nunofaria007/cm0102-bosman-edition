@@ -4,20 +4,23 @@ Usage:
     python tests/diff/run.py <path to cm0102.exe> <path to port_driver> [test name ...]
 
 Needs the unicorn package. The port driver is the CMake target port_driver.
+The fonts come from the Data folder next to cm0102.exe.
 """
+import os
 import random
 import subprocess
 import sys
 
 import cases_area
 import cases_area_draw
+import cases_font
 import cases_images
 import cases_panel
 import cases_primitives
 import cases_widget
 from original import FB_SIZE, HEIGHT, WIDTH, Original
 
-SUITES = [cases_primitives, cases_images, cases_panel, cases_area, cases_widget, cases_area_draw]
+SUITES = [cases_primitives, cases_images, cases_panel, cases_font, cases_area, cases_widget, cases_area_draw]
 
 
 class Mismatch(Exception):
@@ -65,9 +68,10 @@ class Port:
 
 
 class Context:
-    def __init__(self, original, port, seed):
+    def __init__(self, original, port, seed, data_dir):
         self.original = original
         self.port = port
+        self.data_dir = data_dir
         self.rng = random.Random(seed)
 
     def coord(self, limit):
@@ -124,15 +128,19 @@ def main(argv):
     unknown = set(wanted) - {name for name, _ in tests}
     if unknown:
         raise SystemExit(f"unknown test: {', '.join(sorted(unknown))}")
-    original = Original(argv[1])
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(argv[1])), "Data")
+    original = Original(argv[1], data_dir)
     port = Port(argv[2])
+    port.send("fonts", data_dir)
+    if port.reply() != [b"1"]:
+        raise SystemExit(f"the port cannot load the fonts from {data_dir}")
     failed = 0
     for name, test in tests:
         if name not in wanted:
             continue
         original.reset_heap()
         try:
-            count = test(Context(original, port, seed=name))
+            count = test(Context(original, port, seed=name, data_dir=data_dir))
             print(f"ok    {name}: {count} cases")
         except Mismatch as exc:
             failed += 1

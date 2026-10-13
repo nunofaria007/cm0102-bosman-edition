@@ -4,6 +4,7 @@ The DirectDraw back buffer is replaced with a fake surface whose Lock, Unlock
 and Blt write to an 800x600 RGB565 buffer in emulated memory.
 """
 import hashlib
+import os
 import struct
 
 from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
@@ -34,7 +35,20 @@ G_PIXEL_FORMAT = 0xAE3158    # DDPIXELFORMAT, 32 bytes
 
 FUN_INIT_PALETTE = 0x5E4560  # sets the colour globals from the pixel format
 
+# -1 selects the bitmap fonts. The original starts at -2, which selects the T2K font engine.
+G_FONT_MODE = 0x9CC2C4
+# Fonts of 0x1404 bytes each, addressed by font number. Only 1 to 7 exist: the place that the
+# code works out for font 0 holds the pixel format and the palette.
+G_FONTS = 0xAE1DAC
+FONT_SIZE = 0x1404
+FUN_FONT_LOAD = 0x5E4BA0     # (font number, path)
+FONT_FILES = {1: "arial_narrow_10.fnt", 2: "arial_narrow_11.fnt", 3: "arial_14.fnt", 4: "arial_16.fnt",
+              5: "arial_18.fnt", 6: "trade_cond_24_bold.fnt", 7: "trade_cond_28_bold.fnt"}
+
 # CRT functions replaced with host-side versions.
+CRT_DELETE = 0x944C94
+CRT_NEW = 0x944CF1
+CRT_MALLOC = 0x944E46
 CRT_FREE = 0x9452CA
 CRT_CALLOC = 0x945501
 CRT_FCLOSE = 0x945A09
@@ -63,7 +77,7 @@ def _align(n):
 
 
 class Original:
-    def __init__(self, exe_path):
+    def __init__(self, exe_path, data_dir):
         self.uc = Uc(UC_ARCH_X86, UC_MODE_32)
         self.error = None
         self._load_pe(exe_path)
@@ -74,6 +88,9 @@ class Original:
         uc.mem_map(FB_BASE, _align(FB_SIZE))
         uc.mem_map(SURFACE, PAGE)
         uc.mem_map(STUBS, PAGE)
+        # Functions with exception frames read and write fs:[0]. The segment base is 0 here.
+        uc.mem_map(0, PAGE)
+        self.heap_floor = HEAP_BASE
         self.heap_top = HEAP_BASE
 
         uc.mem_write(SURFACE, struct.pack("<I", VTABLE))
@@ -87,7 +104,10 @@ class Original:
 
         self.files = {}
         self._replace(CRT_CALLOC, 2, lambda count, size: self.alloc(count * size))
+        self._replace(CRT_MALLOC, 1, self.alloc)
+        self._replace(CRT_NEW, 1, self.alloc)
         self._replace(CRT_FREE, 1, lambda block: 0)
+        self._replace(CRT_DELETE, 1, lambda block: 0)
         self._replace(CRT_FOPEN, 2, self._fopen)
         self._replace(CRT_FREAD, 4, self._fread)
         self._replace(CRT_FCLOSE, 1, self._fclose)
@@ -105,6 +125,10 @@ class Original:
         self.write_u32(G_SCREEN_H, HEIGHT)
         uc.mem_write(G_PIXEL_FORMAT, struct.pack("<8I", 32, 0x40, 0, 16, 0xF800, 0x07E0, 0x001F, 0))
         self.call(FUN_INIT_PALETTE)
+        self.write_u32(G_FONT_MODE, -1)
+        for font, name in FONT_FILES.items():
+            if not self.load_font(font, os.path.join(data_dir, name)):
+                raise SystemExit(f"the original cannot load {name} from {data_dir}")
 
     def _load_pe(self, path):
         with open(path, "rb") as exe:
@@ -154,8 +178,15 @@ class Original:
         self.write(addr, bytes(size))
         return addr
 
+    def load_font(self, font, path):
+        """Loads a font with the loader of the original and keeps its memory through heap resets."""
+        loaded = self.call(FUN_FONT_LOAD, font, self.alloc_c_string(path))
+        self.heap_floor = self.heap_top
+        return loaded
+
     def reset_heap(self):
-        self.heap_top = HEAP_BASE
+        """Frees everything but the fonts, which the original loads once at the start."""
+        self.heap_top = self.heap_floor
 
     def framebuffer(self):
         return self.read(FB_BASE, FB_SIZE)

@@ -31,25 +31,19 @@ typedef struct widget {
     s32 fixed_y2;          /* 0x34 */
     u32 style;             /* 0x38, panel flags */
     u32 text_flags;        /* 0x3c, passed to gui_text */
-    s32 text_param;        /* 0x44, passed to gui_text */
+    s32 cursor;            /* 0x44, place of the cursor mark, -1 = none */
     cm_image_t *saved;     /* 0x4c, the screen under the widget */
     cm_image_t *picture;   /* 0x5c */
     u16 colour;            /* 0x72 */
     u16 highlight_colour;  /* 0x74, panel colour while highlighted */
-    u16 text_colour;       /* 0x76 */
-    u16 second_colour;     /* 0x78, passed to gui_text */
+    s16 font;              /* 0x76, 0 to 7, -1 = no text */
+    u16 text_colour;       /* 0x78 */
     s16 area;              /* 0x7a, index of the area it sits in, -1 = none */
     s16 popup_area;        /* 0x7c, index of the popup area it opens */
     char text[260];        /* 0x80 */
     s32 lighten_once;      /* 0x184, the next draw makes colour 10% lighter */
     s32 highlighted;       /* 0x188 */
 } widget_t;
-
-/*
- * DAT_009cc2c4. At -1 a widget draws its three marks from glyph tables. At
- * any other value it draws them as text characters. The original starts at -2.
- */
-extern s32 g_mark_mode;
 
 /* FUN_005ee590. `redraw` drops the saved screen and captures it again. */
 void widget_draw(widget_t *widget, bool redraw);

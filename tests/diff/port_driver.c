@@ -3,6 +3,7 @@
  * Reads one text command per line on stdin and writes the result to stdout.
  */
 #include "display.h"
+#include "gui_font.h"
 #include "gui_utils.h"
 #include "port_driver.h"
 #include "port_scene.h"
@@ -37,6 +38,25 @@ void print_image(const cm_image_t *img)
            img->significant_bits, img->r_mask, img->g_mask, img->b_mask,
            img->field_2c);
     fwrite(img->pixels, 1, (size_t)img->data_size, stdout);
+}
+
+/* "font_dump 3": the height, then five words for each of the 256 glyphs. */
+static void dump_font(s32 index)
+{
+    const gui_font_t *font = &g_fonts[index];
+
+    printf("%d", font->height);
+    for (s32 c = 0; c < GUI_FONT_CHARS; c++) {
+        const gui_glyph_t *glyph = &font->glyphs[c];
+        s32 size = glyph->rows ? glyph->row_bytes * font->height : 0;
+
+        printf(" %d %d %d %d -", glyph->width, glyph->row_bytes, glyph->left,
+               glyph->right);
+        for (s32 i = 0; i < size; i++) {
+            printf("%02x", glyph->rows[i]);
+        }
+    }
+    printf("\n");
 }
 
 /* "glyph x y colour hex": the hex digits are a whole glyph table, or "null". */
@@ -110,6 +130,14 @@ int main(void)
                    GUI_COLOUR_ORANGE, GUI_COLOUR_RED, GUI_COLOUR_GREY);
         } else if (!strcmp(cmd, "panel")) {
             gui_panel(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
+        } else if (!strcmp(cmd, "fonts")) {
+            sscanf(args, "%1023s", path);
+            printf("%d\n", gui_fonts_load(path));
+        } else if (!strcmp(cmd, "font_load")) {
+            sscanf(args, "%*d %1023s", path);
+            printf("%d\n", gui_font_load(a[0], path));
+        } else if (!strcmp(cmd, "font_dump")) {
+            dump_font(a[0]);
         } else if (!strcmp(cmd, "text_calls")) {
             text_print_calls();
         } else if (!strcmp(cmd, "darken")) {

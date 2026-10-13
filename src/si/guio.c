@@ -7,8 +7,6 @@
 extern cm_image_t *rgn_load(const char *path);
 extern void rgn_free(cm_image_t *img);
 
-s32 g_mark_mode = -2;
-
 /* One picture stays cached while widgets use it. Its file name shares it. */
 static char g_cached_name[sizeof(((widget_t *)0)->text)]; /* DAT_00ae2920 */
 static cm_image_t *g_cached_picture;                       /* DAT_00ae2a24 */
@@ -75,19 +73,13 @@ static void draw_popup_arrow(const widget_t *widget, s32 dx, s32 dy)
                    mark_colour(widget), glyph);
 }
 
+/* With the T2K fonts, the original draws a mark as a text character. */
 static void draw_mark(const widget_t *widget, s32 dx, s32 dy, const u8 *glyph,
-                      u16 colour, char symbol)
+                      u16 colour)
 {
-    if (g_mark_mode == -1) {
-        gui_draw_glyph(widget->x2 - glyph[0] - 4 + dx,
-                       centred(widget->y1, widget->y2, glyph[1]) + dy, colour,
-                       glyph);
-    } else {
-        const char text[2] = { symbol, '\0' };
-
-        gui_text(widget->x1 + dx, widget->y1 + dy, widget->x2 - 4 + dx,
-                 widget->y2 + dy, 0x48, 0, widget->second_colour, text, -1);
-    }
+    gui_draw_glyph(widget->x2 - glyph[0] - 4 + dx,
+                   centred(widget->y1, widget->y2, glyph[1]) + dy, colour,
+                   glyph);
 }
 
 void widget_draw(widget_t *widget, bool redraw)
@@ -136,13 +128,13 @@ void widget_draw(widget_t *widget, bool redraw)
                        mark_colour(widget), gui_glyph_tick);
     }
     if (widget->flags & WIDGET_MARK_RIGHT) {
-        draw_mark(widget, dx, dy, gui_glyph_mark_right, GUI_COLOUR_ORANGE, '+');
+        draw_mark(widget, dx, dy, gui_glyph_mark_right, GUI_COLOUR_ORANGE);
     }
     if (widget->flags & WIDGET_MARK_UP) {
-        draw_mark(widget, dx, dy, gui_glyph_mark_up, GUI_COLOUR_ORANGE, ',');
+        draw_mark(widget, dx, dy, gui_glyph_mark_up, GUI_COLOUR_ORANGE);
     }
     if (widget->flags & WIDGET_MARK_DOWN) {
-        draw_mark(widget, dx, dy, gui_glyph_mark_down, GUI_COLOUR_RED, '-');
+        draw_mark(widget, dx, dy, gui_glyph_mark_down, GUI_COLOUR_RED);
     }
 
     if (!(widget->flags & WIDGET_PICTURE)) {
@@ -153,8 +145,8 @@ void widget_draw(widget_t *widget, bool redraw)
             if (stop) *stop = '\0';
         }
         gui_text(widget->x1 + dx, widget->y1 + dy, widget->x2 + dx,
-                 widget->y2 + dy, widget->text_flags, widget->text_colour,
-                 widget->second_colour, widget->text, widget->text_param);
+                 widget->y2 + dy, widget->text_flags, widget->font,
+                 widget->text_colour, widget->text, widget->cursor);
         if (stop) *stop = 1;
     }
 }

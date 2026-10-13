@@ -1,7 +1,7 @@
 """Cases for area draw and scrollbar draw."""
 from cases_area import FUN_AREA_LAYOUT, _weights
 from cases_panel import ELLIPSE, divides_by_zero
-from cases_widget import MARK_MODE_AT_START, OTHER_FLAGS, _some, _text, set_mark_mode
+from cases_widget import OTHER_FLAGS, _some, _text
 from scene import Scene
 
 FUN_AREA_DRAW = 0x402E70
@@ -31,8 +31,8 @@ def _member(ctx, columns, total_rows):
         "column": ctx.rng.randrange(columns), "row": ctx.rng.randrange(total_rows),
         "flags": _some(ctx, OTHER_FLAGS, 0.2), "style": style | ctx.rng.choice([0, 0x20, 0x30]),
         "colour": ctx.colour(), "highlight_colour": ctx.colour(),
-        "text_colour": ctx.colour(), "second_colour": ctx.colour(),
-        "text_flags": ctx.rng.getrandbits(32), "text_param": ctx.rng.randint(-5, 500),
+        "font": ctx.rng.randint(-1, 7), "text_colour": ctx.colour(),
+        "text_flags": ctx.rng.getrandbits(32), "cursor": ctx.rng.randint(-5, 500),
         "text": _text(ctx.rng.choice([b"", b"Arsenal", b"1\x01hidden"])),
         "lighten_once": ctx.rng.choice([0, 0, 0, 1]), "highlighted": ctx.rng.choice([0, 0, 0, 1]),
         "area": AREA, "popup_area": -1,
@@ -78,7 +78,6 @@ def test_area_draw(ctx):
     errors = []
     for case in range(500):
         scene = Scene(ctx)
-        set_mark_mode(ctx, ctx.rng.choice([MARK_MODE_AT_START, -1]))
 
         columns, rows = ctx.rng.randint(1, 6), ctx.rng.randint(1, 10)
         total_rows = rows + (ctx.rng.randint(1, 12) if ctx.rng.random() < 0.5 else 0)
@@ -122,7 +121,6 @@ def test_area_draw(ctx):
         _draw(ctx, scene, members, ctx.rng.randint(0, 1), f"area case {case}, drawn again")
     ctx.expect_equal("the original met an area with no first widget", True,
                      LINE_NO_FIRST_WIDGET in errors, source="wanted")
-    set_mark_mode(ctx, MARK_MODE_AT_START)
     return (case + 1) * 3
 
 
