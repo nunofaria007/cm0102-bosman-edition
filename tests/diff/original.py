@@ -280,14 +280,26 @@ class Original:
         return 0
 
     def _sprintf(self, buffer, text_format, *values):
-        """Enough of sprintf for the formats the drawing code needs: plain text and %c."""
-        pieces = self.read_c_string(text_format).split("%c")
-        if any("%" in piece for piece in pieces):
-            self.write(buffer, b"\0")
-            return 0
-        text = pieces[0]
-        for value, piece in zip(values, pieces[1:]):
-            text += chr(value & 0xFF) + piece
+        """Enough of sprintf for the formats the ported code needs: plain text, %c and %s."""
+        text_format = self.read_c_string(text_format)
+        values = list(values)
+        text = ""
+        position = 0
+        while position < len(text_format):
+            char = text_format[position]
+            kind = text_format[position + 1:position + 2]
+            position += 1
+            if char != "%":
+                text += char
+                continue
+            position += 1
+            if kind == "c":
+                text += chr(values.pop(0) & 0xFF)
+            elif kind == "s":
+                text += self.read_c_string(values.pop(0))
+            else:
+                self.write(buffer, b"\0")
+                return 0
         self.write(buffer, text.encode("latin-1") + b"\0")
         return len(text)
 

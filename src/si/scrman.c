@@ -40,6 +40,9 @@ void scrman_reset(scrman_t *sm, bool release)
         for (s16 i = 0; i < sm->area_slots; i++) {
             area_release(&sm->areas[i]);
         }
+        for (s16 i = 0; i < sm->widget_slots; i++) {
+            widget_release(&sm->widgets[i]);
+        }
     }
     sm->mode = 0;
     sm->area_count = 0;
@@ -87,5 +90,36 @@ s16 scrman_area_create(scrman_t *sm, s32 x1, s32 y1, s32 x2, s32 y2,
               column_count, column_weights, row_count, row_weights,
               flags, colour, owner_widget);
     append_to_order(sm, index);
+    return index;
+}
+
+s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
+                         s32 y2, s32 column, s32 row, u32 style, u16 colour,
+                         u16 highlight_colour, u32 text_flags, s16 font,
+                         u16 text_colour, const char *text, s32 unknown_40,
+                         s32 unknown_08, intptr_t unknown_48, s16 area)
+{
+    s16 index = sm->widget_slots;
+
+    if (index >= SCRMAN_MAX_WIDGETS - 1) {
+        sm->widget_overflow = 1;
+        return -1;
+    }
+    sm->widget_slots++;
+    memset(&sm->widgets[index], 0, sizeof(sm->widgets[index]));
+    widget_init(&sm->widgets[index], sm->areas, sm->widgets, index, flags,
+                x1, y1, x2, y2, column, row, style, colour, highlight_colour,
+                text_flags, font, text_colour, text, unknown_40, unknown_08,
+                unknown_48, area);
+    if (area != -1) {
+        /* An index outside the areas reaches other memory in the original. */
+        if (area >= 0 && area < SCRMAN_MAX_AREAS) {
+            area_add_widget(&sm->areas[area], index);
+        }
+        return index;
+    }
+    /* The original shows an error box here (display.cpp 746). */
+    if (sm->widget_count > SCRMAN_MAX_WIDGETS - 1) return index;
+    sm->widget_order[sm->widget_count++] = index;
     return index;
 }

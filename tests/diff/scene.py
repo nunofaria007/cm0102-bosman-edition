@@ -18,7 +18,7 @@ AREA_FIELDS = [
     ("column_x1", 0x01C, "i", 30), ("row_y1", 0x094, "i", 30),
     ("column_x2", 0x10C, "i", 30), ("row_y2", 0x184, "i", 30),
     ("scroll_to", 0x1FC, "i", 1), ("colour", 0x20C, "H", 1), ("owner_widget", 0x20E, "h", 1),
-    ("unknown_210", 0x210, "h", 1),
+    ("unknown_210", 0x210, "h", 1), ("unknown_b78", 0xB78, "h", 1),
     ("widget_index", 0x212, "h", 1200), ("index", 0xB72, "h", 1), ("widget_count", 0xB74, "h", 1),
     ("first_visible", 0xB76, "h", 1),
     ("scrollbar.x1", 0xB7A, "i", 1), ("scrollbar.y1", 0xB7E, "i", 1),
@@ -42,9 +42,15 @@ WIDGET_FIELDS = [
     ("area", 0x7A, "h", 1), ("popup_area", 0x7C, "h", 1),
     ("text_flags", 0x3C, "I", 1), ("cursor", 0x44, "i", 1),
     ("highlight_colour", 0x74, "H", 1), ("font", 0x76, "h", 1),
-    ("text_colour", 0x78, "H", 1), ("text", 0x80, "B", 260),
+    ("text_colour", 0x78, "H", 1), ("text", 0x80, "B", 256),
     ("lighten_once", 0x184, "i", 1), ("highlighted", 0x188, "i", 1),
+    ("unknown_08", 0x08, "i", 1), ("unknown_40", 0x40, "i", 1), ("unknown_48", 0x48, "I", 1),
+    ("tick", 0x50, "i", 1), ("index", 0x70, "h", 1), ("unknown_7e", 0x7E, "h", 1),
+    ("unknown_180", 0x180, "i", 1),
 ]
+
+OFFSET_WIDGET_WIDGETS = 0x04
+OFFSET_WIDGET_TEXT_SOURCE = 0x54
 
 # The screen manager without its areas and widgets. Three pointers are not listed: the two images
 # in IMAGES and one at 0x12F529.
@@ -83,6 +89,9 @@ NET_CAPACITY = 0x1000
 FUN_MANAGER_NEW = 0x55EF50       # thiscall (argument)
 FUN_MANAGER_RESET = 0x55F7C0     # thiscall (release)
 FUN_AREA_CREATE = 0x55FBA0       # thiscall, 11 arguments
+FUN_WIDGET_CREATE = 0x55F990     # thiscall, 18 arguments
+FUN_WIDGET_DRAW = 0x5EE590       # thiscall (redraw)
+G_TICK = 0xB67A08                # widget init copies it into each widget
 
 RANGES = {"B": (0, 0xFF), "h": (-0x8000, 0x7FFF), "H": (0, 0xFFFF),
           "i": (-0x80000000, 0x7FFFFFFF), "I": (0, 0xFFFFFFFF)}
@@ -254,3 +263,40 @@ class ManagerScene(Scene):
         self.ctx.port.send("manager_area", *words)
         self.ctx.expect_equal(f"{case}: area index", result, int(self.ctx.port.reply()[0]))
         return result
+
+    def set_tick(self, tick):
+        self.ctx.original.write_u32(G_TICK, tick)
+        self.ctx.port.send("tick", tick)
+
+    def widget_create(self, case, flags, box, column, row, style, colour, highlight, text_flags, font,
+                      text_colour, text, unknown_40, unknown_08, unknown_48, area):
+        """Creates a widget in both programs and returns its index. The text is bytes or None."""
+        original = self.ctx.original
+        pointer = original.alloc_bytes(text + b"\0") if text is not None else 0
+        result = original.call(FUN_WIDGET_CREATE, flags, *box, column, row, style, colour, highlight,
+                               text_flags, font, text_colour, pointer, unknown_40, unknown_08, unknown_48,
+                               area, this=self.manager)
+        result = (result & 0xFFFF) - (0x10000 if result & 0x8000 else 0)
+        self.ctx.port.send("manager_widget", flags, *box, column, row, style, colour, highlight, text_flags,
+                           font, text_colour, unknown_40, unknown_08, unknown_48, area,
+                           "null" if text is None else "-" + text.hex())
+        self.ctx.expect_equal(f"{case}: widget index", result, int(self.ctx.port.reply()[0]))
+        if result != -1:
+            widget = self.addr("widget", result)
+            links = struct.unpack("<2I", original.read(widget, 8))
+            source = struct.unpack("<I", original.read(widget + OFFSET_WIDGET_TEXT_SOURCE, 4))[0]
+            self.ctx.expect_equal(f"{case}: text source of the original", True, source in (0, pointer),
+                                  source="wanted")
+            self.ctx.port.send("manager_wlinks", result)
+            self.ctx.expect_equal(f"{case}: widget {result} links and text source",
+                                  [int(links[0] == self.base["area"]), int(links[1] == self.base["widget"]),
+                                   int(source != 0)], [int(v) for v in self.ctx.port.reply()])
+        return result
+
+    def draw_widget(self, index, redraw):
+        self.ctx.original.call(FUN_WIDGET_DRAW, redraw, this=self.addr("widget", index))
+        self.ctx.port.send("manager_draw", index, redraw)
+
+    def area_count(self):
+        """The areas in use, as the original counts them."""
+        return struct.unpack("<h", self.ctx.original.read(self.manager + 0x12E99E, 2))[0]

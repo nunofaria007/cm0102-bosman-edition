@@ -52,6 +52,7 @@ typedef struct area {
     s16 index;                            /* 0xb72, of this area */
     s16 widget_count;                     /* 0xb74 */
     s16 first_visible;                    /* 0xb76, into widget_index */
+    s16 unknown_b78;                      /* 0xb78, a place in widget_index */
     area_scrollbar_t scrollbar;           /* 0xb7a */
     u8 column_count;                      /* 0xbab */
     u8 row_count;                         /* 0xbac, rows shown at once */
@@ -71,6 +72,14 @@ void area_init(area_t *area, struct area *areas, widget_t *widgets, s16 index,
                u8 column_count, const u8 *column_weights,
                u8 row_count, const u8 *row_weights,
                u32 flags, u16 colour, s16 owner_widget);
+
+/*
+ * FUN_00403200. Puts a widget of the screen manager into the area, after the
+ * widgets with the same or a lower row. An area with AREA_GRID_ONLY takes no
+ * widgets. The original takes a widget when the area holds 1199 and then
+ * writes past the list. The port takes none then.
+ */
+void area_add_widget(area_t *area, s16 widget);
 
 /*
  * FUN_00403350. Splits the area into columns and rows by weight and sets up

@@ -56,10 +56,10 @@ void scrman_init(scrman_t *sm, u32 arg);
 
 /*
  * FUN_0055f7c0. Empties the screen manager and frees unknown_12f521.
- * `release` frees the saved screens of every area in use first, unless
- * unknown_12f555 is set. Without that, the next create that takes the slot
- * of an area drops its saved screens without freeing them, as the original
- * does.
+ * `release` releases every area and widget in use first (area_release,
+ * widget_release), unless unknown_12f555 is set. Without that, the next
+ * create that takes the slot of an area or widget drops its saved screens
+ * and its picture without freeing them, as the original does.
  */
 void scrman_reset(scrman_t *sm, bool release);
 
@@ -70,6 +70,19 @@ void scrman_reset(scrman_t *sm, bool release);
  * NULL or the count is 0 or 30. A count above 30 writes past the tables in
  * the original. The port sets 30 weights then.
  */
+/*
+ * FUN_0055f990. Returns the index of the new widget, or -1 when 1199 widgets
+ * are in use: the original never uses the last of its 1200 slots. A widget
+ * with an area goes into that area (area_add_widget). A widget with area -1
+ * goes into the draw order of the screen manager. See widget_init for the
+ * rest.
+ */
+s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
+                         s32 y2, s32 column, s32 row, u32 style, u16 colour,
+                         u16 highlight_colour, u32 text_flags, s16 font,
+                         u16 text_colour, const char *text, s32 unknown_40,
+                         s32 unknown_08, intptr_t unknown_48, s16 area);
+
 s16 scrman_area_create(scrman_t *sm, s32 x1, s32 y1, s32 x2, s32 y2,
                        u8 column_count, const u8 *column_weights,
                        u8 row_count, const u8 *row_weights,

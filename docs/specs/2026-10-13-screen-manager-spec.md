@@ -40,6 +40,16 @@ Port the functions of the original that build, draw and empty one screen manager
 - After each error box the original sets `DAT_00b67a34` to 0. It looks like the state of the left mouse button. The port does not do this until it has mouse handling.
 - The image loader of the port counts the images it frees. The differential test compares that count with the frees of the original, because a pointer set to nothing looks the same with and without a free.
 - Widget create sets three fields whose purpose is not known: 0x08, 0x40 and 0x48. Widget init also stores the tick count of the original (`DAT_00b67a08`) at 0x50 and sets 0x7e to -1. The port stores them under offset names. The differential test compares them and sets the tick count to a fixed value.
+- Widget create of the original refuses a new widget when 1199 are in use, so the last of its 1200 slots stays empty. The port does the same.
+- The text of a widget holds 256 bytes, and a field at 0x180 follows it. The earlier spec gave 260 bytes. The original copies a text with no limit. The port keeps 255 characters. No differential case uses a longer text.
+- Widget init puts a reversed box in order, except when the style has bit 0x400 and not bit 0x4000. The bits are those of the style, not of the widget flags.
+- A widget in a popup area gets five spaces before its text. It takes the next row of the area and the column after that of the last widget. The area becomes at least 125 pixels wide, or as wide as the text plus 15. Its height grows by the font height plus 6. A widget on an odd row gets the lighter colour.
+- For font 0 the original reads the font height from the pixel format, and the port reads 0. No differential case puts a widget with font 0 into a popup area.
+- A popup area with no columns makes the original divide by zero. The port uses column 0.
+- An area index outside the 250 areas makes the original read other memory. The port treats the widget as a widget in a plain area and does not add it to an area. An area that no create made has no widget array, and the original reads address 0 for it. No differential case uses either.
+- Add to area of the original takes a widget when the area holds 1199 and then writes one entry past its list. The port takes none then. Widget create cannot reach this state, because it stops at 1199 widgets.
+- Widget release frees the picture of a widget unless the text of the widget equals the name of the shared picture. Then it lowers the use count of the shared picture.
+- New fields with known purpose: the widget array of the screen manager at 0x04 of a widget, the index of a widget at 0x70, and the text of the caller at 0x54 for a text entry widget. Fields with offset names: 0x7e and 0x180 of a widget, and 0xb78 of an area, which the search for the last column uses as its place in the list.
 - The screen draw of the original takes the background file name from the screen stack (`FUN_007fee80`). The port's screen draw takes the name as an argument until the screen stack exists. The port passes the name to its RGN loader unchanged.
 - When the name differs from the last one, the screen draw loads that file. When the load fails, it loads `DEFAULT_PIC.RGN` from the data folder. When the name is empty, it captures the present screen as the background.
 - The port copies the five flags that the screen draw reads. Three are fields of the screen manager: skip the draw (0x12f53d), clear the screen (0x12f4fa) and darken once (0x12f535). Two are globals of the original: `DAT_00dd6bda` forces a fixed name and `DAT_00b77c8c` gates the clear. Nothing in this work sets them. The two globals start at 0 in the port.
@@ -83,10 +93,10 @@ Merge danger: two-way door. Blast radius: none for the current app, because the 
 Blocked by: 1
 Delivers: widget create with widget init and add to area, for a widget with no area, in a plain area and in a popup area. Adds widget release and calls it from the reset. Adds the new fields of the widget to its struct.
 Merge danger: two-way door. Blast radius: a wrong field or a wrong order in an area misplaces widgets on every later screen.
-- [ ] After random sequences of area create and widget create, every known field of each widget and each area equals the original, the row order of each area included.
-- [ ] A widget in a popup area changes the width, the height and the row count of that area as in the original.
-- [ ] The 1201st widget create returns -1 on both sides.
-- [ ] The reset frees the saved screen and the picture of every widget.
+- [x] After random sequences of area create and widget create, every known field of each widget and each area equals the original, the row order of each area included.
+- [x] A widget in a popup area changes the width, the height and the row count of that area as in the original.
+- [x] The 1200th widget create returns -1 on both sides.
+- [x] The reset frees the saved screen and the picture of every widget.
 
 ### 3. Screen draw
 Blocked by: 2

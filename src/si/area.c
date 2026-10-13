@@ -64,6 +64,27 @@ void area_init(area_t *area, struct area *areas, widget_t *widgets, s16 index,
     set_weights(area->row_weight, row_count, row_weights);
 }
 
+void area_add_widget(area_t *area, s16 widget)
+{
+    s16 count = area->widget_count;
+
+    if (widget == -1 || count >= AREA_MAX_WIDGETS - 1) return;
+    if (area->flags & AREA_GRID_ONLY) return;
+
+    s32 row = area->widgets[widget].row;
+
+    area->widget_count = count + 1;
+    if (row < area->first_row) area->first_row = row;
+    if (row > area->last_row) area->last_row = row;
+    while (--count >= 0) {
+        s16 other = area->widget_index[count];
+
+        if (area->widgets[other].row <= row) break;
+        area->widget_index[count + 1] = other;
+    }
+    area->widget_index[count + 1] = widget;
+}
+
 /* FUN_00403600. The original also stores the scrollbar address in DAT_00ad9c58. */
 static void setup_scrollbar(area_t *area, s32 margin_x, s32 margin_y)
 {

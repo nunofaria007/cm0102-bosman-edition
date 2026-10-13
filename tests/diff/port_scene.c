@@ -40,7 +40,8 @@ static const field_t area_fields[] = {
     ARRAY(area_t, column_x2, true), ARRAY(area_t, row_y2, true),
     SCALAR(area_t, scroll_to, true), SCALAR(area_t, colour, false),
     SCALAR(area_t, owner_widget, true),
-    SCALAR(area_t, unknown_210, true), ARRAY(area_t, widget_index, true),
+    SCALAR(area_t, unknown_210, true), SCALAR(area_t, unknown_b78, true),
+    ARRAY(area_t, widget_index, true),
     SCALAR(area_t, index, true), SCALAR(area_t, widget_count, true),
     SCALAR(area_t, first_visible, true),
     SCALAR(area_t, scrollbar.x1, true), SCALAR(area_t, scrollbar.y1, true),
@@ -73,6 +74,10 @@ static const field_t widget_fields[] = {
     SCALAR(widget_t, font, true), SCALAR(widget_t, text_colour, false),
     ARRAY(widget_t, text, false),
     SCALAR(widget_t, lighten_once, true), SCALAR(widget_t, highlighted, true),
+    SCALAR(widget_t, unknown_08, true), SCALAR(widget_t, unknown_40, true),
+    SCALAR(widget_t, unknown_48, false),
+    SCALAR(widget_t, tick, true), SCALAR(widget_t, index, true),
+    SCALAR(widget_t, unknown_7e, true), SCALAR(widget_t, unknown_180, true),
 };
 
 /* Same order as MANAGER_FIELDS in scene.py. */
@@ -117,9 +122,10 @@ static void reset(void)
     }
 }
 
-/* The tables hold fields of 1, 2 and 4 bytes only. */
+/* The tables hold fields of 1, 2 and 4 bytes, and intptr_t. */
 static long long read_value(const void *at, const field_t *field)
 {
+    if (field->size == sizeof(intptr_t)) return *(const intptr_t *)at;
     if (field->size == 1) return *(const u8 *)at;
     if (field->size == 2 && field->is_signed) return *(const s16 *)at;
     if (field->size == 2) return *(const u16 *)at;
@@ -129,7 +135,9 @@ static long long read_value(const void *at, const field_t *field)
 
 static void write_value(void *at, const field_t *field, long long value)
 {
-    if (field->size == 1) {
+    if (field->size == sizeof(intptr_t)) {
+        *(intptr_t *)at = (intptr_t)value;
+    } else if (field->size == 1) {
         *(u8 *)at = (u8)value;
     } else if (field->size == 2) {
         *(u16 *)at = (u16)value;
@@ -264,6 +272,13 @@ static cm_image_t **select_image(const char **args)
         if (!strcmp(which, "unknown_12f521")) return &g_manager.unknown_12f521;
         if (!strcmp(which, "background")) return &g_manager.background;
     }
+    if (!strcmp(kind, "manager_widget") && index >= 0 &&
+        index < SCRMAN_MAX_WIDGETS) {
+        widget_t *widget = &g_manager.widgets[index];
+
+        if (!strcmp(which, "saved")) return &widget->saved;
+        if (!strcmp(which, "picture")) return &widget->picture;
+    }
     if (!strcmp(kind, "manager_area") && index >= 0 &&
         index < SCRMAN_MAX_AREAS) {
         area_t *area = &g_manager.areas[index];
@@ -348,6 +363,41 @@ static bool manager_area(const char *args)
     return true;
 }
 
+/*
+ * "manager_widget" with 17 numbers in the order of scrman_widget_create, then
+ * the text as "null" or "-" and two hex digits for each byte.
+ */
+static bool manager_widget(const char *args)
+{
+    static char text[1024];
+    long long v[17];
+    const char *hex;
+    size_t length = 0;
+    unsigned value;
+    char *end;
+
+    for (int i = 0; i < 17; i++) {
+        v[i] = strtoll(args, &end, 10);
+        if (end == args) return false;
+        args = end;
+    }
+    while (*args == ' ') args++;
+    if (*args != '-' && strncmp(args, "null", 4)) return false;
+    for (hex = args + 1; *args == '-' && sscanf(hex, "%2x", &value) == 1;
+         hex += 2) {
+        if (length == sizeof(text) - 1) return false;
+        text[length++] = (char)value;
+    }
+    text[length] = '\0';
+
+    printf("%d\n", scrman_widget_create(
+        &g_manager, (u32)v[0], (s32)v[1], (s32)v[2], (s32)v[3], (s32)v[4],
+        (s32)v[5], (s32)v[6], (u32)v[7], (u16)v[8], (u16)v[9], (u32)v[10],
+        (s16)v[11], (u16)v[12], *args == '-' ? text : NULL, (s32)v[13],
+        (s32)v[14], (intptr_t)v[15], (s16)v[16]));
+    return true;
+}
+
 bool scene_command(const char *cmd, const char *args)
 {
     int index = (int)strtol(args, NULL, 10);
@@ -372,6 +422,25 @@ bool scene_command(const char *cmd, const char *args)
         return true;
     }
     if (!strcmp(cmd, "manager_area")) return manager_area(args);
+    if (!strcmp(cmd, "manager_widget")) return manager_widget(args);
+    if (!strcmp(cmd, "manager_wlinks")) {
+        if (index < 0 || index >= SCRMAN_MAX_WIDGETS) return false;
+        const widget_t *widget = &g_manager.widgets[index];
+
+        printf("%d %d %d\n", widget->areas == g_manager.areas,
+               widget->widgets == g_manager.widgets,
+               widget->text_source != NULL);
+        return true;
+    }
+    if (!strcmp(cmd, "manager_draw")) {
+        if (index < 0 || index >= SCRMAN_MAX_WIDGETS) return false;
+        widget_draw(&g_manager.widgets[index], second != 0);
+        return true;
+    }
+    if (!strcmp(cmd, "tick")) {
+        g_tick = index;
+        return true;
+    }
     if (!strcmp(cmd, "manager_links")) {
         if (index < 0 || index >= SCRMAN_MAX_AREAS) return false;
         const area_t *area = &g_manager.areas[index];

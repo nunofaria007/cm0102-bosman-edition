@@ -1,14 +1,16 @@
 #include "guio.h"
 #include "area.h"
+#include "gui_font.h"
 #include "gui_text.h"
 #include "gui_utils.h"
+#include <stdio.h>
 #include <string.h>
 
 extern cm_image_t *rgn_load(const char *path);
 extern void rgn_free(cm_image_t *img);
 
 /* One picture stays cached while widgets use it. Its file name shares it. */
-static char g_cached_name[sizeof(((widget_t *)0)->text)]; /* DAT_00ae2920 */
+static char g_cached_name[260];           /* DAT_00ae2920 */
 static cm_image_t *g_cached_picture;                       /* DAT_00ae2a24 */
 static s32 g_cached_users;                                 /* DAT_00ae291c */
 
@@ -27,6 +29,123 @@ static void load_picture(widget_t *widget)
         strcpy(g_cached_name, widget->text);
         g_cached_users = 1;
     }
+}
+
+s32 g_tick;
+
+/* FUN_005e5cd0, bitmap font part. */
+static s32 font_height(s16 font)
+{
+    return font < 0 || font >= GUI_FONT_COUNT ? 0 : g_fonts[font].height;
+}
+
+/* The column after the one of the last widget in the area. */
+static s32 next_column(area_t *area, const widget_t *widgets)
+{
+    s32 last = 0;
+
+    /* The original divides by zero here. */
+    if (area->column_count == 0) return 0;
+    if (area->column_count == 1) return 0;
+    area->unknown_b78 = 0;
+    while (area->unknown_b78 < area->widget_count) {
+        s16 index = area->widget_index[area->unknown_b78++];
+
+        if (index == -1) break;
+        last = widgets[index].column;
+    }
+    return (last + 1) % area->column_count;
+}
+
+void widget_init(widget_t *widget, struct area *areas, widget_t *widgets,
+                 s16 index, u32 flags, s32 x1, s32 y1, s32 x2, s32 y2,
+                 s32 column, s32 row, u32 style, u16 colour,
+                 u16 highlight_colour, u32 text_flags, s16 font,
+                 u16 text_colour, const char *text, s32 unknown_40,
+                 s32 unknown_08, intptr_t unknown_48, s16 area)
+{
+    /* The original tests these two bits of the style, not of the flags. */
+    bool keep_order = (style & 0x400) && !(style & 0x4000);
+    bool in_area = area >= 0 && area < 250; /* the areas of a screen manager */
+
+    widget->areas = areas;
+    widget->widgets = widgets;
+    widget->lighten_once = 0;
+    if (x2 < x1 && !keep_order) { s32 t = x1; x1 = x2; x2 = t; }
+    if (y2 < y1 && !keep_order) { s32 t = y1; y1 = y2; y2 = t; }
+    if (x1 < 1) x1 = 0;
+    if (y1 < 1) y1 = 0;
+    if (x2 > 799) x2 = 799;
+    if (y2 > 599) y2 = 599;
+
+    const char *text_given = text;
+
+    if (!text) text = "";
+    if (!in_area || areas[area].owner_widget == -1) {
+        strncpy(widget->text, text, sizeof(widget->text) - 1);
+        widget->text[sizeof(widget->text) - 1] = '\0';
+    } else {
+        area_t *popup = &areas[area];
+        s32 width;
+
+        snprintf(widget->text, sizeof(widget->text), "     %s", text);
+        width = gui_line_width(font, widget->text) + 15;
+        if (width < 126) width = 125;
+        if (popup->x2 < width) popup->x2 = width;
+        column = next_column(popup, widgets);
+        row = popup->row_count;
+        popup->y2 += font_height(font) + 6;
+        if (row & 1) widget->lighten_once = 1;
+        popup->row_count++;
+    }
+
+    widget->index = index;
+    widget->flags = flags;
+    widget->x1 = widget->fixed_x1 = x1;
+    widget->y1 = widget->fixed_y1 = y1;
+    widget->x2 = widget->fixed_x2 = x2;
+    widget->y2 = widget->fixed_y2 = y2;
+    widget->column = column;
+    widget->row = row;
+    widget->style = style;
+    widget->colour = colour;
+    widget->highlight_colour = highlight_colour;
+    widget->text_flags = text_flags;
+    widget->font = font;
+    widget->text_colour = text_colour;
+    widget->unknown_08 = unknown_08;
+    widget->unknown_40 = unknown_40;
+    widget->unknown_48 = unknown_48;
+    widget->cursor = -1;
+    widget->unknown_180 = 0;
+    widget->saved = NULL;
+    widget->area = area;
+    widget->popup_area = -1;
+    widget->highlighted = 0;
+    widget->tick = g_tick;
+    widget->unknown_7e = -1;
+    widget->picture = NULL;
+    widget->text_source = NULL;
+    if (flags & WIDGET_TEXT_ENTRY) {
+        widget->text_source = text_given;
+        if (flags & WIDGET_CURSOR_AT_END) {
+            widget->cursor = (s32)strlen(widget->text);
+        }
+    }
+}
+
+void widget_release(widget_t *widget)
+{
+    rgn_free(widget->saved);
+    widget->saved = NULL;
+    if (!widget->picture) return;
+    if (strcmp(g_cached_name, widget->text)) {
+        rgn_free(widget->picture);
+    } else {
+        /* The original takes the name as proof that the picture is shared. */
+        g_cached_users--;
+    }
+    widget->picture = NULL;
 }
 
 static s32 centred(s32 low, s32 high, s32 size)
