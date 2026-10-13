@@ -40,6 +40,20 @@ _Avoid_: frame, box
 A small one-colour picture, such as a scroll arrow, stored as one byte per pixel.
 _Avoid_: icon, sprite
 
+### Text
+
+**Bitmap font**:
+One of the seven fonts that the original loads from its .fnt files and uses when its font setting is -1.
+_Avoid_: raster font, FNT font
+
+**Glyph**:
+The picture of one character in a bitmap font.
+_Avoid_: character image, letter
+
+**Mark**:
+A small picture that a widget draws beside its text: the tick or one of the three arrows.
+_Avoid_: icon, symbol
+
 ### Verification
 
 **Differential test**:

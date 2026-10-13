@@ -1,5 +1,5 @@
 # Text and fonts
-Status: In build
+Status: Shipped 2026-10-13
 
 ## Problem
 The port draws areas and widgets with no text. The text function is empty, so a ported screen shows panels, arrows and marks only.

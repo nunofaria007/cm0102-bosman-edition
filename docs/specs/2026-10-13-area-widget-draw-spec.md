@@ -1,5 +1,5 @@
 # Area and widget draw
-Status: In build
+Status: Shipped 2026-10-13
 
 ## Problem
 The port shows a background image and nothing else. Every screen of the original is built from areas and widgets, and the port has no code for either. The port also has no way to prove that a ported function behaves like the original.
