@@ -65,6 +65,11 @@ void key_index_match(void)
     }
 }
 
+void key_index_set(void)
+{
+    key_index_match();
+}
+
 nation_t *key_nation(enum key_nation key)
 {
     s32 row = g_key_nations[key];

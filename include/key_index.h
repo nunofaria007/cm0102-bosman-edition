@@ -69,6 +69,9 @@ extern const char *const g_key_continent_names[KEY_CONTINENT_COUNT];
  */
 void key_index_match(void);
 
+/* FUN_00601a40, the key ids at the end of the database load. */
+void key_index_set(void);
+
 /* The nation of a key id, or NULL when the id is -1. */
 nation_t *key_nation(enum key_nation key);
 continent_t *key_continent(enum key_continent key);
