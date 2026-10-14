@@ -74,7 +74,7 @@ static void post_mouse(uint32_t msg, int x, int y)
 void win_video_init(void)
 {
     if (window) return;
-    window = SDL_CreateWindow("CM 01/02: Re-Signed Edition " CM0102_VERSION, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    window = SDL_CreateWindow("CM 01/02: Bosman Edition " CM0102_VERSION, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                               (int)rt_screen_w, (int)rt_screen_h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!window) rt_fatal("SDL_CreateWindow: %s", SDL_GetError());
     renderer = SDL_CreateRenderer(window, -1, 0);

@@ -21,7 +21,7 @@
 #define WIDE_H 800u
 
 static const char settings_text[] =
-    "# CM 01/02: Re-Signed Edition settings.\n"
+    "# CM 01/02: Bosman Edition settings.\n"
     "# display = widescreen draws the game at 1280x800. display = classic draws it at 800x600.\n"
     "display = widescreen\n";
 
