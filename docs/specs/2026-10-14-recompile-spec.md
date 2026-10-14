@@ -15,6 +15,11 @@ A recompiler translates every x86 instruction of `cm0102.exe` into C that works 
 - Imports: each imported function gets a C replacement with the same calling convention. A missing replacement stops the program with the name of the import.
 - The hand-ported, tested C of the earlier specs may later replace generated functions, where clean code helps.
 - The differential tracer of `tests/diff` checks the recompiled program against the Unicorn run at fixed points: after the database load, after game creation, after each game day.
+- The CRT is recompiled with the game, so `sprintf`, `qsort` and `rand` behave exactly as in the original. About 35 KERNEL32 imports carry it (import inventory, section 5).
+- The runtime reports Windows NT 5.1, so the CRT heap uses only `HeapAlloc`, `HeapFree`, `HeapReAlloc` and `HeapSize`.
+- The CD check: the runtime reports a CD drive `D:\` that holds the player's own `cm0102.exe`. None of the 35 copies of the check is patched.
+- Network play: the WSOCK32 imports return the errors that Windows gives with no network. The original then takes its own failure path. The start screen keeps "Network Play".
+- Printing (GDI32, WINSPOOL, comdlg32) returns failure for now.
 - Commits are local. Nothing is pushed.
 
 ## Slices
