@@ -4,7 +4,8 @@
 # Usage:
 #   tools/release/make_release.sh --game <clean files> --sdl2-mac <folder> --sdl2-mingw <folder> --site-assets <folder> [--publish]
 #
-#   --game         the clean files (tools/clean_files), with the manifest clean-files.tsv in the folder
+#   --game         the clean files (tools/clean_files/make_clean_files.py). The script checks them
+#                  against tools/clean_files/manifest.tsv.
 #   --sdl2-mac     the folder with mac-arm64 and mac-x86_64 SDL2 builds (tools/mac/build_sdl2.sh)
 #   --sdl2-mingw   the SDL2 mingw development release (SDL2-2.x.y)
 #   --site-assets  the site's pictures (logo, screenshots). They go into site-assets.zip on the release,
@@ -44,9 +45,8 @@ fi
 
 OUT="$REPO/build/release-$VERSION"
 mkdir -p "$OUT"
-MANIFEST="$GAME/clean-files.tsv"
-CHECK_ARGS=()
-[ -f "$MANIFEST" ] && CHECK_ARGS=(--manifest "$MANIFEST")
+MANIFEST="$REPO/tools/clean_files/manifest.tsv"
+CHECK_ARGS=(--manifest "$MANIFEST")
 
 echo "== Mac"
 "$REPO/tools/mac/make_app.sh" --game "$GAME" --sdl2-arm64 "$SDL_MAC/mac-arm64" --sdl2-x86_64 "$SDL_MAC/mac-x86_64" \
