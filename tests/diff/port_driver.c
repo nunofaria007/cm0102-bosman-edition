@@ -17,6 +17,7 @@
 #include "port_progress.h"
 #include "port_select.h"
 #include "port_entry.h"
+#include "port_database.h"
 #include "scrman.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -218,7 +219,8 @@ int main(void)
                    !scroll_command(cmd, args) &&
                    !select_command(cmd, args) &&
                    !dates_command(cmd, args) &&
-                   !entry_command(cmd, args)) {
+                   !entry_command(cmd, args) &&
+                   !database_command(cmd, args)) {
             fprintf(stderr, "port_driver: bad command: %s", line);
             return 1;
         }

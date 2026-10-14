@@ -23,7 +23,7 @@ END = TABLE + 4 * (TABLE_SIZE - 1)
 FPU_CONTROL = 0x27F
 
 # A loop in emulated memory that calls the generator once for each count: cdecl (number, counts, results).
-LOOP = 0x65000000
+LOOP = 0x66000000
 LOOP_CODE = (b"\x53\x56\x57"                      # push ebx, esi, edi
              b"\x8b\x5c\x24\x10\x8b\x74\x24\x14\x8b\x7c\x24\x18"
              b"\x85\xdb\x74\x15"                  # loop: test ebx, ebx; jz done
