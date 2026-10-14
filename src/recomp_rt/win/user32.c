@@ -6,9 +6,18 @@
  * For runs without a person: RECOMP_SCRIPT holds steps "<ms> <action> [args]" separated by ';', with
  * the time since the window opened. Actions: move x y, down x y, up x y, click x y (down, then up 100 ms
  * later), rclick x y, key <virtual key>, char <code>, type <text> (one character each 100 ms),
- * dump <file.bmp>, quit. RECOMP_DUMP names a file
- * to save the screen to when the program ends. */
+ * press <key> (an SDL key press, as from the keyboard, for the keys of the options: for example
+ * space, escape, gui+[, alt+left, gui+f, alt+return, or mouseback for the back button of a mouse),
+ * resize w h (the window size), dump <file.bmp>, shot <file.bmp> (the window as shown, after the
+ * scaling), quit. RECOMP_DUMP names a file to save the screen to when the program ends.
+ *
+ * The keys of the options (options.h): Space presses Continue Game (space_to_continue). Cmd+[ on a
+ * Mac, Alt+Left on Windows and the back button of a mouse press the Back arrow, Escape closes an open
+ * popup, and Cmd+F on a Mac or Alt+Enter on Windows switch full screen on and off (shortcuts). A key
+ * that presses something on the screen of the game becomes a click of the left button there
+ * (click_for_key), so the game's own input code runs, as for a click with the mouse. */
 #include "win.h"
+#include "options.h"
 
 #include <SDL.h>
 #include <stdlib.h>
@@ -67,6 +76,39 @@ static void post_mouse(uint32_t msg, int x, int y)
     post(msg, (uint32_t)buttons, mouse_lparam());
 }
 
+/* The scaling of the picture to the window. SDL_RenderSetLogicalSize keeps its shape, with bars at
+ * the sides or at the top and bottom. With the option sharp_picture, each pixel of the game is drawn
+ * as a block of whole pixels (SDL_RenderSetIntegerScale) when that loses at most a fifth of the size
+ * that fits the window, for example 2 times in a window that allows 2.4 times. Otherwise the picture
+ * fills the window and each pixel takes the nearest whole pixels. Without the option, the scaling
+ * stays as in 0.1.0 (SDL's default filter). */
+#define WHOLE_PIXEL_SHARE 0.8
+static void update_scaling(void)
+{
+    if (!renderer || !options_bool(OPT_SHARP_PICTURE)) return;
+    int ow = 0, oh = 0;
+    if (SDL_GetRendererOutputSize(renderer, &ow, &oh) || ow <= 0 || oh <= 0) return;
+    double fit = (double)ow / rt_screen_w;
+    if ((double)oh / rt_screen_h < fit) fit = (double)oh / rt_screen_h;
+    int whole = (int)fit;
+    SDL_bool on = whole >= 1 && whole >= fit * WHOLE_PIXEL_SHARE ? SDL_TRUE : SDL_FALSE;
+    if (SDL_RenderGetIntegerScale(renderer) != on) {
+        SDL_RenderSetIntegerScale(renderer, on);
+        win_screen_dirty = 1;
+    }
+}
+
+/* Full screen on and off: the desktop size, with the picture scaled as in a window. */
+static void toggle_full_screen(void)
+{
+    if (!window) return;
+    int full = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
+    if (SDL_SetWindowFullscreen(window, full ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP))
+        fprintf(stderr, "recomp: full screen: %s\n", SDL_GetError());
+    update_scaling();
+    win_screen_dirty = 1;
+}
+
 /* The window. CM0102_VERSION comes from the CMake project version. */
 #ifndef CM0102_VERSION
 #define CM0102_VERSION "dev"
@@ -84,6 +126,8 @@ void win_video_init(void)
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING,
                                 (int)rt_screen_w, (int)rt_screen_h);
     if (!texture) rt_fatal("SDL_CreateTexture: %s", SDL_GetError());
+    if (options_bool(OPT_SHARP_PICTURE)) SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
+    update_scaling();
     SDL_StartTextInput();
     opened_at = SDL_GetTicks64();
 }
@@ -118,6 +162,85 @@ void win_dump_screen(const char *path)
     else fprintf(stderr, "recomp: screen saved to %s\n", path);
     SDL_FreeSurface(rgb);
     SDL_FreeSurface(s);
+}
+
+/* The window as shown, after the scaling, to a BMP file. */
+static void shot_window(const char *path)
+{
+    int w = 0, h = 0;
+    if (!renderer || SDL_GetRendererOutputSize(renderer, &w, &h)) return;
+    SDL_Surface *s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 24, SDL_PIXELFORMAT_RGB24);
+    if (!s) return;
+    /* The read covers the whole output, with the bars: the logical size is off for it. */
+    SDL_bool whole = SDL_RenderGetIntegerScale(renderer);
+    SDL_RenderSetLogicalSize(renderer, 0, 0);
+    int bad = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_RGB24, s->pixels, s->pitch);
+    SDL_RenderSetLogicalSize(renderer, (int)rt_screen_w, (int)rt_screen_h);
+    SDL_RenderSetIntegerScale(renderer, whole);
+    if (bad || SDL_SaveBMP(s, path)) fprintf(stderr, "recomp: cannot save %s: %s\n", path, SDL_GetError());
+    else fprintf(stderr, "recomp: window (%dx%d) saved to %s\n", w, h, path);
+    SDL_FreeSurface(s);
+}
+
+/* A click of the left button for a key (click_for_key). The key posts a move to the place and a
+ * button down. The button goes up after the input poll 0x55f620 has run once with the down in the
+ * game (or after CLICK_LONGEST ms), then the pointer goes back to the place of the mouse. So the
+ * game sees one click, as from the mouse, and the repeat pacing of input_poll below gives it one
+ * result. While the click runs, moves of the mouse wait. */
+#define CLICK_LONGEST 500u
+static struct {
+    int on, x, y, real_x, real_y;
+    uint32_t down_at;                     /* queue count after the down: it is in the game once q_head passes it */
+    int polls;                            /* input polls since the down went into the game */
+    uint64_t at;
+} key_click;
+
+static int click_for_key(int x, int y)
+{
+    if (key_click.on || (buttons & 1)) return 0;
+    key_click.on = 1;
+    key_click.x = x;
+    key_click.y = y;
+    key_click.real_x = mouse_x;
+    key_click.real_y = mouse_y;
+    key_click.polls = 0;
+    key_click.at = SDL_GetTicks64();
+    post_mouse(WM_MOUSEMOVE, x, y);
+    buttons |= 1;
+    post_mouse(WM_LBUTTONDOWN, x, y);
+    key_click.down_at = q_tail;
+    return 1;
+}
+
+static void end_click_for_key(void)
+{
+    if (!key_click.on) return;
+    if (key_click.polls < 1 && SDL_GetTicks64() - key_click.at < CLICK_LONGEST) return;
+    key_click.on = 0;
+    buttons &= ~1;
+    post_mouse(WM_LBUTTONUP, key_click.x, key_click.y);
+    post_mouse(WM_MOUSEMOVE, key_click.real_x, key_click.real_y);
+}
+
+/* The keys of the options. Returns 1 when the key did its work; the game then does not get it. */
+static int shortcut_key(SDL_Keycode k, Uint16 mod)
+{
+    int x, y;
+#ifdef __APPLE__
+    int back = k == SDLK_AC_BACK || (k == SDLK_LEFTBRACKET && (mod & KMOD_GUI));
+    int full = k == SDLK_f && (mod & KMOD_GUI);
+#else
+    int back = k == SDLK_AC_BACK || (k == SDLK_LEFT && (mod & KMOD_ALT));
+    int full = (k == SDLK_RETURN || k == SDLK_KP_ENTER) && (mod & KMOD_ALT);
+#endif
+    int plain = !(mod & (KMOD_CTRL | KMOD_ALT | KMOD_GUI | KMOD_SHIFT));
+    if (k == SDLK_SPACE && plain && options_bool(OPT_SPACE_TO_CONTINUE))
+        return keys_continue_game(&x, &y) && click_for_key(x, y);
+    if (!options_bool(OPT_SHORTCUTS)) return 0;
+    if (full) { toggle_full_screen(); return 1; }
+    if (back) { if (keys_back(&x, &y)) click_for_key(x, y); return 1; }
+    if (k == SDLK_ESCAPE && plain) return keys_outside_popup(&x, &y) && click_for_key(x, y);
+    return 0;
 }
 
 /* Windows virtual keys of SDL keys. */
@@ -187,7 +310,9 @@ static void load_script(void)
         int n = sscanf(item, " %llu %15s", &at, st.action);
         if (n < 2) continue;
         st.at = at;
-        if (!strcmp(st.action, "dump") || !strcmp(st.action, "type")) sscanf(item, " %*u %*s %511s", st.text);
+        if (!strcmp(st.action, "dump") || !strcmp(st.action, "type") || !strcmp(st.action, "press") ||
+            !strcmp(st.action, "shot"))
+            sscanf(item, " %*u %*s %511s", st.text);
         else sscanf(item, " %*u %*s %d %d", &st.a, &st.b);
         if (!strcmp(st.action, "type")) {
             /* One character every 100 ms: the window procedure keeps only the last WM_CHAR. */
@@ -221,6 +346,122 @@ static void load_script(void)
     }
 }
 
+static SDL_Keycode swallow_key = SDLK_UNKNOWN;    /* a key that did the work of an option */
+
+/* One SDL event to the message queue. */
+static void handle_event(SDL_Event *e)
+{
+    switch (e->type) {
+    case SDL_QUIT:
+        if (rt_on_fatal) rt_on_fatal();
+        SDL_Quit();
+        exit(0);
+    case SDL_MOUSEMOTION:
+        if (key_click.on) { key_click.real_x = e->motion.x; key_click.real_y = e->motion.y; break; }
+        post_mouse(WM_MOUSEMOVE, e->motion.x, e->motion.y);
+        break;
+    case SDL_MOUSEBUTTONDOWN:
+    case SDL_MOUSEBUTTONUP: {
+        int down = e->type == SDL_MOUSEBUTTONDOWN;
+        if (e->button.button == SDL_BUTTON_X1) {
+            if (down) shortcut_key(SDLK_AC_BACK, 0);
+            break;
+        }
+        if (key_click.on) break;               /* the click of a key runs */
+        uint32_t bit = e->button.button == SDL_BUTTON_LEFT ? 1u : e->button.button == SDL_BUTTON_RIGHT ? 2u : 0u;
+        if (!bit) break;
+        if (down) buttons |= (int)bit; else buttons &= ~(int)bit;
+        uint32_t msg = bit == 1 ? (down ? WM_LBUTTONDOWN : WM_LBUTTONUP) : (down ? WM_RBUTTONDOWN : WM_RBUTTONUP);
+        post_mouse(msg, e->button.x, e->button.y);
+        break;
+    }
+    case SDL_MOUSEWHEEL:
+        if (e->wheel.y) post(WM_MOUSEWHEEL, ((uint32_t)(e->wheel.y * 120) & 0xffff) << 16 | (uint32_t)buttons, mouse_lparam());
+        break;
+    case SDL_KEYDOWN:
+    case SDL_KEYUP: {
+        int down = e->type == SDL_KEYDOWN;
+        if (down && !e->key.repeat && shortcut_key(e->key.keysym.sym, e->key.keysym.mod)) {
+            swallow_key = e->key.keysym.sym;
+            break;
+        }
+        if (e->key.keysym.sym == swallow_key) {     /* its repeats, its character and its release */
+            if (!down) swallow_key = SDLK_UNKNOWN;
+            break;
+        }
+        uint32_t vk = virtual_key(e->key.keysym.sym);
+        if (!vk) break;
+        post(down ? WM_KEYDOWN : WM_KEYUP, vk, down ? 1u : 0xC0000001u);
+        /* TranslateMessage gives these keys a character; SDL gives none. */
+        if (down && (vk == 0x08 || vk == 0x09 || vk == 0x0D || vk == 0x1B)) post(WM_CHAR, vk, 1);
+        break;
+    }
+    case SDL_TEXTINPUT: {
+        const unsigned char *t = (const unsigned char *)e->text.text;
+        if (swallow_key == SDLK_SPACE && !strcmp(e->text.text, " ")) break;
+        /* UTF-8 to code page 1252 for the Latin-1 range. */
+        for (; *t; t++) {
+            uint32_t c = *t;
+            if (c >= 0xC0 && c < 0xE0 && (t[1] & 0xC0) == 0x80) { c = ((c & 0x1F) << 6) | (t[1] & 0x3F); t++; }
+            else if (c >= 0x80) continue;
+            if (c < 0x100) post(WM_CHAR, c, 1);
+        }
+        break;
+    }
+    case SDL_WINDOWEVENT:
+        if (e->window.event == SDL_WINDOWEVENT_EXPOSED) win_screen_dirty = 1;
+        if (e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) update_scaling();
+        break;
+    }
+}
+
+/* A key press of the script, through the event code of the keyboard (handle_event): for example
+ * "space", "gui+[", "alt+left" or "mouseback". A space also gives its character, as the keyboard does. */
+static void press_key(const char *name)
+{
+    SDL_Event e;
+    memset(&e, 0, sizeof e);
+    if (!strcmp(name, "mouseback")) {
+        e.type = SDL_MOUSEBUTTONDOWN;
+        e.button.button = SDL_BUTTON_X1;
+        e.button.state = SDL_PRESSED;
+        e.button.x = mouse_x;
+        e.button.y = mouse_y;
+        handle_event(&e);
+        e.type = SDL_MOUSEBUTTONUP;
+        e.button.state = SDL_RELEASED;
+        handle_event(&e);
+        return;
+    }
+    Uint16 mod = 0;
+    const char *plus;
+    while ((plus = strchr(name, '+')) && plus[1]) {
+        if (!strncmp(name, "gui", 3)) mod |= KMOD_LGUI;
+        else if (!strncmp(name, "alt", 3)) mod |= KMOD_LALT;
+        else if (!strncmp(name, "ctrl", 4)) mod |= KMOD_LCTRL;
+        else if (!strncmp(name, "shift", 5)) mod |= KMOD_LSHIFT;
+        name = plus + 1;
+    }
+    SDL_Keycode k = SDL_GetKeyFromName(name);
+    if (k == SDLK_UNKNOWN) { fprintf(stderr, "recomp: script: unknown key %s\n", name); return; }
+    e.type = SDL_KEYDOWN;
+    e.key.state = SDL_PRESSED;
+    e.key.keysym.sym = k;
+    e.key.keysym.scancode = SDL_GetScancodeFromKey(k);
+    e.key.keysym.mod = mod;
+    handle_event(&e);
+    if (k == SDLK_SPACE && !mod) {
+        SDL_Event t;
+        memset(&t, 0, sizeof t);
+        t.type = SDL_TEXTINPUT;
+        t.text.text[0] = ' ';
+        handle_event(&t);
+    }
+    e.type = SDL_KEYUP;
+    e.key.state = SDL_RELEASED;
+    handle_event(&e);
+}
+
 static void run_script(void)
 {
     if (!script_loaded) load_script();
@@ -247,7 +488,13 @@ static void run_script(void)
             post(WM_KEYDOWN, (uint32_t)s->a, 1);
             post(WM_KEYUP, (uint32_t)s->a, 0xC0000001u);
         } else if (!strcmp(s->action, "char")) post(WM_CHAR, (uint32_t)s->a, 1);
-        else if (!strcmp(s->action, "dump")) { present_now(); win_dump_screen(s->text); }
+        else if (!strcmp(s->action, "press")) press_key(s->text);
+        else if (!strcmp(s->action, "resize")) {
+            SDL_SetWindowSize(window, s->a, s->b);
+            update_scaling();
+            present_now();
+        } else if (!strcmp(s->action, "dump")) { present_now(); win_dump_screen(s->text); }
+        else if (!strcmp(s->action, "shot")) { present_now(); shot_window(s->text); }
         else if (!strcmp(s->action, "quit")) {
             if (rt_on_fatal) rt_on_fatal();
             SDL_Quit();
@@ -262,55 +509,10 @@ void win_poll_events(void)
     if (win_screen_dirty && now - last_present >= 16) present_now();
     if (now - last_poll < 2) return;              /* the game pumps very often; SDL needs less */
     last_poll = now;
+    end_click_for_key();
     SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        switch (e.type) {
-        case SDL_QUIT:
-            if (rt_on_fatal) rt_on_fatal();
-            SDL_Quit();
-            exit(0);
-        case SDL_MOUSEMOTION:
-            post_mouse(WM_MOUSEMOVE, e.motion.x, e.motion.y);
-            break;
-        case SDL_MOUSEBUTTONDOWN:
-        case SDL_MOUSEBUTTONUP: {
-            int down = e.type == SDL_MOUSEBUTTONDOWN;
-            uint32_t bit = e.button.button == SDL_BUTTON_LEFT ? 1u : e.button.button == SDL_BUTTON_RIGHT ? 2u : 0u;
-            if (!bit) break;
-            if (down) buttons |= (int)bit; else buttons &= ~(int)bit;
-            uint32_t msg = bit == 1 ? (down ? WM_LBUTTONDOWN : WM_LBUTTONUP) : (down ? WM_RBUTTONDOWN : WM_RBUTTONUP);
-            post_mouse(msg, e.button.x, e.button.y);
-            break;
-        }
-        case SDL_MOUSEWHEEL:
-            if (e.wheel.y) post(WM_MOUSEWHEEL, ((uint32_t)(e.wheel.y * 120) & 0xffff) << 16 | (uint32_t)buttons, mouse_lparam());
-            break;
-        case SDL_KEYDOWN:
-        case SDL_KEYUP: {
-            uint32_t vk = virtual_key(e.key.keysym.sym);
-            if (!vk) break;
-            int down = e.type == SDL_KEYDOWN;
-            post(down ? WM_KEYDOWN : WM_KEYUP, vk, down ? 1u : 0xC0000001u);
-            /* TranslateMessage gives these keys a character; SDL gives none. */
-            if (down && (vk == 0x08 || vk == 0x09 || vk == 0x0D || vk == 0x1B)) post(WM_CHAR, vk, 1);
-            break;
-        }
-        case SDL_TEXTINPUT: {
-            const unsigned char *t = (const unsigned char *)e.text.text;
-            /* UTF-8 to code page 1252 for the Latin-1 range. */
-            for (; *t; t++) {
-                uint32_t c = *t;
-                if (c >= 0xC0 && c < 0xE0 && (t[1] & 0xC0) == 0x80) { c = ((c & 0x1F) << 6) | (t[1] & 0x3F); t++; }
-                else if (c >= 0x80) continue;
-                if (c < 0x100) post(WM_CHAR, c, 1);
-            }
-            break;
-        }
-        case SDL_WINDOWEVENT:
-            if (e.window.event == SDL_WINDOWEVENT_EXPOSED) win_screen_dirty = 1;
-            break;
-        }
-    }
+    while (SDL_PollEvent(&e))
+        handle_event(&e);
     if (window) run_script();
 }
 
@@ -374,7 +576,10 @@ void o_0055f620(void);
 /* The input poll, thiscall, no arguments: the widget index in AX, -1 for nothing. */
 RT_WRAP(0055f620, input_poll)
 {
+    int key_down_in = key_click.on && (int32_t)(q_head - key_click.down_at) >= 0;
+    keys_display = cpu.ecx;
     o_0055f620();
+    if (key_down_in) key_click.polls++;
     uint32_t widget = cpu.eax & 0xffffu;
     int held = (buttons & 1) && rd32(g_mem, 0xb67a34u) && !rd32(g_mem, 0xb67a3cu);
     if (widget == 0xffffu || !held) return;
