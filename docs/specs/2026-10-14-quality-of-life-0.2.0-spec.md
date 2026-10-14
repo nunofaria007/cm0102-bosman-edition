@@ -91,8 +91,14 @@ Delivers: one inventory in `docs/research/` answering: what the tactics screen's
 Merge danger: two-way door. Documents only.
 - [ ] Each fact has its address
 
+### 5b. Repeatable test runs
+Blocked by: 5
+Delivers: two unattended runs with the same `-seed`, the same script and the same start give byte-identical saves. Research B found that runs drift today (first suspect `srand(time())` at 0x696d51). A test-only fixed clock is allowed; play is unchanged.
+Merge danger: two-way door. Test runs only.
+- [ ] Two normal runs to a fixed date give identical saves
+
 ### 6. Assistant selection (#12)
-Blocked by: 1, 5
+Blocked by: 1, 5, 5b
 Delivers: the option, off by default.
 Merge danger: two-way door. Blast radius: the player's team before matches.
 - [ ] With the option off, the same-save check passes
@@ -117,7 +123,7 @@ Merge danger: two-way door. Blast radius: attribute screens.
 - [ ] Max approves the colours on a screenshot
 
 ### 10. Faster days (#20)
-Blocked by: 1, 5
+Blocked by: 1, 5, 5b
 Delivers: days that pass without redrawing every screen.
 Merge danger: two-way door, but it touches the day loop. Blast radius: every saved game. The same-save check is the guard.
 - [ ] The same-save check passes with faster days on and off
