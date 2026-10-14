@@ -70,6 +70,11 @@ void scrman_reset(scrman_t *sm, bool release);
  * NULL or the count is 0 or 30. A count above 30 writes past the tables in
  * the original. The port sets 30 weights then.
  */
+s16 scrman_area_create(scrman_t *sm, s32 x1, s32 y1, s32 x2, s32 y2,
+                       u8 column_count, const u8 *column_weights,
+                       u8 row_count, const u8 *row_weights,
+                       u32 flags, u16 colour, s16 owner_widget);
+
 /*
  * FUN_0055f990. Returns the index of the new widget, or -1 when 1199 widgets
  * are in use: the original never uses the last of its 1200 slots. A widget
@@ -82,10 +87,5 @@ s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
                          u16 highlight_colour, u32 text_flags, s16 font,
                          u16 text_colour, const char *text, s32 unknown_40,
                          s32 unknown_08, intptr_t unknown_48, s16 area);
-
-s16 scrman_area_create(scrman_t *sm, s32 x1, s32 y1, s32 x2, s32 y2,
-                       u8 column_count, const u8 *column_weights,
-                       u8 row_count, const u8 *row_weights,
-                       u32 flags, u16 colour, s16 owner_widget);
 
 #endif

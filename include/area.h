@@ -75,9 +75,8 @@ void area_init(area_t *area, struct area *areas, widget_t *widgets, s16 index,
 
 /*
  * FUN_00403200. Puts a widget of the screen manager into the area, after the
- * widgets with the same or a lower row. An area with AREA_GRID_ONLY takes no
- * widgets. The original takes a widget when the area holds 1199 and then
- * writes past the list. The port takes none then.
+ * widgets with the same or a lower row. An area with AREA_GRID_ONLY or with
+ * 1200 widgets takes none.
  */
 void area_add_widget(area_t *area, s16 widget);
 

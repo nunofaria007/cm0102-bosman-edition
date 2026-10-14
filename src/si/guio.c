@@ -3,6 +3,7 @@
 #include "gui_font.h"
 #include "gui_text.h"
 #include "gui_utils.h"
+#include "scrman.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -66,7 +67,7 @@ void widget_init(widget_t *widget, struct area *areas, widget_t *widgets,
 {
     /* The original tests these two bits of the style, not of the flags. */
     bool keep_order = (style & 0x400) && !(style & 0x4000);
-    bool in_area = area >= 0 && area < 250; /* the areas of a screen manager */
+    bool in_area = area >= 0 && area < SCRMAN_MAX_AREAS;
 
     widget->areas = areas;
     widget->widgets = widgets;

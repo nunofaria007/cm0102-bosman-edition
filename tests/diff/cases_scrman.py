@@ -5,8 +5,8 @@ import tempfile
 from cases_images import _pixels, _rgn, _write
 from scene import KINDS, ManagerScene
 
-SPARE_WIDGETS = 3                # the same for widgets
 SPARE_AREAS = 3                  # areas past those in use that the reset test also fills
+SPARE_WIDGETS = 3                # the same for widgets
 MAX_AREAS = 249                  # the original never uses the last of its 250 slots
 LINE_ORDER_FULL = 0x302          # display.cpp: no room in the draw order
 
@@ -203,7 +203,7 @@ def _widget_arguments(ctx, area, popup):
     return [flags, _box(ctx), ctx.rng.randint(-2, 31), row, style, ctx.colour(), ctx.colour(),
             ctx.rng.getrandbits(32), font, ctx.colour(), _text(ctx, 250 if popup else 255),
             ctx.rng.randint(-0x80000000, 0x7FFFFFFF), ctx.rng.randint(-0x80000000, 0x7FFFFFFF),
-            ctx.rng.getrandbits(31), area]
+            ctx.rng.getrandbits(32), area]
 
 
 def _build_areas(ctx, scene, name):
@@ -314,9 +314,8 @@ def test_manager_widget_limit(ctx):
         ctx.expect_equal(f"{name}: error of the original", error, ctx.original.error_lines, source="wanted")
         scene.expect_same(name, "manager", 0)
 
-    # An area with 1198 widgets takes one more. An area with 1200 takes none. The port and the
-    # original differ at 1199, so no case uses it.
-    for held in (1198, 1200):
+    # An area with 1199 widgets takes one more. An area with 1200 takes none.
+    for held in (1198, 1199, 1200):
         name = f"area with {held} widgets"
         scene.reset(1)
         scene.area_create(f"{name}: area", *_area_arguments(ctx, owner=-1)[:5], 0, 0x1234, -1)

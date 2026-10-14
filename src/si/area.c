@@ -68,7 +68,7 @@ void area_add_widget(area_t *area, s16 widget)
 {
     s16 count = area->widget_count;
 
-    if (widget == -1 || count >= AREA_MAX_WIDGETS - 1) return;
+    if (widget == -1 || count >= AREA_MAX_WIDGETS) return;
     if (area->flags & AREA_GRID_ONLY) return;
 
     s32 row = area->widgets[widget].row;
