@@ -299,7 +299,7 @@ void select_leagues_build(void)
         text_format(g_text_buffer, sizeof(g_text_buffer), "BACKGROUND");
         flag_button(st, list, 4, row, ID_BACKGROUND, n,
                     n->league_flags & LEAGUE_BACKGROUND);
-        if (league_extra_division(n, g_text_buffer, 2000)) {
+        if (league_extra_division(n, g_text_buffer, sizeof(g_text_buffer))) {
             flag_button(st, list, 6, row, ID_EXTRA_DIVISION, n,
                         n->league_flags & LEAGUE_EXTRA);
         }

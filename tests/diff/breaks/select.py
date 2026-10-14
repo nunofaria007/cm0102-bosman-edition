@@ -1,5 +1,5 @@
 """Deliberate breaks of "Start New Game" and "Select League(s)". Each one must fail a suite. See tools/breaks.py."""
-SUITES = ["select_start_new_game", "select_build", "select_input"]
+SUITES = ["select_start_new_game", "select_build", "select_input", "select_background_then_selected"]
 
 SETUP = "src/cm3/setup.c"
 DB = "src/cm3/database.c"
@@ -96,4 +96,5 @@ BREAKS = [
     ("input: next none", SETUP, "        if (g_selected_nations == 0) return 0;", "        if (g_selected_nations == 0) return SCREEN_REBUILD;"),
     ("input: side bar", SETUP, "        break;\n    }\n    result = menubar_input(clicked);\n    if (result == 0) result = menubar_input_more(clicked);\n    return result;\n}\n",
      "        break;\n    }\n    return 0;\n}\n"),
+    ("selected after background: first", "src/cm3/setup.c", "LEAGUE_SELECTED);\n            if (!g_first_selected) g_first_selected = n;", "LEAGUE_SELECTED);"),
 ]

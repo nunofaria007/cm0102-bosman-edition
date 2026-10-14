@@ -10,6 +10,7 @@
 #include "gui_utils.h"
 #include "scrman.h"
 #include "scrman_input.h"
+#include <SDL2/SDL.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -473,6 +474,57 @@ static bool manager_screen(const char *args)
     return true;
 }
 
+extern void input_poll(SDL_Event *e);
+
+/* The SDL key for a Windows virtual key code from VK_PRIOR to VK_DOWN. */
+static SDL_Keycode sdl_key(long vk)
+{
+    static const SDL_Keycode keys[] = {
+        SDLK_PAGEUP, SDLK_PAGEDOWN, SDLK_END, SDLK_HOME,
+        SDLK_LEFT, SDLK_UP, SDLK_RIGHT, SDLK_DOWN,
+    };
+
+    return vk >= 0x21 && vk <= 0x28 ? keys[vk - 0x21] : SDLK_a;
+}
+
+/*
+ * "sdl kind a b c": one SDL event into input_poll, the same one that the
+ * test gives the window procedure of the original as a Windows message.
+ * kind: 0 key down (a = virtual key), 1 wheel (a = notches), 2 mouse move
+ * (a, b = x, y), 3 button (a = 1 down or 0 up, b = 1 left or 3 right, c = x
+ * packed with y as y * 65536 + x). Prints the mouse globals.
+ */
+static bool sdl_event(const char *args)
+{
+    long v[4] = {0};
+    SDL_Event e;
+
+    if (sscanf(args, "%ld %ld %ld %ld", &v[0], &v[1], &v[2], &v[3]) < 2) {
+        return false;
+    }
+    memset(&e, 0, sizeof(e));
+    if (v[0] == 0) {
+        e.type = SDL_KEYDOWN;
+        e.key.keysym.sym = sdl_key(v[1]);
+    } else if (v[0] == 1) {
+        e.type = SDL_MOUSEWHEEL;
+        e.wheel.y = (Sint32)v[1];
+    } else if (v[0] == 2) {
+        e.type = SDL_MOUSEMOTION;
+        e.motion.x = (Sint32)v[1];
+        e.motion.y = (Sint32)v[2];
+    } else {
+        e.type = v[1] ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+        e.button.button = (Uint8)v[2];
+        e.button.x = (Sint32)(v[3] & 0xffff);
+        e.button.y = (Sint32)(v[3] >> 16);
+    }
+    input_poll(&e);
+    printf("%d %d %d %d %d %d %d\n", g_mouse_x, g_mouse_y, g_left_held,
+           g_right_held, g_left_clicked, g_right_clicked, g_click_frames);
+    return true;
+}
+
 bool scene_command(const char *cmd, const char *args)
 {
     int index = (int)strtol(args, NULL, 10);
@@ -561,6 +613,13 @@ bool scene_command(const char *cmd, const char *args)
         display_on_flip = record_flip;
         printf("%d %d %d\n", scrman_hit_test(&g_manager), g_cursor_kind,
                g_left_held);
+        return true;
+    }
+    if (!strcmp(cmd, "sdl")) return sdl_event(args);
+    if (!strcmp(cmd, "clicks")) {
+        /* "clicks left right": the one-shot click flags of the original. */
+        g_left_clicked = index;
+        g_right_clicked = second;
         return true;
     }
     if (!strcmp(cmd, "tick")) {

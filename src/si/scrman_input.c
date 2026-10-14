@@ -238,8 +238,12 @@ s16 scrman_scrollbar_drag(scrman_t *sm)
         bar->thumb_y1 += dy;
         bar->thumb_y2 += dy;
         redraw_scrollbar(area);
-        bar->position = (bar->thumb_y1 - bar->track_y1) * bar->max_position /
-                        (bar->track_y2 - bar->thumb_height - bar->track_y1 + 1);
+        s32 room = bar->track_y2 - bar->thumb_height - bar->track_y1 + 1;
+
+        /* The original divides by zero for a track no longer than the thumb. */
+        bar->position = room > 0 ? (bar->thumb_y1 - bar->track_y1) *
+                                       bar->max_position / room
+                                 : 0;
         if (bar->position != old_position) {
             area_scroll(area, bar->position - old_position);
         }

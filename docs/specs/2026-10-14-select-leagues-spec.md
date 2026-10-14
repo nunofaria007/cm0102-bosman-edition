@@ -61,6 +61,10 @@ Port the path from "Start New Game" to the first screen with real data: the "Loa
 - The port's load (`database_load`) makes the 47 progress calls of the loader and reads the two tables after the read steps. The reads draw nothing, so the order does not show.
 - The differential test of "Start New Game" models the loader `FUN_00524d50` with a small x86 stub: 47 calls of opcode 7 with "Loading database", steps 0 to 46 of 46, channel -1, then the nation table of the original readers is put in place. It stubs `FUN_007a1710` with 8190 MB (the most that `GlobalMemoryStatus` gives) and `FUN_005d8480` with a return. `FUN_00827d50` and `FUN_00667150` run for real. "Next" with a selected nation is checked on the port only.
 
+- The port takes the mouse position from a button event as well as from a move. The original takes it from WM_MOUSEMOVE only. A tap on a Mac can come with no move before it. After a move the two give the same position.
+- The test `window` runs the window procedure of the original (0x68d630) on keys, the wheel, moves and buttons, and the port's `input_poll` on the same SDL events, then compares the mouse globals and the frame count. Two Windows calls of the original are stubs: the default window procedure and the cursor update `FUN_005e81e0`.
+- The port passes SDL's wheel direction through. With natural scrolling on, macOS turns it round, as the player expects on a Mac.
+
 ## Testing
 One seam: the differential test.
 - Nation table: the port and the original each load `nation.dat` and `continent.dat`, and the test compares every field of every record.

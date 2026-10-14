@@ -57,7 +57,8 @@ s32 gui_progress_box(const char *text, s32 step, s32 total);
  * FUN_00802f80, the part that a game with one local player runs: opcode 7
  * applied to the screen manager of the record. It sets unknown_12f551 to 0
  * and draws gui_progress_box(text, step, total). Channel -1 sends to every
- * channel with records, so it draws when record_count > 0. Channel 0 draws
+ * channel with records, so it draws when record_count > 0 and the record is
+ * the local player's. Channel 0 draws
  * when the record is the local player's. Channels 1 to 15 have no record in
  * a local game, and the original then applies the opcode to the local
  * screen manager as well. Other channels do nothing.

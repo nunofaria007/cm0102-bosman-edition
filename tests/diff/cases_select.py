@@ -344,7 +344,46 @@ def test_input(ctx):
     return steps
 
 
+def _find(select, wanted_id, nation=None):
+    """The index of a widget with this id, for this nation when given. -1 when none is there."""
+    for index, value in enumerate(select.ids()):
+        if value == wanted_id and (nation is None or select.widget(index, 0x48, "<I") == nation):
+            return index
+    return -1
+
+
+def test_background_then_selected(ctx):
+    """De-Select All, then BACKGROUND on a nation, then SELECTED on the same nation: it becomes the first
+    selected nation (0x81e47e)."""
+    steps = 0
+    for case in range(12):
+        select = _build(ctx, case)
+        name = f"background then selected {case}"
+        title = _background(ctx)
+        select.expect_same_draw(name, title)
+        nation = None
+        for step, wanted in enumerate((0xB, 0xE, 0xD)):
+            clicked = _find(select, wanted, nation)
+            if wanted == 0xE:
+                # Any nation in view, picked from its BACKGROUND button.
+                choices = [i for i, value in enumerate(select.ids()) if value == 0xE]
+                clicked = ctx.rng.choice(choices)
+                nation = select.widget(clicked, 0x48, "<I")
+            if clicked < 0 and wanted == 0xB:
+                continue        # some builds show no "De-Select All"
+            ctx.expect_equal(f"{name}: button {wanted:#x} is on the screen", True, clicked >= 0, source="wanted")
+            select.input(f"{name}: click {wanted:#x}", clicked)
+            select.expect_same_state(f"{name} step {step}")
+            title = _background(ctx)
+            select.build(title)
+            select.expect_same_select_screen(f"{name} step {step}")
+            steps += 1
+        select.finish()
+    return steps
+
+
 TESTS = [
+    ("select_background_then_selected", test_background_then_selected),
     ("select_start_new_game", test_start_new_game),
     ("select_build", test_build),
     ("select_input", test_input),

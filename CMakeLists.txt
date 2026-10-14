@@ -57,6 +57,7 @@ add_executable(port_driver
     src/si/gui_text.c
     src/si/os_compat.c
     src/si/guio.c
+    src/si/input.c
     src/si/area.c
     src/si/scrman.c
     src/si/screen_stack.c

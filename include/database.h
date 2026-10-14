@@ -7,7 +7,7 @@
  * The database of the original, from Database.cpp (the loader FUN_00528540)
  * and Db_files.cpp (one reader for each table). This part loads index.dat,
  * the continent table and the nation table, which "Select League(s)" needs.
- * The other 19 tables wait for the spec that creates the game.
+ * The other 20 tables of index.dat wait for the spec that creates the game.
  *
  * API for the screens:
  *   database_load_nations(dir)  reads index.dat, continent.dat and
