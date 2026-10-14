@@ -25,7 +25,7 @@ Release 0.2.0 adds those comforts and sound, without changing a single match res
 ## Decisions
 Settled in the interview of 2026-10-14 (Q50 to Q58).
 
-- **Scope:** 0.2.0 holds issues #11 to #21. The new screens (#22: player comparison, squad depth, best XI) are release 0.3.0.
+- **Scope:** 0.2.0 holds issues #11 to #21 and #23 (positions on the match tactics screen, added by Max after the interview). The new screens (#22: player comparison, squad depth, best XI) are release 0.3.0.
 - **Options:** every option is a line in the settings file. No new in-game options screen in 0.2.0. The site lists each option with its default.
 - **Defaults:** on: Space to continue, shortcuts, sharp picture, sound, clickable names, attribute colours, faster days. Off: assistant selection. The save folder defaults to the current folder.
 - **Faithful logic:** no feature may change match results or the game's decisions. Faster days must leave a save that is byte for byte the same as normal days, given the same start and the same input.
@@ -86,7 +86,7 @@ Merge danger: two-way door. Blast radius: sound only, and the DirectSound stub.
 
 ### 5. Research (#11, #12, #18, #19, #20)
 Blocked by: none
-Delivers: one inventory in `docs/research/` answering: does a news item keep the IDs of the people and clubs it names; which function opens a profile; how the game picks teams for computer-run clubs and whether it can run for the player's club with the tactic kept; where attributes are drawn; what the day loop draws and which drawing can be skipped safely.
+Delivers: one inventory in `docs/research/` answering: what the tactics screen's View drop-down offers and where it draws the column beside each name; does a news item keep the IDs of the people and clubs it names; which function opens a profile; how the game picks teams for computer-run clubs and whether it can run for the player's club with the tactic kept; where attributes are drawn; what the day loop draws and which drawing can be skipped safely.
 Merge danger: two-way door. Documents only.
 - [ ] Each fact has its address
 
@@ -121,8 +121,14 @@ Delivers: days that pass without redrawing every screen.
 Merge danger: two-way door, but it touches the day loop. Blast radius: every saved game. The same-save check is the guard.
 - [ ] The same-save check passes with faster days on and off
 
-### 11. Release 0.2.0
-Blocked by: 2 to 10
+### 11. Positions on the match tactics screen (#23)
+Blocked by: 1, 5
+Delivers: each player's position beside his name on the tactics screen during a match. First check whether the View drop-down already offers it; if so, the change is a default.
+Merge danger: two-way door. Blast radius: the tactics screen.
+- [ ] Screenshot of the tactics screen in a match with positions shown
+
+### 12. Release 0.2.0
+Blocked by: 2 to 11
 Delivers: the options on the site, the changelog, and the pre-release.
 Merge danger: one-way door. It publishes. Max approves the upload.
 - [ ] Package checks pass
