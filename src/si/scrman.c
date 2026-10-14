@@ -207,3 +207,11 @@ void scrman_draw(scrman_t *sm, char *background, s16 x1, s16 y1, s16 x2,
     }
     sm->laid_out = 1;
 }
+
+void scrman_darken_once(scrman_t *sm)
+{
+    if (sm->darken_screen) return;
+    sm->darken_screen = 1;
+    gui_darken(0, 0, 799, 599);
+    display_flip(0, 0, 799, 599);
+}

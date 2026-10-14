@@ -425,6 +425,11 @@ static void record_flip(s32 x1, s32 y1, s32 x2, s32 y2)
     g_flip_count++;
 }
 
+void scene_record_flips(void)
+{
+    display_on_flip = record_flip;
+}
+
 /* "flips": the count, then a line and the screen for each flip. */
 static void show_flips(void)
 {

@@ -36,6 +36,13 @@ Port the path from "Start New Game" to the first screen with real data: the "Loa
   - The language block of `index.dat` (0x528848..0x52896f). The shipped file has none. The port fails the load when the byte before it is not 0.
 - Where the original makes a pointer outside a table, the port gives NULL: a link id at or above the record count (`FUN_005315a0` checks only for a negative id), and a key nation or continent with id -1 in the league table and in `FUN_00827d50`. The shipped data has neither.
 - The port keeps the language index `DAT_009eb2dc` at 0. The name compare `FUN_0090c1d0` has no assert string. It goes to `src/si/utils.c` next to `FUN_0090bde0` (inference).
+- The progress box `FUN_005e76f0` is `gui_progress_box` and the local part of opcode 7 `FUN_00802f80` is `screen_stack_progress`, in `src/si/progress_box.c`. `include/progress_box.h` lists the 47 calls of the load (steps 0 to 46, total 46). The darken before step 0, `FUN_0055f2c0`, is `scrman_darken_once`.
+- The progress box leaves out the check of `DAT_00aebe0c` (display off, 0x5e76f0). The port has no such switch.
+- The progress box runs `g_screen_pump` where the original runs its message pump `FUN_0068d520`, and ignores its result. A closed window ends the main loop at its next pump, after the load.
+- Opcode 7 leaves out the packet buffer at S+0x37fe and its read back (`FUN_005601e0`, `FUN_00564080`), the network send `FUN_0077ac30`, and the cursor call `FUN_005e8170(1)` at 0x567073. That call runs only when `DAT_00b77c8c` is not 0, and nothing writes it.
+- Channels 1 to 15 have no records in a local game, and their record word is 0. The original then applies opcode 7 to the local screen manager too (0x80317b), and the port does the same. A channel outside -1 to 15 does nothing in the port. The original reads past its records there.
+- The original fails on opcode 7 with a NULL text (`strlen` at 0x803123). The port does nothing.
+- The fourth argument of the progress calls in the two loops and the last call of the loader is a register of the loader. Its value is unknown. Every channel from -1 to 15 gives the same box for one local player, so the port's load can pass -1.
 
 ## Testing
 One seam: the differential test.
