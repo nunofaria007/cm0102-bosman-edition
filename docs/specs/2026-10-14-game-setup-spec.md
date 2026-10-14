@@ -45,7 +45,7 @@ One seam: the differential test, with the tracer harness of the inventory moved 
 Blocked by: none
 Delivers: the stubs of the tracer in `tests/diff/original.py` (a larger heap, import stubs, a file layer in a temp folder, `realloc` in place), and a function that turns a pointer of the original into a row index.
 Merge danger: two-way door. Blast radius: the test harness only.
-- [ ] The load of the original runs in the emulator and gives the counts of the inventory, section 2b.
+- [x] The load of the original runs in the emulator and gives the counts of the inventory, section 2b.
 
 ### 1. Dates and random numbers
 Blocked by: none

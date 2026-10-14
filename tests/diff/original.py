@@ -5,7 +5,9 @@ and Blt write to an 800x600 RGB565 buffer in emulated memory.
 """
 import hashlib
 import os
+import re
 import struct
+import tempfile
 
 from unicorn import Uc, UcError, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_ECX, UC_X86_REG_EIP, UC_X86_REG_ESP
@@ -19,13 +21,15 @@ EXPECTED_SHA256 = "0c78e7da6d0bcb4603fa179449bbe6d1b6b5e1c627a22c445d14d489bd9bf
 PAGE = 0x1000
 STACK_BASE, STACK_SIZE = 0x20000000, 0x100000
 CLEAN_STACK = 0x10000        # zeroed below the stack top before each call
-HEAP_BASE, HEAP_SIZE = 0x30000000, 0x1000000
+# 1 GB: the database load allocates about 80 MB, game creation much more.
+HEAP_BASE, HEAP_SIZE = 0x70000000, 0x40000000
 RETURN_ADDR = 0x40000000
 FB_BASE = 0x50000000
 SURFACE = 0x60000000
 VTABLE = SURFACE + 0x100
 STUBS = 0x61000000
 STUB_STRIDE = 8
+IMPORT_STUBS = 0x65000000    # one hlt for each import of the original, 4 bytes apart
 
 # Globals of the original.
 G_DISPLAY_OFF = 0xAEBE0C     # non-zero disables every drawing function
@@ -68,6 +72,20 @@ CRT_FOPEN = 0x945B00
 CRT_FREAD = 0x945BFE
 CRT_SPLITPATH = 0x944CFF
 CRT_SPRINTF = 0x944C9F
+CRT_REALLOC = 0x945667
+CRT_FWRITE = 0x945CE6
+CRT_FSEEK = 0x946A22
+CRT_FTELL = 0x946AAE
+CRT_FGETC = 0x9469E0
+CRT_ACCESS = 0x9478D8
+CRT_TIME = 0x946EBB
+CRT_CLOCK = 0x947299
+# The findfirst wrappers of the original: first (pattern, data, flag), next, close.
+FUN_FIND_FIRST, FUN_FIND_NEXT, FUN_FIND_CLOSE = 0x4C0AA0, 0x4C0B50, 0x4C0C10
+FUN_COPY_FILE = 0x90CC50     # (from, to): the loader copies the .lng files with it
+FUN_FREE_MEMORY = 0x7A1710   # free memory in MB
+FUN_MEMORY_CHECK = 0x7A1820
+MSVC_EOF = 0x10              # _IOEOF in the flags of a FILE, +0xc
 
 # The error box of the original: FUN_005e8290(title, message, 0) shows it. Before that the code
 # pushes the file name, extension and line for a sprintf and calls FUN_0090d130, which returns the
@@ -103,6 +121,7 @@ class Original:
         uc.mem_map(0, PAGE)
         self.heap_floor = HEAP_BASE
         self.heap_top = HEAP_BASE
+        self.sizes = {}              # block -> size, for realloc and HeapSize
 
         uc.mem_write(SURFACE, struct.pack("<I", VTABLE))
         for slot in range(64):
@@ -124,7 +143,24 @@ class Original:
         self._replace(CRT_FREAD, 4, self._fread)
         self._replace(CRT_FCLOSE, 1, self._fclose)
         self._replace(CRT_SPLITPATH, 0, lambda: 0)
-        self._replace(CRT_SPRINTF, 8, self._sprintf)
+        self._replace(CRT_SPRINTF, 2, self._sprintf)
+        self.sandbox_dir = tempfile.TemporaryDirectory(prefix="cm0102-diff-")
+        self.sandbox = self.sandbox_dir.name
+        self._replace(CRT_REALLOC, 2, self._realloc)
+        self._replace(CRT_FWRITE, 4, self._fwrite)
+        self._replace(CRT_FSEEK, 3, self._fseek)
+        self._replace(CRT_FTELL, 1, lambda stream: self.files[stream].tell())
+        self._replace(CRT_FGETC, 1, self._fgetc)
+        self._replace(CRT_ACCESS, 2, self._access)
+        self._replace(CRT_TIME, 1, self._time)
+        self._replace(CRT_CLOCK, 0, lambda: 12345)
+        self._replace(FUN_FIND_FIRST, 3, self._find_first)
+        self._replace(FUN_FIND_NEXT, 1, lambda find: 1)
+        self._replace(FUN_FIND_CLOSE, 1, lambda find: 0)
+        self._replace(FUN_COPY_FILE, 2, lambda source, target: 1)
+        self._replace(FUN_FREE_MEMORY, 0, lambda: 1000)
+        self._replace(FUN_MEMORY_CHECK, 1, lambda value: 1000)
+        self._imports(exe_path)
         uc.hook_add(UC_HOOK_CODE, self._on_text_entry, begin=FUN_TEXT, end=FUN_TEXT)
         self.error_lines = []
         self.data_dir = data_dir
@@ -203,6 +239,7 @@ class Original:
         if self.heap_top > HEAP_BASE + HEAP_SIZE:
             raise MemoryError("emulated heap is full")
         self.write(addr, bytes(size))
+        self.sizes[addr] = size
         return addr
 
     def load_font(self, font, path):
@@ -284,11 +321,41 @@ class Original:
         self.write(uc.reg_read(UC_X86_REG_ESP) - TEXT_FRAME, bytes(TEXT_FRAME))
 
     def _replace(self, addr, arg_count, host_function):
-        """Makes a cdecl function of the original return the result of a host function."""
+        """Makes a cdecl function of the original return the result of a host function.
+        Returns a function that undoes the replacement."""
         def on_call(uc, address, size, user_data):
-            uc.reg_write(UC_X86_REG_EAX, host_function(*self._stack_args(arg_count)))
-        self.uc.mem_write(addr, b"\xc3")
-        self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
+            result = host_function(*self._stack_args(arg_count))
+            uc.reg_write(UC_X86_REG_EAX, (result or 0) & 0xFFFFFFFF)
+        return self._hook_at(addr, b"\xc3", on_call)
+
+    def replace_thiscall(self, addr, arg_count, host_function):
+        """The same for a thiscall or stdcall function, which pops its arguments. The host function
+        gets ECX first. Returns a function that undoes the replacement."""
+        def on_call(uc, address, size, user_data):
+            args = self._stack_args(arg_count) if arg_count else ()
+            result = host_function(uc.reg_read(UC_X86_REG_ECX), *args)
+            uc.reg_write(UC_X86_REG_EAX, (result or 0) & 0xFFFFFFFF)
+        code = b"\xc2" + struct.pack("<H", arg_count * 4) if arg_count else b"\xc3"
+        return self._hook_at(addr, code, on_call)
+
+    def _hook_at(self, addr, code, on_call):
+        """A later replacement of the same address takes the place of the earlier one until it is
+        undone."""
+        replaced = self.__dict__.setdefault("replaced", {})
+        old = self.read(addr, len(code))
+        earlier = replaced.get(addr)
+        if earlier:
+            self.uc.hook_del(earlier[0])
+        self.uc.mem_write(addr, code)
+        hook = self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
+        replaced[addr] = (hook, on_call)
+
+        def undo():
+            self.uc.hook_del(replaced.pop(addr)[0])
+            self.uc.mem_write(addr, old)
+            if earlier:
+                replaced[addr] = (self.uc.hook_add(UC_HOOK_CODE, earlier[1], begin=addr, end=addr), earlier[1])
+        return undo
 
     def _data_path(self, folder, name):
         """The CM3_DATA or CM3_PICTURES folder. A backslash in the name separates folders."""
@@ -312,34 +379,49 @@ class Original:
         self.frees += 1
         return 0
 
-    def _sprintf(self, buffer, text_format, *values):
-        """Enough of sprintf for the formats the ported code needs: plain text, %c and %s."""
-        text_format = self.read_c_string(text_format)
-        values = list(values)
+    def _sprintf(self, buffer, text_format):
+        """sprintf for %s, %c and the integer formats, with flags and widths. %f gives "?"."""
+        values = list(self._stack_args(16)[2:])
         text = ""
-        position = 0
-        while position < len(text_format):
-            char = text_format[position]
-            kind = text_format[position + 1:position + 2]
-            position += 1
-            if char != "%":
-                text += char
+        pattern = r"%([-+ #0]*)(\d*)(?:\.(\d+))?(l|h)?([dioxXucsf%])|%|[^%]+"
+        for match in re.finditer(pattern, self.read_c_string(text_format)):
+            kind = match.group(5)
+            if not kind:
+                text += match.group(0)
                 continue
-            position += 1
-            if kind == "c":
-                text += chr(values.pop(0) & 0xFF)
-            elif kind == "s":
-                text += self.read_c_string(values.pop(0))
+            if kind == "%":
+                text += "%"
+                continue
+            value = values.pop(0) if values else 0
+            spec = "%" + match.group(1) + match.group(2) + ("." + match.group(3) if match.group(3) else "")
+            if kind == "s":
+                text += (spec + "s") % self.read_c_string(value)
+            elif kind == "c":
+                text += chr(value & 0xFF)
+            elif kind in "di":
+                text += (spec + "d") % (value - (1 << 32) if value & 0x80000000 else value)
+            elif kind == "f":
+                text += "?"
             else:
-                self.write(buffer, b"\0")
-                return 0
-        self.write(buffer, text.encode("latin-1") + b"\0")
+                text += (spec + kind) % value
+        self.write(buffer, text.encode("latin-1", "replace") + b"\0")
         return len(text)
+
+    # The file layer. A read comes from the named file, or from the file of the same name in the
+    # sandbox folder when the original wrote one there. A write goes to the sandbox folder only.
+
+    def _sandbox_path(self, name):
+        return os.path.join(self.sandbox, os.path.basename(name.replace("\\", "/")))
 
     def _fopen(self, path, mode):
         name = self.read_c_string(path)
+        mode = self.read_c_string(mode) if mode else "rb"
+        box = self._sandbox_path(name)
         try:
-            handle = open(name, "rb")
+            if any(c in mode for c in "wa+"):
+                handle = open(box, mode.replace("t", "").replace("b", "") + "b")
+            else:
+                handle = open(box if os.path.exists(box) else name, "rb")
         except OSError:
             return 0
         # A FILE of MSVC is 0x20 bytes. Code of the original reads its flags at +0xc.
@@ -350,8 +432,153 @@ class Original:
     def _fread(self, buffer, size, count, stream):
         data = self.files[stream].read(size * count)
         self.write(buffer, data)
+        if len(data) < size * count:
+            self.write_u32(stream + 0xC, MSVC_EOF)
         return len(data) // size if size else 0
 
     def _fclose(self, stream):
         self.files.pop(stream).close()
         return 0
+
+    def _fwrite(self, buffer, size, count, stream):
+        self.files[stream].write(self.read(buffer, size * count))
+        return count
+
+    def _fseek(self, stream, offset, origin):
+        self.write_u32(stream + 0xC, 0)
+        try:
+            self.files[stream].seek(offset - (1 << 32) if offset & 0x80000000 else offset, origin)
+        except OSError:
+            return -1
+        return 0
+
+    def _fgetc(self, stream):
+        byte = self.files[stream].read(1)
+        if not byte:
+            self.write_u32(stream + 0xC, MSVC_EOF)
+            return -1
+        return byte[0]
+
+    def _access(self, path, mode):
+        name = self.read_c_string(path)
+        return 0 if os.path.exists(name) or os.path.exists(self._sandbox_path(name)) else -1
+
+    def _time(self, out):
+        if out:
+            self.write_u32(out, 1000000000)
+        return 1000000000
+
+    def _find_first(self, pattern, data, flag):
+        """Finds only cm0102.exe, which the CD check of game creation looks for."""
+        return 0 if self.read_c_string(pattern).lower().endswith("cm0102.exe") else 1
+
+    def _realloc(self, block, size):
+        """In place when the block shrinks: FUN_00524d70 asserts that realloc keeps the address."""
+        if block and size <= self.sizes.get(block, 0):
+            self.sizes[block] = size
+            return block
+        new = self.alloc(size)
+        if block:
+            self.write(new, self.read(block, min(self.sizes.get(block, 0), size)))
+        return new
+
+    # Imports of the original. Each entry of the import table points to a hlt stub, and the hook
+    # runs a host function in its place. An import with no host function stops the emulation.
+
+    IMPORTS = {
+        "GlobalAlloc": (2, lambda s, flags, size: s.alloc(size)),
+        "GlobalFree": (1, lambda s, h: 0),
+        "GetLogicalDriveStringsA": (2, lambda s, n, buf: s.write(buf, b"D:\\\0\0") or 4),
+        "GetDriveTypeA": (1, lambda s, p: 5),
+        "DeleteFileA": (1, lambda s, p: 1),
+        "GlobalMemoryStatus": (1, lambda s, p: s.write(p, struct.pack("<8I", 32, 0, *[1 << 30] * 6))),
+        "GetTickCount": (0, lambda s: 100000),
+        "HeapSize": (3, lambda s, h, f, p: s.sizes.get(p, 0)),
+        "HeapAlloc": (3, lambda s, h, f, n: s.alloc(n)),
+        "HeapFree": (3, lambda s, h, f, p: 1),
+        "HeapReAlloc": (4, lambda s, h, f, p, n: s._realloc(p, n)),
+        "GetProcessHeap": (0, lambda s: 1),
+        "GetCurrentDirectoryA": (2, lambda s, n, b: s.write(b, b"C:\\CM\0") or 5),
+        "SetCurrentDirectoryA": (1, lambda s, p: 1),
+        "FindFirstFileA": (2, lambda s, p, d: 0xFFFFFFFF),
+        "FindNextFileA": (2, lambda s, h, d: 0),
+        "FindClose": (1, lambda s, h: 1),
+        "CloseHandle": (1, lambda s, h: 1),
+        "MessageBoxA": (4, lambda s, a, b, c, d: 1),
+        "OutputDebugStringA": (1, lambda s, p: 0),
+        "CreateDirectoryA": (2, lambda s, p, a: 1),
+        "RemoveDirectoryA": (1, lambda s, p: 1),
+        "GetTempPathA": (2, lambda s, n, b: s.write(b, b"C:\\T\\\0") or 5),
+        "CreateFileA": (7, lambda s, *a: 0xFFFFFFFF),
+        "GetLocalTime": (1, lambda s, p: s.write(p, struct.pack("<8H", 2001, 7, 0, 14, 12, 0, 0, 0))),
+        "GetSystemTime": (1, lambda s, p: s.write(p, struct.pack("<8H", 2001, 7, 0, 14, 12, 0, 0, 0))),
+        "GetFileAttributesA": (1, lambda s, p: 0xFFFFFFFF),
+        "GetLastError": (0, lambda s: 2),
+        "SetLastError": (1, lambda s, e: 0),
+        "Sleep": (1, lambda s, ms: 0),
+        "timeGetTime": (0, lambda s: 100000),
+        "GetModuleHandleA": (1, lambda s, p: 0x400000),
+    }
+
+    def _imports(self, exe_path):
+        with open(exe_path, "rb") as exe:
+            data = exe.read()
+        pe = struct.unpack_from("<I", data, 0x3C)[0]
+        section_count = struct.unpack_from("<H", data, pe + 6)[0]
+        optional_size = struct.unpack_from("<H", data, pe + 20)[0]
+        base = struct.unpack_from("<I", data, pe + 24 + 28)[0]
+        sections = [struct.unpack_from("<8sIIII", data, pe + 24 + optional_size + i * 40)[1:]
+                    for i in range(section_count)]
+
+        def offset(rva):
+            for vsize, va, rsize, rptr in sections:
+                if va <= rva < va + max(vsize, rsize):
+                    return rptr + rva - va
+            raise ValueError(f"rva {rva:#x} is in no section")
+
+        self.uc.mem_map(IMPORT_STUBS, PAGE)
+        self.import_names = {}
+        descriptor = offset(struct.unpack_from("<I", data, pe + 24 + 104)[0])
+        while True:
+            lookup, _, _, name, iat = struct.unpack_from("<5I", data, descriptor)
+            descriptor += 20
+            if name == 0:
+                break
+            for i in range(1 << 16):
+                entry = struct.unpack_from("<I", data, offset(lookup or iat) + 4 * i)[0]
+                if entry == 0:
+                    break
+                if entry & 0x80000000:
+                    symbol = f"ordinal {entry & 0xFFFF}"
+                else:
+                    symbol = data[offset(entry) + 2:].split(b"\0")[0].decode()
+                stub = IMPORT_STUBS + 4 * len(self.import_names)
+                self.uc.mem_write(stub, b"\xf4")
+                self.write_u32(base + iat + 4 * i, stub)
+                self.import_names[stub] = symbol
+        self.uc.hook_add(UC_HOOK_CODE, self._on_import, begin=IMPORT_STUBS, end=IMPORT_STUBS + PAGE - 1)
+
+    def _on_import(self, uc, address, size, user_data):
+        symbol = self.import_names.get(address, "?")
+        if symbol not in self.IMPORTS:
+            return self._fail(f"import {symbol} has no host function")
+        arg_count, host_function = self.IMPORTS[symbol]
+        result = host_function(self, *self._stack_args(arg_count))
+        sp = uc.reg_read(UC_X86_REG_ESP)
+        uc.reg_write(UC_X86_REG_EAX, (result or 0) & 0xFFFFFFFF)
+        uc.reg_write(UC_X86_REG_ESP, sp + 4 + 4 * arg_count)
+        uc.reg_write(UC_X86_REG_EIP, struct.unpack("<I", self.read(sp, 4))[0])
+
+    # Tables
+
+    @staticmethod
+    def table_row(pointer, base, record_size, rows):
+        """The row of a pointer into a table of the original: -1 for NULL, the row for a pointer to the
+        start of a row, and the value itself for anything else, such as an id that the original left
+        in a pointer field."""
+        if pointer == 0:
+            return -1
+        offset = pointer - base
+        if 0 <= offset < record_size * rows and offset % record_size == 0:
+            return offset // record_size
+        return pointer

@@ -12,6 +12,7 @@ import subprocess
 import sys
 
 import cases_area
+import cases_database
 import cases_area_draw
 import cases_font
 import cases_helpers
@@ -34,7 +35,8 @@ from original import FB_SIZE, HEIGHT, WIDTH, Original
 
 SUITES = [cases_primitives, cases_images, cases_panel, cases_font, cases_text, cases_area, cases_widget,
           cases_area_draw, cases_scrman, cases_screen, cases_stack, cases_input,
-          cases_helpers, cases_start, cases_leagues, cases_progress, cases_scroll, cases_select, cases_window]
+          cases_helpers, cases_start, cases_leagues, cases_progress, cases_scroll, cases_select, cases_window,
+          cases_database]
 
 
 class Mismatch(Exception):
