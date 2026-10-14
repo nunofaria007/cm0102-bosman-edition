@@ -16,6 +16,8 @@ G_SETTINGS = 0xAE3138                # pointer to the settings object. +0x08 is 
 G_LANGUAGE = 0x9EB2DC
 G_KEY_IDS = (0x9CF178, 0x9D0528)     # all -1 when the original starts
 G_EMPTY_COMMON_NAME = 0x9B59B4       # -1 when the original starts
+# Code that other suites patch and the load runs: the date constructor (cases_leagues).
+PATCHED_CODE = [(0x549F70, 5)]
 
 # Steps of the load where the test copies the tables: the call of the id pass, the instruction after
 # the delete of duff.out (the id pass is done), and the call of the key ids (the staff pass and the
@@ -124,7 +126,10 @@ def original_load(ctx):
              for name, addr in (("read", AT_READ), ("resolved", AT_RESOLVED), ("staff", AT_STAFF_PASS))]
     hooks.append(original.uc.hook_add(UC_HOOK_CODE, lambda *a: randoms.append(1), begin=FUN_RANDOM,
                                       end=FUN_RANDOM))
-    undo = original.replace_thiscall(FUN_PROGRESS, 4, on_progress)
+    patched = [(addr, original.read(addr, size)) for addr, size in PATCHED_CODE]
+    for addr, size in PATCHED_CODE:
+        original.write(addr, original.pristine(addr, size))
+    undo = original.replace_thiscall(FUN_PROGRESS, 4, on_progress)    # flushes the translated code
     try:
         settings = original.alloc(0x400)
         original.write_u32(G_SETTINGS, settings)
@@ -136,6 +141,9 @@ def original_load(ctx):
         result = original.call(FUN_LOAD, folder, 1, 0)
     finally:
         undo()
+        for addr, code in patched:
+            original.write(addr, code)
+        original.uc.ctl_flush_tb()
         for hook in hooks:
             original.uc.hook_del(hook)
     ctx.expect_equal("original load", 1, result, source="wanted")
@@ -236,7 +244,23 @@ def test_read(ctx):
     return expect_tables(ctx, "read", linked=False)
 
 
+def test_resolve(ctx):
+    """The id pass FUN_005315a0: every id field becomes a pointer, or NULL, or keeps its id."""
+    test_read(ctx)
+    ctx.port.send("db_resolve")
+    return expect_tables(ctx, "resolved", linked=True)
+
+
+def test_staff_pass(ctx):
+    """The staff pass and the national clubs of the loader."""
+    test_resolve(ctx)
+    ctx.port.send("db_staff_pass")
+    return expect_tables(ctx, "staff", linked=True)
+
+
 TESTS = [
     ("database_original_load", test_original_load),
     ("database_read", test_read),
+    ("database_resolve", test_resolve),
+    ("database_staff_pass", test_staff_pass),
 ]

@@ -448,6 +448,12 @@ void database_staff_pass(void);
 void database_national_clubs(void);
 
 /*
+ * FUN_0053c190(club, staff, date, unlink, as_player): takes a staff row out
+ * of the list of the club that its job there names. See database_links.c.
+ */
+bool database_leave_club(club_t *c, staff_t *s, const db_date_t *date, bool unlink, bool as_player);
+
+/*
  * Index.dat, the continent table and the nation table, with the continent
  * and the rivals of each nation linked as the id pass does. The other id
  * fields of a nation keep their ids. For the league tests.

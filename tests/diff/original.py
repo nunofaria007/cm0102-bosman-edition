@@ -197,10 +197,18 @@ class Original:
         base = struct.unpack_from("<I", data, pe + 24 + 28)[0]
         image_size = struct.unpack_from("<I", data, pe + 24 + 56)[0]
         self.uc.mem_map(base, _align(image_size))
+        self.image_base = base
+        self.image = bytearray(_align(image_size))     # as loaded, before any test patches code
         table = pe + 24 + optional_size
         for i in range(section_count):
             _, vsize, va, rsize, rptr = struct.unpack_from("<8sIIII", data, table + i * 40)
-            self.uc.mem_write(base + va, data[rptr:rptr + min(rsize, vsize or rsize)])
+            section = data[rptr:rptr + min(rsize, vsize or rsize)]
+            self.image[va:va + len(section)] = section
+            self.uc.mem_write(base + va, section)
+
+    def pristine(self, addr, size):
+        """Bytes of the original as loaded, before any test patched them."""
+        return bytes(self.image[addr - self.image_base:addr - self.image_base + size])
 
     # Memory helpers
 
@@ -349,12 +357,16 @@ class Original:
         self.uc.mem_write(addr, code)
         hook = self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
         replaced[addr] = (hook, on_call)
+        # Unicorn checks the address range of a hook when it translates code. A block that it
+        # translated before keeps running without the new hook.
+        self.uc.ctl_flush_tb()
 
         def undo():
             self.uc.hook_del(replaced.pop(addr)[0])
             self.uc.mem_write(addr, old)
             if earlier:
                 replaced[addr] = (self.uc.hook_add(UC_HOOK_CODE, earlier[1], begin=addr, end=addr), earlier[1])
+            self.uc.ctl_flush_tb()
         return undo
 
     def _data_path(self, folder, name):
