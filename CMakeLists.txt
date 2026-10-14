@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(cm0102-mac C)
+project(cm0102-mac VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -152,9 +152,16 @@ if(EXISTS "${CM0102_EXE}")
         VERBATIM)
     add_custom_target(recomp_gen DEPENDS "${RECOMP_OUT}/recomp.stamp")
 
+    # The host functions (src/recomp_rt/host.h): Windows when cross-compiled with mingw-w64, else POSIX.
+    if(WIN32)
+        set(RECOMP_HOST src/recomp_rt/host/win32.c)
+    else()
+        set(RECOMP_HOST src/recomp_rt/host/posix.c)
+    endif()
     add_executable(cm0102_recomp ${RECOMP_GEN}
         src/recomp_rt/rt.c
         src/recomp_rt/heap.c
+        ${RECOMP_HOST}
         ${RECOMP_WIN}
     )
     add_dependencies(cm0102_recomp recomp_gen)
@@ -165,8 +172,12 @@ if(EXISTS "${CM0102_EXE}")
     set_source_files_properties(${RECOMP_GEN} PROPERTIES GENERATED TRUE COMPILE_OPTIONS "-O1;-w")
     target_compile_options(cm0102_recomp PRIVATE -fno-strict-aliasing -fwrapv -O1)
     # Every call of the original is a host call: give the main thread a deep stack.
-    target_link_options(cm0102_recomp PRIVATE "LINKER:-stack_size,0x10000000")
-    target_link_libraries(cm0102_recomp PRIVATE ${SDL2_LIBRARIES} m)
+    if(WIN32)
+        include(packaging/windows/windows.cmake)
+    else()
+        target_link_options(cm0102_recomp PRIVATE "LINKER:-stack_size,0x10000000")
+        target_link_libraries(cm0102_recomp PRIVATE ${SDL2_LIBRARIES} m)
+    endif()
 else()
     message(STATUS "cm0102_recomp: ${CM0102_EXE} not found, so the recompiled game is not built")
 endif()

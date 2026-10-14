@@ -47,6 +47,7 @@ RESUME_AFTER_CALLS = {0x947998}
 
 def runtime_sources(extra):
     core = [os.path.join(RUNTIME, n) for n in sorted(os.listdir(RUNTIME)) if n.endswith(".c")]
+    core.append(os.path.join(RUNTIME, "host", "posix.c"))     # --compile builds on the Mac
     return core + [os.path.abspath(p) for p in extra]
 
 

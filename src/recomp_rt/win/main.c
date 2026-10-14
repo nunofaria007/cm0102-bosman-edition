@@ -2,18 +2,18 @@
  *
  * Usage: cm0102_recomp [--game <folder>] [options of the original, for example -windowed]
  * The game folder holds the player's own cm0102.exe, Data and Pictures. It is the registry value
- * Location, the base of every path and the CD drive D:\ (files.c). Default: the first folder above the
- * program that holds cm0102.exe and Data, else the current folder. The game folder is read only:
- * every write goes to ~/Library/Application Support/cm0102 (files.c).
+ * Location, the base of every path and the CD drive (files.c). Default: the folder "game" beside the
+ * program, then the first folder above the program that holds cm0102.exe and Data, else the current
+ * folder. The game folder is read only:
+ * every write goes to the user folder (files.c): ~/Library/Application Support/cm0102 on macOS,
+ * %APPDATA%\cm0102 on Windows.
  * Environment: RECOMP_TRACE=1 (print import calls), RECOMP_SCRIPT and RECOMP_DUMP
  * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr). */
 #include "win.h"
+#include "host.h"
 
 #include <SDL.h>
-#include <mach-o/dyld.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 char win_game_dir[1024];
 char win_exe_path[1024];
@@ -36,26 +36,30 @@ static void at_end(void)
 static int has_game(const char *dir)
 {
     char p[1200];
-    struct stat st;
+    HostStat st;
     snprintf(p, sizeof p, "%s/cm0102.exe", dir);
-    if (stat(p, &st) || !S_ISREG(st.st_mode)) return 0;
+    if (host_stat(p, &st) || st.is_dir) return 0;
     snprintf(p, sizeof p, "%s/Data", dir);
-    return stat(p, &st) == 0 && S_ISDIR(st.st_mode);
+    return host_stat(p, &st) == 0 && st.is_dir;
 }
 
-/* The default game folder: look upwards from the program, else the current folder. */
+/* The default game folder: the folder "game" beside the program (where the Windows installer puts the
+ * clean files), then each folder upwards from the program, else the current folder. */
 static void default_game_dir(char *out, size_t room)
 {
-    char exe[1024], real[1024];
-    uint32_t n = sizeof exe;
-    if (_NSGetExecutablePath(exe, &n) == 0 && realpath(exe, real)) {
-        for (char *slash; (slash = strrchr(real, '/')) != NULL;) {
+    char real[1024];
+    if (host_program_path(real, sizeof real)) {
+        char beside[1100];
+        char *slash = strrchr(real, '/');
+        snprintf(beside, sizeof beside, "%.*s/game", slash ? (int)(slash - real) : 0, real);
+        if (slash && has_game(beside)) { snprintf(out, room, "%s", beside); return; }
+        for (; (slash = strrchr(real, '/')) != NULL;) {
             *slash = 0;
             if (!real[0]) break;
             if (has_game(real)) { snprintf(out, room, "%s", real); return; }
         }
     }
-    if (!getcwd(out, room)) snprintf(out, room, ".");
+    if (!host_current_dir(out, room)) snprintf(out, room, ".");
 }
 
 int main(int argc, char **argv)
@@ -74,17 +78,13 @@ int main(int argc, char **argv)
     }
     char exe_path[1100];
     snprintf(exe_path, sizeof exe_path, "%s/cm0102.exe", game);
-    if (!realpath(game, win_game_dir) || !realpath(exe_path, win_exe_path)) {
+    if (!host_realpath(game, win_game_dir, sizeof win_game_dir)
+        || !host_realpath(exe_path, win_exe_path, sizeof win_exe_path)) {
         fprintf(stderr, "cm0102_recomp: cannot find cm0102.exe in the folder %s. "
                         "Give the folder of the original game with --game <folder>.\n", game);
         return 2;
     }
-    const char *home = getenv("HOME");
-    if (!home || !*home) {
-        fprintf(stderr, "cm0102_recomp: HOME is not set, so the user folder is unknown.\n");
-        return 2;
-    }
-    snprintf(win_user_dir, sizeof win_user_dir, "%s/Library/Application Support/cm0102", home);
+    if (!host_user_dir(win_user_dir, sizeof win_user_dir)) return 2;
     {
         char tmp[1100];
         snprintf(tmp, sizeof tmp, "%s", win_user_dir);
@@ -92,12 +92,12 @@ int main(int argc, char **argv)
             if (*p != '/' && *p) continue;
             char c = *p;
             *p = 0;
-            mkdir(tmp, 0755);
+            host_mkdir(tmp);
             if (!c) break;
             *p = c;
         }
-        struct stat st;
-        if (stat(win_user_dir, &st) || !S_ISDIR(st.st_mode)) {
+        HostStat st;
+        if (host_stat(win_user_dir, &st) || !st.is_dir) {
             fprintf(stderr, "cm0102_recomp: cannot create the user folder %s.\n", win_user_dir);
             return 2;
         }

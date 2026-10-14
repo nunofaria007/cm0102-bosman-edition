@@ -2,11 +2,11 @@
  * state save and the stops. The heap is in heap.c. */
 #include "rt.h"
 #include "rt_host.h"
+#include "host.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/mman.h>
 
 Cpu cpu;
 Fpu fpu;
@@ -26,8 +26,8 @@ void rt_init(const char *exe_path)
 {
     /* 4 GB and a page, so that an access at the top of the 32-bit space stays inside. */
     size_t span = (size_t)1 << 32;
-    void *m = mmap(NULL, span + 0x10000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
-    if (m == MAP_FAILED) rt_fatal("cannot reserve 4 GB of address space");
+    void *m = host_reserve(span + 0x10000);
+    if (!m) rt_fatal("cannot reserve 4 GB of address space");
     g_mem = m;
 
     FILE *f = fopen(exe_path, "rb");

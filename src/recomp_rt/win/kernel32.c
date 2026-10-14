@@ -3,11 +3,11 @@
  * The values follow docs/research/2026-10-14-import-inventory.md section 1.1: the runtime is Windows
  * NT 5.1, so the CRT heap uses only HeapAlloc, HeapFree, HeapReAlloc and HeapSize. */
 #include "win.h"
+#include "host.h"
 
 #include <SDL.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <sys/time.h>
 #include <time.h>
 
 uint32_t win_last_error;
@@ -263,9 +263,7 @@ RT_IMPORT(TerminateProcess)
 /* Time. FILETIME counts 100 ns from 1601-01-01; the Unix epoch is 11644473600 s later. */
 uint64_t win_filetime_now(void)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return ((uint64_t)tv.tv_sec + 11644473600ull) * 10000000ull + (uint64_t)tv.tv_usec * 10u;
+    return (host_unix_time_us() + 11644473600000000ull) * 10u;
 }
 
 RT_IMPORT(GetSystemTimeAsFileTime)
@@ -288,25 +286,18 @@ void win_put_systemtime(uint32_t p, const struct tm *t, uint32_t ms)
 
 static void system_time(int local)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    time_t s = tv.tv_sec;
+    uint64_t us = host_unix_time_us();
+    time_t s = (time_t)(us / 1000000u);
     struct tm t;
-    if (local) localtime_r(&s, &t); else gmtime_r(&s, &t);
-    win_put_systemtime(rt_arg(0), &t, (uint32_t)(tv.tv_usec / 1000));
+    if (local) host_localtime(s, &t); else host_gmtime(s, &t);
+    win_put_systemtime(rt_arg(0), &t, (uint32_t)(us % 1000000u / 1000u));
 }
 
 RT_IMPORT(GetLocalTime) { system_time(1); rt_ret_stdcall(0, 1); }
 RT_IMPORT(GetSystemTime) { system_time(0); rt_ret_stdcall(0, 1); }
 
 /* The host's offset from UTC now, as one bias without daylight rules (TIME_ZONE_ID_UNKNOWN). */
-int32_t win_bias_minutes(void)
-{
-    time_t now = time(NULL);
-    struct tm t;
-    localtime_r(&now, &t);
-    return (int32_t)(-t.tm_gmtoff / 60);
-}
+int32_t win_bias_minutes(void) { return host_bias_minutes(); }
 
 RT_IMPORT(GetTimeZoneInformation)
 {

@@ -1,8 +1,9 @@
 /* KERNEL32 files and folders over the host file system.
  *
- * Paths: C:\ is the host root, so the original's folder /Users/max/Downloads/Game is
- * C:\Users\max\Downloads\Game. D:\ is the CD drive: the folder that holds the player's own cm0102.exe,
- * which the CD check looks for (inventory 4.6). A relative path starts at the current folder, which
+ * Paths: on macOS C:\ is the host root, so the original's folder /Users/max/Downloads/Game is
+ * C:\Users\max\Downloads\Game. On Windows each drive is the host drive of that letter. The CD drive
+ * (D:\ on macOS, a letter that Windows does not use there, host_cd_drive) is the folder that holds the
+ * player's own cm0102.exe, which the CD check looks for (inventory 4.6). A relative path starts at the current folder, which
  * WinMain sets from the registry value Location. Each part of a path is matched without regard to case,
  * as Windows does; a part that does not exist keeps its spelling (a new file).
  *
@@ -12,36 +13,42 @@
  * it is opened for update). A folder is created in U. A delete or rename acts on U only. A file search
  * lists U and H, U winning on equal names. A path outside the game folder maps to U/_outside/<path>. */
 #include "win.h"
+#include "host.h"
 
 #include <ctype.h>
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libgen.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <sys/stat.h>
 #include <time.h>
-#include <unistd.h>
 
 char win_cwd[1024] = "C:\\";
 char win_user_dir[1024];
 
-static int exists(const char *p) { struct stat st; return stat(p, &st) == 0; }
-static int is_dir(const char *p) { struct stat st; return stat(p, &st) == 0 && S_ISDIR(st.st_mode); }
+static int exists(const char *p) { HostStat st; return host_stat(p, &st) == 0; }
+static int is_dir(const char *p) { HostStat st; return host_stat(p, &st) == 0 && st.is_dir; }
 
-/* The spelling of a name in a folder, ignoring case: found = the entry, or empty. */
+/* The spelling of a name in a folder, ignoring case: found = the entry, or empty. A host that ignores
+ * case needs no lookup. */
 static void ci_lookup(const char *dir, const char *part, char *found, size_t room)
 {
     found[0] = 0;
-    DIR *d = opendir(dir[0] ? dir : "/");
+    if (HOST_FOLDS_CASE) return;
+    HostDir *d = host_opendir(dir[0] ? dir : "/");
     if (!d) return;
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        if (!strcmp(e->d_name, part)) { snprintf(found, room, "%s", e->d_name); break; }
-        if (!found[0] && !strcasecmp(e->d_name, part)) snprintf(found, room, "%s", e->d_name);
+    const char *e;
+    while ((e = host_readdir(d))) {
+        if (!strcmp(e, part)) { snprintf(found, room, "%s", e); break; }
+        if (!found[0] && !strcasecmp(e, part)) snprintf(found, room, "%s", e);
     }
-    closedir(d);
+    host_closedir(d);
+}
+
+/* The start of a host path is the game folder (the whole path or the part before a '/'). */
+static int in_game_dir(const char *host, size_t gl)
+{
+    int same = HOST_FOLDS_CASE ? !strncasecmp(host, win_game_dir, gl) : !strncmp(host, win_game_dir, gl);
+    return same && (host[gl] == '/' || host[gl] == 0);
 }
 
 /* The user-folder form U of a host path H: the part below the game folder, else _outside/<H>. Names that
@@ -52,13 +59,15 @@ static int user_form(const char *host, char *out, size_t room)
     const char *rel;
     char base[1100];
     snprintf(base, sizeof base, "%s", win_user_dir);
-    if (!strncmp(host, win_game_dir, gl) && (host[gl] == '/' || host[gl] == 0)) rel = host + gl;
+    if (in_game_dir(host, gl)) rel = host + gl;
     else {
         snprintf(base + strlen(base), sizeof base - strlen(base), "/_outside");
         rel = host;
     }
     char copy[2048];
     snprintf(copy, sizeof copy, "%s", rel);
+    /* A drive letter becomes a folder name: C:/Windows is _outside/C/Windows. */
+    for (char *c = copy; HOST_FOLDS_CASE && *c; c++) if (*c == ':') memmove(c, c + 1, strlen(c));
     size_t len = (size_t)snprintf(out, room, "%s", base);
     char *save = NULL;
     for (char *part = strtok_r(copy, "/", &save); part; part = strtok_r(NULL, "/", &save)) {
@@ -78,27 +87,27 @@ static void make_parents(const char *path)
     for (char *p = buf + 1; *p; p++) {
         if (*p != '/') continue;
         *p = 0;
-        mkdir(buf, 0755);
+        host_mkdir(buf);
         *p = '/';
     }
 }
 
 static int copy_file(const char *from, const char *to)
 {
-    int in = open(from, O_RDONLY);
+    int in = host_open(from, O_RDONLY, 0);
     if (in < 0) return -1;
     make_parents(to);
-    int out = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (out < 0) { close(in); return -1; }
+    int out = host_open(to, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (out < 0) { host_close(in); return -1; }
     char buf[65536];
-    ssize_t r;
+    long r;
     int ok = 0;
-    while ((r = read(in, buf, sizeof buf)) > 0) {
-        if (write(out, buf, (size_t)r) != r) { ok = -1; break; }
+    while ((r = host_read(in, buf, sizeof buf)) > 0) {
+        if (host_write(out, buf, (uint32_t)r) != r) { ok = -1; break; }
     }
     if (r < 0) ok = -1;
-    close(in);
-    close(out);
+    host_close(in);
+    host_close(out);
     return ok;
 }
 
@@ -153,16 +162,18 @@ static void full_path(const char *in, char *out, size_t room)
     for (int i = 0; i < n && len < room; i++) len += (size_t)snprintf(out + len, room - len, "\\%s", parts[i]);
 }
 
-/* The host folder of a drive's root, or NULL for a drive that does not exist. */
+/* The host folder of a drive's root, or NULL for a drive that does not exist. On macOS C: is the
+ * host root (""); on Windows a drive is the host drive ("E:"). */
 static const char *drive_root(char drive, char *buf, size_t room)
 {
-    if (drive == 'C') return "";
-    if (drive == 'D') {
+    if (drive == host_cd_drive()) {
         snprintf(buf, room, "%s", win_exe_path);
         char *slash = strrchr(buf, '/');
         if (slash) *slash = 0;
         return buf;
     }
+    if (HOST_FOLDS_CASE && host_has_drive(drive)) { snprintf(buf, room, "%c:", drive); return buf; }
+    if (!HOST_FOLDS_CASE && drive == 'C') return "";
     return NULL;
 }
 
@@ -184,14 +195,17 @@ int win_host_path(const char *winpath, char *out, size_t room)
         if (len >= room) return 0;
     }
     if (!len) snprintf(out, room, "/");
+    else if (len == 2 && out[1] == ':') snprintf(out + len, room - len, "/");   /* a Windows drive root */
     return 1;
 }
 
 void win_windows_path(const char *host, char *out, size_t room)
 {
-    size_t len = (size_t)snprintf(out, room, "C:%s", host);
+    /* A Windows host path starts with its drive; a macOS one lies on C:. */
+    int has_drive = isalpha((unsigned char)host[0]) && host[1] == ':';
+    size_t len = (size_t)snprintf(out, room, "%s%s", has_drive ? "" : "C:", host);
     for (size_t i = 0; i < len && i < room; i++) if (out[i] == '/') out[i] = '\\';
-    if (len == 2 && room > 3) snprintf(out, room, "C:\\");
+    if (len == 2 && room > 3) snprintf(out + 2, room - 2, "\\");
 }
 
 
@@ -220,7 +234,7 @@ int win_close_file(uint32_t h)
 {
     int fd = fd_of(h);
     if (fd < 0) return 0;
-    close(fd);
+    host_close(fd);
     fd_used[(h - FILE_BASE) / 4] = 0;
     return 1;
 }
@@ -279,7 +293,7 @@ RT_IMPORT(CreateFileA)
         if (!in_u && in_h && (disposition == 2 || disposition == 5)) make_parents(u);
         if (disposition == 5 && !in_u) flags |= O_CREAT;
     }
-    int fd = open(target, flags, 0644);
+    int fd = host_open(target, flags, 0644);
     WIN_TRACE("CreateFileA(%s -> %s, %#x, %u) = %d\n", name, target, access, disposition, fd);
     if (fd < 0) {
         win_error_from_errno();
@@ -306,7 +320,7 @@ RT_IMPORT(ReadFile)
     uint32_t got = 0;
     if (fd >= 0) {
         while (got < count) {
-            ssize_t r = read(fd, g_mem + buf + got, count - got);
+            long r = host_read(fd, g_mem + buf + got, count - got);
             if (r <= 0) break;
             got += (uint32_t)r;
         }
@@ -328,7 +342,7 @@ RT_IMPORT(WriteFile)
     uint32_t put = 0;
     if (fd >= 0) {
         while (put < count) {
-            ssize_t r = write(fd, g_mem + buf + put, count - put);
+            long r = host_write(fd, g_mem + buf + put, count - put);
             if (r <= 0) break;
             put += (uint32_t)r;
         }
@@ -356,7 +370,7 @@ RT_IMPORT(SetFilePointer)
         return;
     }
     int64_t off = high_at ? (int64_t)((uint64_t)rd32(g_mem, high_at) << 32 | low) : (int64_t)(int32_t)low;
-    off_t r = lseek(fd, off, method == 0 ? SEEK_SET : method == 1 ? SEEK_CUR : SEEK_END);
+    int64_t r = host_seek(fd, off, method == 0 ? SEEK_SET : method == 1 ? SEEK_CUR : SEEK_END);
     if (r < 0) {
         win_last_error = 131;                       /* ERROR_NEGATIVE_SEEK */
         rt_ret_stdcall(0xffffffffu, 4);
@@ -370,7 +384,7 @@ RT_IMPORT(SetFilePointer)
 RT_IMPORT(SetEndOfFile)
 {
     int fd = fd_of(rt_arg(0));
-    int ok = fd >= 0 && ftruncate(fd, lseek(fd, 0, SEEK_CUR)) == 0;
+    int ok = fd >= 0 && host_truncate(fd, host_seek(fd, 0, SEEK_CUR)) == 0;
     rt_ret_stdcall((uint32_t)ok, 1);
 }
 
@@ -396,13 +410,13 @@ RT_IMPORT(GetFileAttributesA)
 {
     const char *name = win_str(rt_arg(0));
     char h[2048], u[2048];
-    struct stat st;
-    if (!win_paths(name, h, u, sizeof h) || (stat(u, &st) && stat(h, &st))) {
+    HostStat st;
+    if (!win_paths(name, h, u, sizeof h) || (host_stat(u, &st) && host_stat(h, &st))) {
         win_last_error = ERROR_FILE_NOT_FOUND;
         rt_ret_stdcall(0xffffffffu, 1);
         return;
     }
-    rt_ret_stdcall(S_ISDIR(st.st_mode) ? 0x10u : 0x20u, 1);
+    rt_ret_stdcall(st.is_dir ? 0x10u : 0x20u, 1);
 }
 
 /* Delete and rename act on the user folder only. A file that exists only in the game folder stays. */
@@ -412,7 +426,7 @@ RT_IMPORT(DeleteFileA)
     char h[2048], u[2048];
     int ok = 0;
     if (win_paths(name, h, u, sizeof h)) {
-        if (exists(u)) ok = unlink(u) == 0;
+        if (exists(u)) ok = host_unlink(u) == 0;
         else if (exists(h)) { errno = EACCES; }
         else errno = ENOENT;
     }
@@ -428,7 +442,7 @@ RT_IMPORT(MoveFileA)
     if (ok && (exists(tu) || exists(th))) { win_last_error = ERROR_ALREADY_EXISTS; ok = 0; }
     else if (ok && exists(fu)) {
         make_parents(tu);
-        if (rename(fu, tu)) { win_error_from_errno(); ok = 0; }
+        if (host_rename(fu, tu)) { win_error_from_errno(); ok = 0; }
     } else if (ok && exists(fh) && !is_dir(fh)) {
         /* The source is in the game folder: the new name appears in the user folder. */
         if (copy_file(fh, tu)) { win_error_from_errno(); ok = 0; }
@@ -458,7 +472,7 @@ RT_IMPORT(CreateDirectoryA)
         if (!parent_h && !is_dir(parent)) ok = 0, win_last_error = ERROR_PATH_NOT_FOUND;
         else {
             make_parents(u);
-            ok = mkdir(u, 0755) == 0;
+            ok = host_mkdir(u) == 0;
             if (!ok) win_last_error = ERROR_PATH_NOT_FOUND;
         }
     } else win_last_error = ERROR_PATH_NOT_FOUND;
@@ -506,21 +520,29 @@ RT_IMPORT(GetFullPathNameA)
     rt_ret_stdcall(len, 4);
 }
 
-/* Drives: C: the fixed disk, D: the CD. */
+/* Drives: the fixed disk of the game folder (C: on macOS) and the CD. */
 RT_IMPORT(GetLogicalDriveStringsA)
 {
     uint32_t room = rt_arg(0), buf = rt_arg(1);
-    static const char drives[] = "C:\\\0D:\\\0";
-    if (room < sizeof drives) { rt_ret_stdcall(sizeof drives, 2); return; }
-    memcpy(g_mem + buf, drives, sizeof drives);
-    rt_ret_stdcall(sizeof drives - 1, 2);
+    char game[1100], a, b;
+    win_windows_path(win_game_dir, game, sizeof game);
+    a = (char)toupper((unsigned char)game[0]);
+    b = host_cd_drive();
+    if (a > b) { char t = a; a = b; b = t; }
+    const char drives[9] = { a, ':', '\\', 0, b, ':', '\\', 0, 0 };   /* the CD letter is never the game's */
+    uint32_t size = sizeof drives;
+    if (room < size) { rt_ret_stdcall(size, 2); return; }
+    memcpy(g_mem + buf, drives, size);
+    rt_ret_stdcall(size - 1, 2);
 }
 
 RT_IMPORT(GetDriveTypeA)
 {
     uint32_t root = rt_arg(0);
     char drive = root ? (char)toupper((unsigned char)win_str(root)[0]) : win_cwd[0];
-    rt_ret_stdcall(drive == 'C' ? 3u : drive == 'D' ? 5u : 1u, 1);   /* FIXED, CDROM, NO_ROOT_DIR */
+    char rootbuf[1024];
+    uint32_t type = drive == host_cd_drive() ? 5u : drive_root(drive, rootbuf, sizeof rootbuf) ? 3u : 1u;
+    rt_ret_stdcall(type, 1);   /* CDROM, FIXED, NO_ROOT_DIR */
 }
 
 /* GetDiskFreeSpaceA(root, sectors per cluster, bytes per sector, free clusters, clusters) */
@@ -534,7 +556,7 @@ RT_IMPORT(GetDiskFreeSpaceA)
 }
 
 /* File times. */
-static uint64_t filetime_of(time_t t) { return ((uint64_t)t + 11644473600ull) * 10000000ull; }
+static uint64_t filetime_of(int64_t t) { return ((uint64_t)t + 11644473600ull) * 10000000ull; }
 
 RT_IMPORT(FileTimeToLocalFileTime)
 {
@@ -548,7 +570,7 @@ RT_IMPORT(FileTimeToSystemTime)
     uint64_t ft = rd64(g_mem, rt_arg(0));
     time_t s = (time_t)(ft / 10000000ull) - (time_t)11644473600ll;
     struct tm t;
-    gmtime_r(&s, &t);
+    host_gmtime(s, &t);
     win_put_systemtime(rt_arg(1), &t, (uint32_t)(ft / 10000ull % 1000));
     rt_ret_stdcall(1, 2);
 }
@@ -585,17 +607,17 @@ static int wild_match(const char *pat, const char *s)
 /* WIN32_FIND_DATAA: attributes 0, times 4/0xc/0x14, size 0x1c/0x20, name 0x2c, short name 0x130. */
 static void fill_find_data(Find *f, uint32_t data, int idx)
 {
-    struct stat st;
+    HostStat st;
     const char *path = f->paths[idx];
     memset(g_mem + data, 0, 0x140);
-    if (stat(path, &st) == 0) {
-        wr32(g_mem, data, S_ISDIR(st.st_mode) ? 0x10u : 0x20u);
-        uint64_t ft = filetime_of(st.st_mtime);
+    if (host_stat(path, &st) == 0) {
+        wr32(g_mem, data, st.is_dir ? 0x10u : 0x20u);
+        uint64_t ft = filetime_of(st.mtime);
         wr64(g_mem, data + 4, ft);
         wr64(g_mem, data + 0xc, ft);
         wr64(g_mem, data + 0x14, ft);
-        wr32(g_mem, data + 0x1c, (uint32_t)((uint64_t)st.st_size >> 32));
-        wr32(g_mem, data + 0x20, (uint32_t)st.st_size);
+        wr32(g_mem, data + 0x1c, (uint32_t)(st.size >> 32));
+        wr32(g_mem, data + 0x20, (uint32_t)st.size);
     }
     win_put_str(data + 0x2c, f->names[idx], 260);
 }
@@ -611,23 +633,23 @@ static void free_find(Find *f)
 /* Adds the matching names of one folder; a name already listed (ignoring case) is skipped. */
 static void find_add_dir(Find *f, const char *host, const char *mask, int is_root)
 {
-    DIR *d = opendir(host);
+    HostDir *d = host_opendir(host);
     if (!d) return;
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        if (is_root && (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))) continue;
-        if (!wild_match(mask, e->d_name)) continue;
+    const char *name;
+    while ((name = host_readdir(d))) {
+        if (is_root && (!strcmp(name, ".") || !strcmp(name, ".."))) continue;
+        if (!wild_match(mask, name)) continue;
         int dup = 0;
-        for (int i = 0; i < f->count && !dup; i++) dup = !strcasecmp(f->names[i], e->d_name);
+        for (int i = 0; i < f->count && !dup; i++) dup = !strcasecmp(f->names[i], name);
         if (dup) continue;
         f->names = realloc(f->names, sizeof(char *) * (size_t)(f->count + 1));
         f->paths = realloc(f->paths, sizeof(char *) * (size_t)(f->count + 1));
         char path[2400];
-        snprintf(path, sizeof path, "%s/%s", host, e->d_name);
-        f->names[f->count] = strdup(e->d_name);
+        snprintf(path, sizeof path, "%s/%s", host, name);
+        f->names[f->count] = strdup(name);
         f->paths[f->count++] = strdup(path);
     }
-    closedir(d);
+    host_closedir(d);
 }
 
 RT_IMPORT(FindFirstFileA)
