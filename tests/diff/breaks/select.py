@@ -7,6 +7,10 @@ DB = "src/cm3/database.c"
 # Equivalent breaks, left out because no test can see them:
 # - The order of the progress calls and the reads of the two tables: the reads draw nothing.
 # - "if (!n) continue;" in first_selected: a NULL nation never has flags.
+# - "new game: slot 0", the set of slot 0 after the push: a new screen starts with every slot 0.
+# - "input: select all setup", the test of the setup function: every league entry has one.
+# - "build: second area", the second options area: the side bar makes areas first, so the options
+#   area never has index 0 (or 1) on a real screen.
 
 # name, file, text to find (once in the file), text to put in its place
 BREAKS = [
@@ -21,7 +25,6 @@ BREAKS = [
     ("load: keys", DB, "    key_index_match();                                         /* FUN_00601a40 */\n", ""),
     ("new game: no load check", SETUP, "    if (!g_nations) {\n        /*\n         * The original checks", "    if (1) {\n        /*\n         * The original checks"),
     ("new game: default", SETUP, "        setup_default_leagues();\n", ""),
-    ("new game: slot 0", SETUP, "        screen_stack_set_slot(st, 0, 0, false);   /* scroll position */\n", ""),
     ("new game: slot 1", SETUP, "        screen_stack_set_slot(st, 1, 0, false);   /* list area */", "        screen_stack_set_slot(st, 1, 1, false);"),
     ("new game: push", SETUP, "    if (screen_stack_push(st, select_leagues_build, select_leagues_input, 0,",
      "    if (screen_stack_push(st, select_leagues_build, select_leagues_input, 1,"),
@@ -60,16 +63,14 @@ BREAKS = [
      "    screen_cell_button(st, area, column, row, set ? 0x801 : 1, 0, 0xc, 1,"),
     ("build: order", SETUP, "    order = league_order(0);", "    order = league_order(1);"),
     ("build: next", SETUP, "                      g_selected_nations != 0);", "                      1);"),
-    ("build: back", SETUP, "    gui_back_next_bar(screen_stack_cannot_go_back(st, 0) == 0,", "    gui_back_next_bar(1,"),
+    ("build: back", SETUP, "    gui_back_next_bar(screen_stack_cannot_go_back(st, 0) == 0,\n                      g_selected_nations",
+     "    gui_back_next_bar(1,\n                      g_selected_nations"),
     ("build: scroll", SETUP, "        area_set_scroll_to(&sm->areas[list], (s32)screen_stack_slot(st, 0));\n", ""),
     ("build: slot 1", SETUP, "    screen_stack_set_slot(st, 1, (uintptr_t)(u32)(s32)list, false);", "    screen_stack_set_slot(st, 1, 0, false);"),
-    ("build: second area", SETUP, "    if (area == 0) {\n        area = scrman_area_create(sm, 110, 145, 525, 165, 9, masking_weights,",
-     "    if (area == 1) {\n        area = scrman_area_create(sm, 110, 145, 525, 165, 9, masking_weights,"),
     ("input: no table", SETUP, "    if (!g_nations) return SCREEN_BACK;", "    if (!g_nations) return SCREEN_REBUILD;"),
     ("input: scroll slot", SETUP, "        screen_stack_set_slot(st, 0, (uintptr_t)(u32)shown, false);\n", ""),
     ("input: select all bg", SETUP, "                m->league_flags = (u8)((m->league_flags - 1) | LEAGUE_SELECTED);",
      "                m->league_flags = LEAGUE_SELECTED;"),
-    ("input: select all setup", SETUP, "            if (!m || !g_leagues[i].setup) continue;", "            if (!m) continue;"),
     ("input: select all first", SETUP, "            if (!g_first_selected) g_first_selected = m;\n        }", "        }"),
     ("input: real yes", SETUP, "        g_real_players = 1;", "        g_real_players = 2;"),
     ("input: masking no", SETUP, "        g_attribute_masking = 0;", "        g_attribute_masking = 1;"),

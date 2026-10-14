@@ -50,6 +50,16 @@ Port the path from "Start New Game" to the first screen with real data: the "Loa
 - The port does not keep the key code `DAT_00b67a04`, as text entry is not ported. Keys Left and Right do nothing, as in the original.
 - `FUN_00803320` uses the record of channel `+0x382a`. The port has one channel.
 - The differential test stubs the text timers `FUN_00569610` and the cursor `FUN_005e8170` to run the poll `FUN_0055f620` of the original. The window procedure and the pump have no differential test. The test models the countdown of the pump from the assembly.
+- Slice 3 left these parts out:
+  - The free memory `FUN_007a1710` in all its uses. The port acts as if memory is enough. "Select All" is then a button when fewer than 15 nations are selected (the original also needs free MB / 7 >= 16, 0x81d5e6). The input adds a nation with no memory check and no "Not enough memory" box (0x81dfc2, 0x81e17e, 0x81e309, 0x81e517).
+  - The settings apply `FUN_005d8480`. For language 0 it reloads nothing.
+  - The writes of `DAT_00dd7124` (0 in the build at 0x81d0b2, 1 before game creation at 0x81e708) and of `DAT_00a15704` (1 at 0x81cff2, already 1 in the file). Their meaning is unknown.
+- "Next" with one or more selected nations returns -4 (rebuild). The original pushes "Select Start Season" (more than one) or creates the game (one), and returns -4 too. With none, both return 0.
+- A failed load or league table makes "Start New Game" return SCREEN_QUIT after a line on stderr. The original shows an error box and calls `exit(-1)`.
+- The build ports the second options area of 0x81d33e: when the first options area has index 0, the original makes another area for "Attribute Masking". A real screen never has index 0 there, as the side bar comes first.
+- The original reads a NULL nation for an injected id 0xc, 0xd, 0xe or 0x38 with no clicked widget. The port returns -11 and changes nothing.
+- The port's load (`database_load`) makes the 47 progress calls of the loader and reads the two tables after the read steps. The reads draw nothing, so the order does not show.
+- The differential test of "Start New Game" models the loader `FUN_00524d50` with a small x86 stub: 47 calls of opcode 7 with "Loading database", steps 0 to 46 of 46, channel -1, then the nation table of the original readers is put in place. It stubs `FUN_007a1710` with 8190 MB (the most that `GlobalMemoryStatus` gives) and `FUN_005d8480` with a return. `FUN_00827d50` and `FUN_00667150` run for real. "Next" with a selected nation is checked on the port only.
 
 ## Testing
 One seam: the differential test.
@@ -85,6 +95,6 @@ Merge danger: two-way door. Blast radius: every list.
 Blocked by: 1, 2
 Delivers: the progress bar, "Start New Game", the build and input of "Select League(s)", and the link from the start screen.
 Merge danger: two-way door. Blast radius: the path from the start screen.
-- [ ] The build and each click give the same screen manager, screen and counters as the original.
+- [x] The build and each click give the same screen manager, screen and counters as the original.
 - [ ] Manual check: the list shows 27 nations, scrolls to the end, and selects and clears.
-- [ ] The full differential test passes.
+- [x] The full differential test passes.

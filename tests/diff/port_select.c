@@ -5,6 +5,7 @@
  */
 #include "port_select.h"
 #include "database.h"
+#include "key_index.h"
 #include "port_helpers.h"
 #include "port_scene.h"
 #include "screen_stack.h"
@@ -27,6 +28,10 @@ bool select_command(const char *cmd, const char *args)
 
     if (!strcmp(cmd, "sl_new_game")) {
         printf("%d\n", setup_start_new_game());
+    } else if (!strcmp(cmd, "sl_clear_keys")) {
+        /* The load must find the key ids again. */
+        for (s32 k = 0; k < KEY_NATION_COUNT; k++) g_key_nations[k] = -1;
+        for (s32 k = 0; k < KEY_CONTINENT_COUNT; k++) g_key_continents[k] = -1;
     } else if (!strcmp(cmd, "sl_record")) {
         /* Flips and pumps from here on. */
         g_screen_pump = count_pump;

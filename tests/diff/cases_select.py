@@ -95,6 +95,7 @@ class Select(Screens):
             # No database in memory: FUN_0081ce00 loads it.
             original.write_u32(G_NATIONS, 0)
             ctx.port.send("lg_free")
+            ctx.port.send("sl_clear_keys")
         else:
             original.call(FUN_LEAGUE_TABLE)
             ctx.port.send("lg_table")
@@ -132,6 +133,12 @@ class Select(Screens):
         counters = [ctx.rng.choice([0, 1, 2, 14, 15, 16, ctx.rng.randint(-2, 40)]),
                     ctx.rng.choice([0, 1, 2, 14, 15, 16, ctx.rng.randint(-2, 40)]),
                     ctx.rng.choice([-1, -1] + rows)]
+        selected = [row for row in rows
+                    if ctx.original.read(tables.nations + row * NATION_SIZE + 0x11C, 1)[0] & 2]
+        if selected and ctx.rng.random() < 0.6:
+            counters[2] = selected[0] if ctx.rng.random() < 0.5 else ctx.rng.choice(selected)
+        if ctx.rng.random() < 0.3:
+            counters[2] = -1
         ctx.original.write_u32(G_TO_LOAD, counters[0])
         ctx.original.write_u32(G_SELECTED, counters[1])
         ctx.original.write_u32(G_FIRST, 0 if counters[2] < 0 else tables.nations + counters[2] * NATION_SIZE)
@@ -246,6 +253,10 @@ def _build(ctx, case, prefix=True):
         select.push_start()
     select.scramble()
     select.new_game(f"build {case}")
+    if ctx.rng.random() < 0.25:
+        # A screen after it, so that ">>>" (id -3, as "Next") is a button.
+        select.push_start()
+        select.back()
     if ctx.rng.random() < 0.6:
         select.set_scroll_slot(ctx.rng.choice([0, 1, 5, 11, 12, 26, 40, -3, ctx.rng.randint(0, 30)]))
     select.build(_background(ctx))
@@ -269,6 +280,21 @@ def _click(ctx, select):
     roll = ctx.rng.random()
     if roll < 0.05:
         return -1
+    if roll < 0.2:
+        choices = [i for i, value in enumerate(ids) if value in (0xA, 0xB, ID_NEXT)]
+        return ctx.rng.choice(choices) if choices else -1
+    if roll < 0.45:
+        # The buttons of the first selected nation, which a change moves on.
+        first = struct.unpack("<I", ctx.original.read(G_FIRST, 4))[0]
+        choices = [i for i, value in enumerate(ids) if value in LIST_IDS and first and
+                   select.widget(i, 0x48, "<I") == first]
+        if choices:
+            return ctx.rng.choice(choices)
+    if roll < 0.55:
+        # Only six nations have an extra division.
+        choices = [i for i, value in enumerate(ids) if value == 0x38]
+        if choices:
+            return ctx.rng.choice(choices)
     wanted = LIST_IDS if roll < 0.7 else OPTION_IDS if roll < 0.88 else None
     choices = [i for i, value in enumerate(ids) if wanted is None or value in wanted]
     return ctx.rng.choice(choices) if choices else -1
@@ -276,7 +302,7 @@ def _click(ctx, select):
 
 def test_input(ctx):
     steps = 0
-    for case in range(40):
+    for case in range(60):
         select = _build(ctx, case)
         name = f"select input {case}"
         title = _background(ctx)
@@ -293,6 +319,12 @@ def test_input(ctx):
                 select.expect_same_flips(f"{name}: scroll {rows}")
             clicked = _click(ctx, select)
             steps += 1
+            if ctx.rng.random() < 0.04:
+                # No nation table: the screen goes back.
+                ctx.original.write_u32(G_NATIONS, 0)
+                ctx.port.send("lg_free")
+                select.input(f"{name}: no table, click {clicked}", clicked)
+                break
             selected = struct.unpack("<i", ctx.original.read(G_SELECTED, 4))[0]
             if clicked >= 0 and select.ids()[clicked] == ID_NEXT and selected != 0:
                 # The original goes on to "Select Start Season" or creates the game. The port rebuilds.
