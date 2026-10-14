@@ -86,7 +86,7 @@ Merge danger: two-way door. Blast radius: sound only, and the DirectSound stub.
 
 ### 5. Research (#11, #12, #18, #19, #20)
 Blocked by: none
-Delivers: one inventory in `docs/research/` answering: what the tactics screen's View drop-down offers and where it draws the column beside each name; does a news item keep the IDs of the people and clubs it names; which function opens a profile; how the game picks teams for computer-run clubs and whether it can run for the player's club with the tactic kept; where attributes are drawn; what the day loop draws and which drawing can be skipped safely.
+Delivers: one inventory in `docs/research/` answering: what the tactics screen's View drop-down offers and where it draws the column beside each name, and where the match screen's Player Ratings view draws its ratings; does a news item keep the IDs of the people and clubs it names; which function opens a profile; how the game picks teams for computer-run clubs and whether it can run for the player's club with the tactic kept; where attributes are drawn; what the day loop draws and which drawing can be skipped safely.
 Merge danger: two-way door. Documents only.
 - [ ] Each fact has its address
 
@@ -121,11 +121,11 @@ Delivers: days that pass without redrawing every screen.
 Merge danger: two-way door, but it touches the day loop. Blast radius: every saved game. The same-save check is the guard.
 - [ ] The same-save check passes with faster days on and off
 
-### 11. Position, condition and match rating together (#23)
+### 11. Position, condition and match rating together during matches (#23)
 Blocked by: 1, 5
-Delivers: an option, on by default, that shows the View drop-down's Position(s), Condition and Match Rating columns side by side beside each name on the tactics screen. The drop-down already offers each one alone (Max checked). Widescreen has room; in classic mode, if three columns do not fit, the option applies in widescreen only.
+Delivers: an option, on by default, that shows the View drop-down's Position(s), Condition and Match Rating columns side by side beside each name on the tactics screen. The drop-down already offers each one alone (Max checked). The match screen's Player Ratings view also shows each player's condition beside the rating, for both teams. Widescreen has room; in classic mode, if the columns do not fit, the option applies in widescreen only.
 Merge danger: two-way door. Blast radius: the tactics screen.
-- [ ] Screenshot of the tactics screen in a match with all three columns, in both modes
+- [ ] Screenshots of the tactics screen (three columns) and the Player Ratings view (rating and condition) in a match, in both modes
 
 ### 12. Release 0.2.0
 Blocked by: 2 to 11
