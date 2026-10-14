@@ -218,6 +218,14 @@ int host_user_dir(char *out, size_t room)
     return (size_t)snprintf(out, room, "%s/cm0102", base) < room;
 }
 
+int host_home_dir(char *out, size_t room)
+{
+    wchar_t w[MAX_PATH];
+    char base[WPATH];
+    if (SHGetFolderPathW(NULL, CSIDL_PROFILE, NULL, 0, w) != S_OK || !from_wide(w, base, sizeof base)) return 0;
+    return (size_t)snprintf(out, room, "%s", base) < room;
+}
+
 /* Drives. The CD drive is the first letter from D that the system does not use. */
 char host_cd_drive(void)
 {

@@ -56,6 +56,8 @@ int host_current_dir(char *out, size_t room);
 /* The folder for every write of the game, not yet created: ~/Library/Application Support/cm0102 or
  * %APPDATA%\cm0102. 0 with a message on stderr when the system gives no base folder. */
 int host_user_dir(char *out, size_t room);
+/* The home folder of the player, with "/" between parts. 0 when the system gives none. */
+int host_home_dir(char *out, size_t room);
 
 /* The drive letter of the CD drive that holds the player's cm0102.exe: D on macOS, a letter that the
  * system does not use on Windows. */

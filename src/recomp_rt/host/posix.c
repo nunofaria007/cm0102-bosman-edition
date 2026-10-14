@@ -76,6 +76,12 @@ int host_user_dir(char *out, size_t room)
     return (size_t)snprintf(out, room, "%s/Library/Application Support/cm0102", home) < room;
 }
 
+int host_home_dir(char *out, size_t room)
+{
+    const char *home = getenv("HOME");
+    return home && *home && (size_t)snprintf(out, room, "%s", home) < room;
+}
+
 char host_cd_drive(void) { return 'D'; }
 int host_has_drive(char letter) { (void)letter; return 0; }
 
