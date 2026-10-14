@@ -8,7 +8,8 @@ Usage:
 --functions   the known function entries: one hex address per line, or the JSON that REA list_procedures
               writes (its normalized_result). A jump to one of them is a tail call. The indirect call
               table holds every translated function.
---all         translate every function of --functions.
+--all         translate every function of --functions, and every function that a pointer in the data
+              sections names.
 --runtime     a C file of replacements (RT_REPLACE, RT_IMPORT) that goes with the core runtime
               (src/recomp_rt/*.c). Give it once per file.
 --shards      write the functions into this many files gen/fn_000.c ... so that a build system knows
@@ -61,6 +62,30 @@ def runtime_symbols(sources):
     return replaced, imports
 
 
+def data_pointers(image, known):
+    """Addresses of code that the data sections hold (vtables, initializer tables, callbacks) and
+    that are not in the known list. Only values where a function can start count: aligned to 16 or
+    after padding or a ret. Other values are text that happens to look like an address."""
+    found = set()
+    for name, va, vsize, rptr, rsize, flags in image.sections:
+        if image.is_code(va) or not rsize:
+            continue
+        data = image.read(va, min(vsize or rsize, rsize))
+        for off in range(0, len(data) - 3, 4):
+            v = int.from_bytes(data[off:off + 4], "little")
+            if not image.is_code(v) or v in known:
+                continue
+            if function_start(image, v, ()):
+                found.add(v)
+    return found
+
+
+def function_start(image, v, known):
+    """Whether a function can start at v: a known entry, or aligned to 16, or after padding or a ret."""
+    return v in known or v % 16 == 0 or image.u8(v - 1) in (0x90, 0xCC, 0xC3) \
+        or (image.u8(v - 3) == 0xC2 and image.u8(v - 1) == 0)
+
+
 def read_functions(path):
     text = open(path).read()
     if text.lstrip().startswith("{"):
@@ -111,7 +136,12 @@ def main(argv):
         entries += known
     sources = runtime_sources(args.runtime)
     replaced, imported = runtime_symbols(sources)
+    # Function boundaries: the known list and the given entries. Entries found below (data pointers,
+    # callbacks, resume points) are translated too, but do not cut the function they lie in.
     an = Analyzer(image, set(known) | set(entries))
+    known_set = set(known)
+    if args.all:
+        entries += sorted(data_pointers(image, known_set))
 
     funcs = {}
     resume = set()
@@ -126,6 +156,13 @@ def main(argv):
         f = an.function(e)
         funcs[e] = f
         for a, insn in f.insns.items():
+            if args.all and insn.mnemonic in ("push", "mov"):
+                # An address of code as a value: a callback, for example the constructor that the
+                # vector constructor iterator calls.
+                for op in insn.operands:
+                    if op.type == 2 and image.is_code(op.imm & 0xFFFFFFFF) and op.imm & 0xFFFFFFFF not in funcs \
+                            and function_start(image, op.imm & 0xFFFFFFFF, known_set):
+                        work.append(op.imm & 0xFFFFFFFF)
             if insn.mnemonic == "call" and insn.operands[0].type == 2 \
                     and insn.operands[0].imm & 0xFFFFFFFF in RESUME_AFTER_CALLS:
                 resume.add(a + insn.size)
