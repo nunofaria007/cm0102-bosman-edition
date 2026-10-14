@@ -392,6 +392,49 @@ RT_WRAP(0055f620, input_poll)
     next_repeat_at = SDL_GetTicks64() + REPEAT_INTERVAL;
 }
 
+/* The same pacing for the scrollbars. The hit test calls the scrollbar test 0x561f10 for each area
+ * with a scrollbar in every pass. While 0xb67a34 is set and the pointer is on an arrow or on the track,
+ * it moves the list one row or one page and returns 1, so one click moved a list to its end. Here the
+ * first move of a press goes through at once. Later moves of the same area in the same press wait as
+ * above. If the button goes up during the wait, the test runs with the button flag clear for that call:
+ * it then draws the arrow up and moves nothing. The wheel and the keys hold the button for a count of
+ * passes (0xb67a3c), one row each; they do not wait. A click on the thumb starts a drag (display mode
+ * 2), which does not call this test. */
+static uint32_t scroll_press, scroll_this, scroll_area = 0xffffffffu;
+static uint64_t next_scroll_at;
+
+void o_00561f10(void);
+
+/* The scrollbar test, thiscall: (s16 area index); returns 1 when the list moved. */
+RT_WRAP(00561f10, scrollbar_test)
+{
+    uint32_t area = rt_arg(0) & 0xffffu, self = cpu.ecx;
+    int held = (buttons & 1) && rd32(g_mem, 0xb67a34u) && !rd32(g_mem, 0xb67a3cu);
+    int again = held && scroll_press == press_count && scroll_this == self && scroll_area == area;
+    if (again) {
+        while ((buttons & 1) && SDL_GetTicks64() < next_scroll_at) {
+            win_poll_events();
+            SDL_Delay(1);
+        }
+        if (!(buttons & 1)) {                                  /* released while it waited */
+            wr32(g_mem, 0xb67a34u, 0);
+            o_00561f10();
+            wr32(g_mem, 0xb67a34u, 1);
+            return;
+        }
+    }
+    o_00561f10();
+    if (!held || !(cpu.eax & 0xffu)) return;
+    if (!again) {
+        scroll_press = press_count;
+        scroll_this = self;
+        scroll_area = area;
+        next_scroll_at = press_at + REPEAT_DELAY;
+    } else {
+        next_scroll_at = SDL_GetTicks64() + REPEAT_INTERVAL;
+    }
+}
+
 RT_IMPORT(TranslateMessage) { rt_ret_stdcall(1, 1); }
 
 RT_IMPORT(DispatchMessageA)
