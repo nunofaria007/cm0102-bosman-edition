@@ -8,6 +8,7 @@
 #include "gui_utils.h"
 #include "port_driver.h"
 #include "port_scene.h"
+#include "port_stack.h"
 #include "scrman.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,8 +121,9 @@ int main(void)
 
         if (sscanf(line, "%15s%n", cmd, &used) != 1) continue;
         const char *args = line + used;
-        /* These two read their own arguments, which can be 32-bit values. */
-        if (strcmp(cmd, "glyph") && strncmp(cmd, "manager", 7)) {
+        /* These commands read their own arguments, which can be 32-bit values. */
+        if (strcmp(cmd, "glyph") && strncmp(cmd, "manager", 7) &&
+            strncmp(cmd, "stack", 5)) {
             sscanf(args, "%d %d %d %d %d %d %d %d",
                    &a[0], &a[1], &a[2], &a[3], &a[4], &a[5], &a[6], &a[7]);
         }
@@ -201,7 +203,7 @@ int main(void)
             print_image(second);
             if (second != first) rgn_free(second);
             rgn_free(first);
-        } else if (!scene_command(cmd, args)) {
+        } else if (!scene_command(cmd, args) && !stack_command(cmd, args)) {
             fprintf(stderr, "port_driver: bad command: %s", line);
             return 1;
         }

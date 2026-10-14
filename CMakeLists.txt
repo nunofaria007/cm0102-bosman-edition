@@ -20,6 +20,7 @@ add_executable(cm0102
     src/si/guio.c
     src/si/area.c
     src/si/scrman.c
+    src/si/screen_stack.c
     src/cm3/database.c
 )
 
@@ -30,6 +31,7 @@ target_link_libraries(cm0102 PRIVATE ${SDL2_LIBRARIES})
 add_executable(port_driver
     tests/diff/port_driver.c
     tests/diff/port_scene.c
+    tests/diff/port_stack.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
@@ -40,6 +42,7 @@ add_executable(port_driver
     src/si/guio.c
     src/si/area.c
     src/si/scrman.c
+    src/si/screen_stack.c
 )
 target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})
 target_link_libraries(port_driver PRIVATE ${SDL2_LIBRARIES})

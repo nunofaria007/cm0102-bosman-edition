@@ -60,7 +60,7 @@ Port the functions of the original that build, draw and empty one screen manager
 - The original loads a background into the old image when both have the same size. The port does the same, so the image loader of the port gets a form that reuses an image.
 - With an empty name, the original captures the screen as the background. When the old background has another size, the original loses it without a free. The port frees it.
 - The original also clears the key that the input code queued (`DAT_00b67a24`). The port has no input code yet.
-- With `DAT_00dd6bda` set, the original writes the backslash into the title of the screen stack itself, so the title stays a backslash after the global goes back to 0. The port changes only the name it uses for the draw. The screen stack spec must decide where this write goes.
+- With `DAT_00dd6bda` set, the original writes the backslash into the title of the screen stack itself, so the title stays a backslash after the global goes back to 0. The port changes only the name it uses for the draw. The screen stack spec moved this write into the title, as in the original.
 - Each flip of the port calls a hook first. The differential test records each flip with its box and the screen at that time, and compares the list with the flips of the original.
 - The text function of the original writes past its line buffer for a text above 251 characters (text spec). The screen draw cases keep their texts to 251 characters.
 - The screen draw takes the four arguments of the original for the part of the screen to flip. A value of -1 in any of them flips the whole screen.

@@ -2,6 +2,7 @@
 #include "gui_text.h"
 #include "gui_utils.h"
 #include "scrman.h"
+#include "screen_stack.h"
 #include <stdio.h>
 
 #define TABLE_COLUMNS 4
@@ -67,7 +68,10 @@ void demo_draw(const char *background)
     add_widget(0, 140, 495, 310, 535, 0, 0, 0, 0, GUI_TEXT_LEFT, 2,
                "Use the up and down keys", -1);
     /* A backslash names no file, so the screen draw shows DEFAULT_PIC.RGN. */
-    scrman_draw(&g_screen, background ? background : "\\", -1, -1, -1, -1);
+    static char name[SCREEN_TITLE_SIZE];
+
+    snprintf(name, sizeof(name), "%s", background ? background : "\\");
+    scrman_draw(&g_screen, name, -1, -1, -1, -1);
 }
 
 void demo_scroll(s32 rows)

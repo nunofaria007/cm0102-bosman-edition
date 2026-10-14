@@ -101,12 +101,14 @@ extern const char *g_data_dir;
  * FUN_0055f300. Draws the background, the areas with no owner widget, the
  * widgets with no area and the popup areas, then flips the box (-1 in any
  * value flips the whole screen). The first draw after a reset lays the areas
- * out. `background` is the file name of the background. The original takes it
- * from the screen stack. A name that differs from the last one, ignoring
+ * out. `background` is the file name of the background: the title of the
+ * current screen of the screen stack (screen_stack_title). With
+ * g_no_backgrounds, the draw writes a backslash into it, as the original
+ * does. A name that differs from the last one, ignoring
  * case, loads that file, or DEFAULT_PIC.RGN of the data folder when it does
  * not load. An empty name keeps the screen as it is as the background.
  */
-void scrman_draw(scrman_t *sm, const char *background, s16 x1, s16 y1, s16 x2,
+void scrman_draw(scrman_t *sm, char *background, s16 x1, s16 y1, s16 x2,
                  s16 y2);
 
 #endif

@@ -167,12 +167,12 @@ static void update_background(scrman_t *sm, const char *name)
     }
 }
 
-void scrman_draw(scrman_t *sm, const char *background, s16 x1, s16 y1, s16 x2,
+void scrman_draw(scrman_t *sm, char *background, s16 x1, s16 y1, s16 x2,
                  s16 y2)
 {
     if (sm->skip_draw) return;
     /* The original also clears the key that the input code queued. */
-    if (g_no_backgrounds && background[0] != '\0') background = "\\";
+    if (g_no_backgrounds && background[0] != '\0') strcpy(background, "\\");
     update_background(sm, background);
     if (sm->background) gui_blit(0, 0, sm->background);
 
