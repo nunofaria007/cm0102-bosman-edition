@@ -4,14 +4,48 @@
 #include "database.h"
 
 /*
- * Key ids of index.cpp. The original keeps about 1,100 globals at
- * 0x9cf178..0x9d0524, one for each record that its code names, such as
- * England or Europe. FUN_00601a40 sets them all to -1, then matches each row
- * of a table by name (_stricmp, ASCII case only) against a fixed list and
- * stores the row in the global of the name. A later row with the same name
- * wins. The port has the 27 nations and the 6 continents that the league
- * table and "Select League(s)" read. The other globals wait for their spec.
+ * Key ids of index.cpp. The original keeps 1,284 globals, at
+ * 0x9cf178..0x9d0524 and 0xb63c9c..0xb63d00, one for each record that its
+ * code names, such as England or Europe. FUN_00601a40 sets 1,282 of them to
+ * -1, then matches each row of six tables by name (_stricmp, ASCII case
+ * only) against fixed chains of names and stores the row in the global of
+ * the first equal name of each chain. A later row with the same name wins.
+ * The port keeps them in g_key_ids, in the order of their addresses
+ * (src/cm3/key_ids_table.c, made by tools/research/gen_key_ids.py). The
+ * enums below name the ones that the port reads so far, and the arrays
+ * g_key_nations and g_key_continents copy them.
  */
+
+#define KEY_ID_COUNT 1284
+
+typedef struct {
+    u32 address;    /* the global in the original */
+    s32 initial;    /* its value in the file */
+    u8 reset;       /* FUN_00601a40 sets it to -1 first */
+} key_id_global_t;
+
+typedef struct {
+    const char *name;
+    s16 slot;       /* index into g_key_ids */
+    s16 slot2;      /* a second key id that the name sets, or -1 */
+    u8 chain;       /* in each chain the first equal name wins */
+} key_id_entry_t;
+
+extern const key_id_global_t g_key_id_globals[KEY_ID_COUNT];
+extern const key_id_entry_t g_key_colour_chain[], g_key_nation_chain[], g_key_club_comp_chain[],
+    g_key_continent_chain[], g_key_staff_comp_chain[], g_key_club_chain[];
+extern const s32 g_key_colour_chain_length, g_key_nation_chain_length,
+    g_key_club_comp_chain_length, g_key_continent_chain_length, g_key_staff_comp_chain_length,
+    g_key_club_chain_length;
+
+/* The key ids, in the order of g_key_id_globals. */
+extern s32 g_key_ids[KEY_ID_COUNT];
+
+/* The key id of a global of the original, or NULL. */
+s32 *key_id(u32 address);
+
+/* Every key id as the file has it: the state of the original at its start. */
+void key_ids_initial(void);
 
 enum key_nation {
     KEY_ARGENTINA,        /* DAT_009cf218 */
@@ -58,18 +92,21 @@ enum key_continent {
 extern s32 g_key_nations[KEY_NATION_COUNT];
 extern s32 g_key_continents[KEY_CONTINENT_COUNT];
 
-/* The names that the original matches, in the order of the enums. */
-extern const char *const g_key_nation_names[KEY_NATION_COUNT];
-extern const char *const g_key_continent_names[KEY_CONTINENT_COUNT];
-
 /*
  * The nation loop (0x60420d, which calls FUN_0060d810 for each row) and the
  * continent loop (0x604278) of FUN_00601a40, over g_nations and
- * g_continents. Sets every key id to -1 first.
+ * g_continents. Sets the named key ids to -1 first.
  */
 void key_index_match(void);
 
-/* FUN_00601a40, the key ids at the end of the database load. */
+/*
+ * FUN_00601a40, the key ids at the end of the database load: every reset
+ * key id to -1, then the colours, nations, club comps (without the 127
+ * reserve rows), continents, staff comps and clubs. Left out: the names of
+ * the eng.lng file when DAT_009b5984 is set (0x603c52, not for the shipped
+ * data), and the log line and error box for each key id that stays -1
+ * (0x6043ac..0x60ba6e; none with the shipped data).
+ */
 void key_index_set(void);
 
 /* The nation of a key id, or NULL when the id is -1. */

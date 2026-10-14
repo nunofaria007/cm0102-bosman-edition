@@ -14,15 +14,15 @@ DB = "src/cm3/database.c"
 
 # name, file, text to find (once in the file), text to put in its place
 BREAKS = [
-    ("load: step 0", DB, "    screen_stack_progress(st, text, 0, DB_PROGRESS_TOTAL, -1); /* 0x5285d4 */\n", ""),
-    ("load: step 1", DB, "    screen_stack_progress(st, text, 1, DB_PROGRESS_TOTAL, -1); /* 0x5289a9 */\n", ""),
-    ("load: sizing steps", DB, "        screen_stack_progress(st, text, 2 + i, DB_PROGRESS_TOTAL, -1);",
-     "        screen_stack_progress(st, text, 1 + i, DB_PROGRESS_TOTAL, -1);"),
-    ("load: read steps", DB, "        screen_stack_progress(st, text, 2 + DB_INDEX_ENTRIES + i, DB_PROGRESS_TOTAL, -1);",
-     "        screen_stack_progress(st, text, 2 + DB_INDEX_ENTRIES + i, DB_PROGRESS_TOTAL + 1, -1);"),
-    ("load: last step", DB, "    screen_stack_progress(st, text, DB_PROGRESS_TOTAL, DB_PROGRESS_TOTAL, -1); /* 0x52c671 */\n", ""),
+    ("load: step 0", DB, "    progress(step++);                                          /* 0x5285d4 */\n", ""),
+    ("load: step 1", DB, "    progress(step++);                                          /* 0x5289a9 */\n", ""),
+    ("load: sizing steps", DB, "        progress((*step)++);\n        switch (e->table) {",
+     "        progress((*step)++ - 1);\n        switch (e->table) {"),
+    ("load: read steps", DB, "        progress((*step)++);\n        if (table < 0",
+     "        progress((*step)++ + 1);\n        if (table < 0"),
+    ("load: last step", DB, "    progress(step);                                            /* 0x52c671 */\n", ""),
     ("load: text", DB, "    text_format(text, sizeof(text), \"Loading database\");", "    text_format(text, sizeof(text), \"Loading Database\");"),
-    ("load: keys", DB, "    key_index_match();                                         /* FUN_00601a40 */\n", ""),
+    ("load: keys", DB, "    key_index_set();                                           /* FUN_00601a40 */\n", ""),
     ("new game: no load check", SETUP, "    if (!g_nations) {\n        /*\n         * The original checks", "    if (1) {\n        /*\n         * The original checks"),
     ("new game: default", SETUP, "        setup_default_leagues();\n", ""),
     ("new game: slot 1", SETUP, "        screen_stack_set_slot(st, 1, 0, false);   /* list area */", "        screen_stack_set_slot(st, 1, 1, false);"),

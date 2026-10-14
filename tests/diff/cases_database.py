@@ -8,6 +8,8 @@ import struct
 
 from unicorn import UC_HOOK_CODE
 
+import cases_leagues
+
 FUN_LOAD = 0x528540                  # (data folder with a trailing separator, shared, from stream): 1 when it worked.
                                      # FUN_00524d50 calls it with (folder, 1, 0). The select suite replaces that one
 FUN_PROGRESS = 0x802F80              # thiscall on the screen stack: (text, step, total, channel)
@@ -16,6 +18,8 @@ G_SETTINGS = 0xAE3138                # pointer to the settings object. +0x08 is 
 G_LANGUAGE = 0x9EB2DC
 G_KEY_IDS = (0x9CF178, 0x9D0528)     # all -1 when the original starts
 G_EMPTY_COMMON_NAME = 0x9B59B4       # -1 when the original starts
+# The globals of the key ids: FUN_00601a40 sets them to -1, then from the names of the rows.
+KEY_RANGES = [G_KEY_IDS, (0xB63C9C, 0xB63D04)]
 # Code that other suites patch and the load runs: the date constructor (cases_leagues).
 PATCHED_CODE = [(0x549F70, 5)]
 
@@ -138,7 +142,9 @@ def original_load(ctx):
             original.write_u32(address, -1)
         original.write_u32(G_EMPTY_COMMON_NAME, -1)
         folder = original.alloc_c_string(ctx.data_dir.rstrip("/") + "/")
+        errors_before = len(original.error_lines)
         result = original.call(FUN_LOAD, folder, 1, 0)
+        errors = original.error_lines[errors_before:]
     finally:
         undo()
         for addr, code in patched:
@@ -148,7 +154,10 @@ def original_load(ctx):
             original.uc.hook_del(hook)
     ctx.expect_equal("original load", 1, result, source="wanted")
     ctx.expect_equal("random numbers in the load", 0, len(randoms), source="wanted")
+    ctx.expect_equal("error boxes in the load", [], errors, source="wanted")
     snapshots["keys"] = Snapshot(original)
+    original.database_keys = {a: struct.unpack("<i", original.read(a, 4))[0]
+                              for start, end in KEY_RANGES for a in range(start, end, 4)}
     original.heap_floor = original.heap_top
     original.database_progress = progress
     original.database_snapshots = snapshots
@@ -258,9 +267,28 @@ def test_staff_pass(ctx):
     return expect_tables(ctx, "staff", linked=True)
 
 
+def test_keys(ctx):
+    """FUN_00601a40: every key id after the load, and the copies of the named ones."""
+    test_staff_pass(ctx)
+    ctx.port.send("db_keys")
+    words = [int(w) for w in ctx.port.reply()]
+    port = dict(zip(words[0::2], words[1::2]))
+    wanted = ctx.original.database_keys
+    ctx.expect_equal("key ids outside the ranges", [], sorted(set(port) - set(wanted)), source="wanted")
+    # Two globals of the ranges (0x9d0300, 0x9d034c) are never used and stay -1. The port has none.
+    wrong = [f"{a:#x}: original {wanted[a]}, port {port.get(a, 'none')}" for a in sorted(wanted)
+             if wanted[a] != port.get(a, -1)]
+    ctx.expect_equal("key ids", [], wrong[:5], source="wanted")
+    named = [wanted[a] for a in cases_leagues.KEY_NATIONS + cases_leagues.KEY_CONTINENTS]
+    ctx.port.send("db_named_keys")
+    ctx.expect_equal("named key ids", named, [int(w) for w in ctx.port.reply()])
+    return len(wanted) + 1
+
+
 TESTS = [
     ("database_original_load", test_original_load),
     ("database_read", test_read),
     ("database_resolve", test_resolve),
     ("database_staff_pass", test_staff_pass),
+    ("database_keys", test_keys),
 ]

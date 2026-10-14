@@ -33,6 +33,7 @@ add_executable(cm0102
     src/cm3/database.c
     src/cm3/database_links.c
     src/cm3/key_index.c
+    src/cm3/key_ids_table.c
     src/cm3/key_nation.c
 )
 
@@ -75,6 +76,7 @@ add_executable(port_driver
     src/cm3/database.c
     src/cm3/database_links.c
     src/cm3/key_index.c
+    src/cm3/key_ids_table.c
     src/cm3/key_nation.c
 )
 target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})

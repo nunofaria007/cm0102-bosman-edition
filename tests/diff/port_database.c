@@ -37,9 +37,9 @@ bool database_command(const char *cmd, const char *args)
     int table = 0;
 
     if (!strcmp(cmd, "db_fresh")) {
-        /* The state of the original at its start: no key ids, no cached name. */
-        for (s32 k = 0; k < KEY_NATION_COUNT; k++) g_key_nations[k] = -1;
-        for (s32 k = 0; k < KEY_CONTINENT_COUNT; k++) g_key_continents[k] = -1;
+        /* The state of the original at its start: the key ids of the file, no
+           cached name. */
+        key_ids_initial();
         g_db_empty_common_name = -1;
     } else if (!strcmp(cmd, "db_read")) {
         sscanf(args, "%1023s", path);
@@ -49,6 +49,17 @@ bool database_command(const char *cmd, const char *args)
     } else if (!strcmp(cmd, "db_staff_pass")) {
         database_staff_pass();
         database_national_clubs();
+    } else if (!strcmp(cmd, "db_keys")) {
+        /* The key ids: the address of each global and its value. */
+        key_index_set();
+        for (s32 i = 0; i < KEY_ID_COUNT; i++) {
+            printf("%u %d ", g_key_id_globals[i].address, g_key_ids[i]);
+        }
+        printf("\n");
+    } else if (!strcmp(cmd, "db_named_keys")) {
+        for (s32 k = 0; k < KEY_NATION_COUNT; k++) printf("%d ", g_key_nations[k]);
+        for (s32 k = 0; k < KEY_CONTINENT_COUNT; k++) printf("%d ", g_key_continents[k]);
+        printf("\n");
     } else if (!strcmp(cmd, "db_free")) {
         database_free();
     } else if (!strcmp(cmd, "db_counts")) {
