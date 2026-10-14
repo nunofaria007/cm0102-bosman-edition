@@ -121,7 +121,7 @@ RT_WRAP(00800890, widget_set_rect)
  * The runtime scales those coordinates, so in widescreen mode such a call gets the width in classic
  * pixels (rounded up): the widget then lands on the text, and its click area covers what is drawn.
  * The calls of tools/recomp/widescreen.py TRUE_WIDTH compare with rects on the screen or draw, and
- * get screen pixels. */
+ * get screen pixels, as do calls from the runtime (rt_callback). */
 extern const uint32_t rt_true_width_returns[];
 extern const uint32_t rt_true_width_count;
 
@@ -130,6 +130,7 @@ RT_WRAP(005e5ad0, text_width)
     uint32_t ret = rd32(g_mem, cpu.esp);
     o_005e5ad0();
     if (rt_unwinding || rt_screen_w == CLASSIC_W) return;
+    if (ret == RT_RETURN_ADDR) return;           /* the runtime itself (names.c) measures the drawn text */
     for (uint32_t i = 0; i < rt_true_width_count; i++)
         if (rt_true_width_returns[i] == ret) return;
     int32_t w = (int32_t)cpu.eax;
