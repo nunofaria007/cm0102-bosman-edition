@@ -71,10 +71,33 @@ RT_WRAP(0055fba0, area_create)
     o_0055fba0();
 }
 
+/* The text with links 0x4aeaf0 (comp_text.cpp) makes a label for each line of its text and a button over
+ * each linked name (the clickable names of the news). Its coordinates are for 800x600, but it adds the
+ * pixel widths of the text to them: a name starts at the line's x plus the width of the text before it.
+ * The text keeps its size in widescreen mode, so only the line's x scales: a button that 0x4aeaf0 makes
+ * (flags 2) gets x = scaled line x + (x - line x). The line of the button is its row less the first row
+ * (*[ebp+0x14]), and the frame of 0x4aeaf0 keeps the x of each line at [ebp + 4*line - 0x194]
+ * (0x4af1c0, 0x4af6da, 0x4af8a1, 0x4af961). Returns 1 when it scaled the rectangle. */
+static int scale_link_args(void)
+{
+    uint32_t ret = rd32(g_mem, cpu.esp), a = cpu.esp + 4;
+    if (ret < 0x4aeaf0u || ret >= 0x4afa30u || rd32(g_mem, a) != 2) return 0;
+    uint32_t ebp = cpu.ebp;
+    int32_t line = (int32_t)rd32(g_mem, a + 24) - (int32_t)rd32(g_mem, rd32(g_mem, ebp + 0x14));
+    if (line < 0 || line >= 50) return 0;
+    int32_t x = (int32_t)rd32(g_mem, ebp + 4 * (uint32_t)line - 0x194);
+    int32_t shift = (int32_t)scale((uint32_t)x, rt_screen_w, CLASSIC_W, 0) - x;
+    wr32(g_mem, a + 4, rd32(g_mem, a + 4) + (uint32_t)shift);
+    wr32(g_mem, a + 12, rd32(g_mem, a + 12) + (uint32_t)shift);
+    wr32(g_mem, a + 8, scale(rd32(g_mem, a + 8), rt_screen_h, CLASSIC_H, 0));
+    wr32(g_mem, a + 16, scale(rd32(g_mem, a + 16), rt_screen_h, CLASSIC_H, 1));
+    return 1;
+}
+
 /* Widget create, thiscall: (flags, x1, y1, x2, y2, column, row, ...). */
 RT_WRAP(0055f990, widget_create)
 {
-    scale_rect_args(1);
+    if (rt_screen_w == CLASSIC_W || !scale_link_args()) scale_rect_args(1);
     o_0055f990();
 }
 

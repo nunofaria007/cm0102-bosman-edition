@@ -95,6 +95,7 @@ static void present_now(void)
     SDL_UpdateTexture(texture, NULL, g_mem + px, (int)rt_screen_w * 2);
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
+    names_draw(renderer);
     SDL_RenderPresent(renderer);
     win_screen_dirty = 0;
     last_present = SDL_GetTicks64();
@@ -114,6 +115,7 @@ void win_dump_screen(const char *path)
     SDL_Surface *s = SDL_CreateRGBSurfaceWithFormatFrom(g_mem + px, (int)rt_screen_w, (int)rt_screen_h, 16,
                                                         (int)rt_screen_w * 2, SDL_PIXELFORMAT_RGB565);
     SDL_Surface *rgb = s ? SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_RGB24, 0) : NULL;
+    names_draw_surface(rgb);
     if (!rgb || SDL_SaveBMP(rgb, path)) fprintf(stderr, "recomp: cannot save %s: %s\n", path, SDL_GetError());
     else fprintf(stderr, "recomp: screen saved to %s\n", path);
     SDL_FreeSurface(rgb);
@@ -375,6 +377,7 @@ void o_0055f620(void);
 RT_WRAP(0055f620, input_poll)
 {
     o_0055f620();
+    names_after_poll();
     uint32_t widget = cpu.eax & 0xffffu;
     int held = (buttons & 1) && rd32(g_mem, 0xb67a34u) && !rd32(g_mem, 0xb67a3cu);
     if (widget == 0xffffu || !held) return;
@@ -507,7 +510,7 @@ RT_IMPORT(BeginPaint)
 }
 RT_IMPORT(EndPaint) { rt_ret_stdcall(1, 2); }
 
-/* Cursors: a handle per resource; the system arrow and wait cursors stand in for the images. */
+/* Cursors: a handle per resource; system cursors stand in for the images (win_cursor_shape). */
 #define CURSOR_BASE 0x00030000u
 static uint32_t current_cursor;
 static int cursor_count;                          /* the ShowCursor counter; shown while >= 0 */
@@ -523,14 +526,13 @@ RT_IMPORT(GetCursor) { rt_ret_stdcall(current_cursor, 0); }
 
 RT_IMPORT(SetCursor)
 {
-    static SDL_Cursor *arrow, *wait;
+    static SDL_Cursor *cursors[SDL_NUM_SYSTEM_CURSORS];
     uint32_t h = rt_arg(0), old = current_cursor;
     current_cursor = h;
     if (window && h) {
-        int is_wait = h == CURSOR_BASE + 0x7f02;  /* IDC_WAIT */
-        SDL_Cursor **c = is_wait ? &wait : &arrow;
-        if (!*c) *c = SDL_CreateSystemCursor(is_wait ? SDL_SYSTEM_CURSOR_WAIT : SDL_SYSTEM_CURSOR_ARROW);
-        if (*c) SDL_SetCursor(*c);
+        int shape = win_cursor_shape(h);          /* names.c */
+        if (!cursors[shape]) cursors[shape] = SDL_CreateSystemCursor((SDL_SystemCursor)shape);
+        if (cursors[shape]) SDL_SetCursor(cursors[shape]);
     }
     rt_ret_stdcall(old, 1);
 }
