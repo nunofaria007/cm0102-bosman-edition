@@ -129,3 +129,25 @@ _Avoid_: main nation
 **Progress bar**:
 The box that shows how far a long step has gone, such as "Loading database".
 _Avoid_: loading screen
+
+### Options and features
+
+**Settings file**:
+The file settings.txt in the save folder. Each line sets one option, such as `display = classic`. It is the only place where the player sets the options of the Bosman Edition.
+_Avoid_: config, preferences file, ini
+
+**Option**:
+One line of the settings file that switches a feature on or off or sets its value.
+_Avoid_: preference, flag, toggle
+
+**Assistant selection**:
+The option that lets the assistant manager pick the player's starting team and substitutes before each match, with the same judgement the game uses for computer-run clubs, keeping the player's tactic.
+_Avoid_: auto pick, auto team, AI selection
+
+**Clickable name**:
+A person's or club's name drawn on a screen that opens their profile when the player clicks it. It shows an underline only while the mouse is over it.
+_Avoid_: link, hyperlink
+
+**Attribute colour**:
+The colour of an attribute number by its value on the 1 to 20 scale, as in modern Football Manager.
+_Avoid_: attribute highlighting, heatmap

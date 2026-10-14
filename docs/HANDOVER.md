@@ -8,6 +8,10 @@ Read this first in the next session, then `GLOSSARY.md`.
 - **Site:** https://maxevans60.github.io/cm0102-bosman-edition/ from `site/`, published by `.github/workflows/pages.yml`. Its pictures come from `site-assets.zip` on the newest release. The Pages environment allows `main` and tags `v*`.
 - **Repo:** GitHub `maxevans60/cm0102-bosman-edition` (old names redirect). Milestone 0.1.0 is closed. Milestone 0.2.0 holds issue #11: click a name in news to open the profile.
 
+## Next: release 0.2.0
+
+Max settled the plan on 2026-10-14 (interview Q50 to Q58). Spec: `docs/specs/2026-10-14-quality-of-life-0.2.0-spec.md`, status Ready, eleven slices. Start the build in a fresh session with the to-spec skill: slice 1 first, then slices 2 to 5 in parallel worktrees with one shared brief, then 6 to 10. GitHub issues #11 to #21 are in milestone 0.2.0, #22 is in 0.3.0.
+
 ## How to make the next release
 
 1. Bump `project(... VERSION x.y.z)` in `CMakeLists.txt` and add a `## x.y.z` section to `CHANGELOG.md`. Commit.
