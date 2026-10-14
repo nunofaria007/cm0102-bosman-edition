@@ -337,6 +337,8 @@ else {
 setText(buf, 1)  // FUN_005eed50
 b67a24 = b67a04 = 0; return false
 ```
+Assembly read 2026-10-14 (slice 3 of the game setup spec). The pseudocode above holds, with three details. A key that the widget cannot use (cursor -1, limit reached, character rejected) leaves `b67a04` and `b67a24` set. A character that makes the text too wide clears them and goes in nowhere. `setText` is `FUN_005eed50(text, redraw)`, read: it copies the text into `W.+0x80` and into the caller's buffer `W.+0x54`, then redraws only if the shown screen manager has `+0x12f545` set. In `FUN_00560490`, the sweep after a text entry in an area row finishes covers this area and the areas after it. The further sweep at `0x560adb` starts after the last area and never runs.
+
 `restoreBg` means: if `W.+0x4c` (saved image) is non-zero, `FUN_005e3fd0(W.x1, W.y1, W.+0x4c)`. `setText` is `FUN_005eed50(buf, redraw)` with ECX = the widget (inference); it was not read. The rejected-character list is the filter for file names, so this widget serves save-game and file name entry as well as other text.
 
 ### 2.8 `FUN_00569610` (text timers)

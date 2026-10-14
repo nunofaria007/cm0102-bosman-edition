@@ -4,6 +4,8 @@
 #include "gui_text.h"
 #include "gui_utils.h"
 #include "scrman.h"
+#include "scrman_input.h"
+#include "screen_stack.h"
 #include "display.h"
 #include <stdio.h>
 #include <string.h>
@@ -63,7 +65,7 @@ void widget_init(widget_t *widget, struct area *areas, widget_t *widgets,
                  s16 index, u32 flags, s32 x1, s32 y1, s32 x2, s32 y2,
                  s32 column, s32 row, u32 style, u16 colour,
                  u16 highlight_colour, u32 text_flags, s16 font,
-                 u16 text_colour, const char *text, s32 unknown_40,
+                 u16 text_colour, const char *text, s32 text_limit,
                  s32 unknown_08, intptr_t unknown_48, s16 area)
 {
     /* The original tests these two bits of the style, not of the flags. */
@@ -80,7 +82,8 @@ void widget_init(widget_t *widget, struct area *areas, widget_t *widgets,
     if (x2 > 799) x2 = 799;
     if (y2 > 599) y2 = 599;
 
-    const char *text_given = text;
+    /* A text entry writes into the caller's buffer, as the original does. */
+    char *text_given = (char *)text;
 
     if (!text) text = "";
     if (!in_area || areas[area].owner_widget == -1) {
@@ -116,10 +119,10 @@ void widget_init(widget_t *widget, struct area *areas, widget_t *widgets,
     widget->font = font;
     widget->text_colour = text_colour;
     widget->unknown_08 = unknown_08;
-    widget->unknown_40 = unknown_40;
+    widget->text_limit = text_limit;
     widget->unknown_48 = unknown_48;
     widget->cursor = -1;
-    widget->unknown_180 = 0;
+    widget->text_changed = 0;
     widget->saved = NULL;
     widget->area = area;
     widget->popup_area = -1;
@@ -292,4 +295,41 @@ void widget_set_highlight(widget_t *widget, bool on)
     } else if (area->unknown_210 == widget->index) {
         area->unknown_210 = -1;
     }
+}
+
+void widget_set_text(widget_t *widget, const char *text, bool redraw)
+{
+    /* The original shows an error box here, then lets the button go. */
+    if (!text) {
+        g_left_held = 0;
+        return;
+    }
+    if ((widget->flags & WIDGET_PICTURE) && widget->picture) {
+        if (!strcmp(g_cached_name, widget->text)) {
+            g_cached_users--;
+        } else {
+            rgn_free(widget->picture);
+        }
+        widget->picture = NULL;
+    }
+    /* As strcpy: the bytes after the new end stay. */
+    size_t length = strnlen(text, sizeof(widget->text) - 1);
+
+    memcpy(widget->text, text, length);
+    widget->text[length] = '\0';
+    if ((widget->flags & WIDGET_TEXT_ENTRY) && widget->text_source) {
+        strcpy(widget->text_source, widget->text);
+    }
+
+    /* DAT_00b74c4c: the screen manager of the screen that shows. */
+    const scrman_t *shown = g_screen_stack.record.screen_manager;
+
+    if (!shown || !shown->laid_out || !redraw) return;
+    if (widget->saved) {
+        gui_blit(widget->x1, widget->y1, widget->saved);
+        rgn_free(widget->saved);
+        widget->saved = NULL;
+    }
+    widget_draw(widget, false);
+    display_flip(widget->x1, widget->y1, widget->x2, widget->y2);
 }

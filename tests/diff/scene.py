@@ -46,9 +46,9 @@ WIDGET_FIELDS = [
     ("highlight_colour", 0x74, "H", 1), ("font", 0x76, "h", 1),
     ("text_colour", 0x78, "H", 1), ("text", 0x80, "B", 256),
     ("lighten_once", 0x184, "i", 1), ("highlighted", 0x188, "i", 1),
-    ("unknown_08", 0x08, "i", 1), ("unknown_40", 0x40, "i", 1), ("unknown_48", 0x48, "I", 1),
+    ("unknown_08", 0x08, "i", 1), ("text_limit", 0x40, "i", 1), ("unknown_48", 0x48, "I", 1),
     ("tick", 0x50, "i", 1), ("index", 0x70, "h", 1), ("unknown_7e", 0x7E, "h", 1),
-    ("unknown_180", 0x180, "i", 1),
+    ("text_changed", 0x180, "i", 1),
 ]
 
 OFFSET_WIDGET_WIDGETS = 0x04
@@ -69,7 +69,7 @@ MANAGER_FIELDS = [
     ("unknown_12f501", 0x12F501, "h", 1), ("unknown_12f503", 0x12F503, "h", 1),
     ("unknown_12f505", 0x12F505, "i", 1), ("unknown_12f509", 0x12F509, "i", 6),
     ("unknown_12f52d", 0x12F52D, "h", 1), ("unknown_12f52f", 0x12F52F, "h", 1),
-    ("unknown_12f531", 0x12F531, "h", 1), ("unknown_12f533", 0x12F533, "h", 1),
+    ("unknown_12f531", 0x12F531, "h", 1), ("passed_focus", 0x12F533, "h", 1),
     ("fade_in", 0x12F535, "i", 1),
     ("unknown_12f539", 0x12F539, "h", 1), ("unknown_12f53b", 0x12F53B, "h", 1),
     ("skip_draw", 0x12F53D, "i", 1), ("unknown_12f541", 0x12F541, "I", 1),
@@ -275,16 +275,16 @@ class ManagerScene(Scene):
         self.ctx.port.send("tick", tick)
 
     def widget_create(self, case, flags, box, column, row, style, colour, highlight, text_flags, font,
-                      text_colour, text, unknown_40, unknown_08, unknown_48, area):
+                      text_colour, text, text_limit, unknown_08, unknown_48, area):
         """Creates a widget in both programs and returns its index. The text is bytes or None."""
         original = self.ctx.original
         pointer = original.alloc_bytes(text + b"\0") if text is not None else 0
         result = original.call(FUN_WIDGET_CREATE, flags, *box, column, row, style, colour, highlight,
-                               text_flags, font, text_colour, pointer, unknown_40, unknown_08, unknown_48,
+                               text_flags, font, text_colour, pointer, text_limit, unknown_08, unknown_48,
                                area, this=self.manager)
         result = (result & 0xFFFF) - (0x10000 if result & 0x8000 else 0)
         self.ctx.port.send("manager_widget", flags, *box, column, row, style, colour, highlight, text_flags,
-                           font, text_colour, unknown_40, unknown_08, unknown_48, area,
+                           font, text_colour, text_limit, unknown_08, unknown_48, area,
                            "null" if text is None else "-" + text.hex())
         self.ctx.expect_equal(f"{case}: widget index", result, int(self.ctx.port.reply()[0]))
         if result != -1:

@@ -34,10 +34,77 @@ static s32 key_mode(SDL_Keycode key)
 }
 
 /*
+ * The Windows virtual key code of an SDL key, for the US keyboard layout.
+ * 0 for a key that the port does not map: Alt and F10 give WM_SYSKEYDOWN in
+ * Windows, which the window procedure does not read.
+ */
+static s32 virtual_key(SDL_Keycode key)
+{
+    static const struct {
+        SDL_Keycode key;
+        s32 vk;
+    } keys[] = {
+        {SDLK_BACKSPACE, 0x08}, {SDLK_TAB, 0x09}, {SDLK_RETURN, 0x0d},
+        {SDLK_KP_ENTER, 0x0d}, {SDLK_LSHIFT, 0x10}, {SDLK_RSHIFT, 0x10},
+        {SDLK_LCTRL, 0x11}, {SDLK_RCTRL, 0x11}, {SDLK_CAPSLOCK, 0x14},
+        {SDLK_ESCAPE, 0x1b}, {SDLK_SPACE, 0x20}, {SDLK_PAGEUP, 0x21},
+        {SDLK_PAGEDOWN, 0x22}, {SDLK_END, 0x23}, {SDLK_HOME, 0x24},
+        {SDLK_LEFT, 0x25}, {SDLK_UP, 0x26}, {SDLK_RIGHT, 0x27},
+        {SDLK_DOWN, 0x28}, {SDLK_INSERT, 0x2d}, {SDLK_DELETE, 0x2e},
+        {SDLK_KP_MULTIPLY, 0x6a}, {SDLK_KP_PLUS, 0x6b},
+        {SDLK_KP_MINUS, 0x6d}, {SDLK_KP_PERIOD, 0x6e},
+        {SDLK_KP_DIVIDE, 0x6f}, {SDLK_F11, 0x7a}, {SDLK_F12, 0x7b},
+        {SDLK_SEMICOLON, 0xba}, {SDLK_EQUALS, 0xbb}, {SDLK_COMMA, 0xbc},
+        {SDLK_MINUS, 0xbd}, {SDLK_PERIOD, 0xbe}, {SDLK_SLASH, 0xbf},
+        {SDLK_BACKQUOTE, 0xc0}, {SDLK_LEFTBRACKET, 0xdb},
+        {SDLK_BACKSLASH, 0xdc}, {SDLK_RIGHTBRACKET, 0xdd},
+        {SDLK_QUOTE, 0xde},
+    };
+
+    if (key >= SDLK_0 && key <= SDLK_9) return 0x30 + (key - SDLK_0);
+    if (key >= SDLK_a && key <= SDLK_z) return 0x41 + (key - SDLK_a);
+    if (key >= SDLK_F1 && key <= SDLK_F9) return 0x70 + (key - SDLK_F1);
+    if (key >= SDLK_KP_1 && key <= SDLK_KP_9) return 0x61 + (key - SDLK_KP_1);
+    if (key == SDLK_KP_0) return 0x60;
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        if (keys[i].key == key) return keys[i].vk;
+    }
+    return 0;
+}
+
+/*
+ * The character of an SDL text event. Windows gives one WM_CHAR for each
+ * character, so the last one wins. A character above U+00FF has no byte in
+ * the Latin-1 set, and the port drops it.
+ */
+static void set_char(const char *text)
+{
+    const u8 *c = (const u8 *)text;
+
+    while (*c) {
+        if (*c < 0x80) {
+            g_key_char = *c++;
+        } else if ((*c & 0xe0) == 0xc0 && (c[1] & 0xc0) == 0x80) {
+            u32 code = (u32)(*c & 0x1f) << 6 | (c[1] & 0x3f);
+
+            if (code < 0x100) g_key_char = (u8)code;
+            c += 2;
+        } else {
+            c++;
+            while ((*c & 0xc0) == 0x80) c++;
+        }
+    }
+}
+
+/*
  * Sets the mouse globals of the original as its window procedure does for
  * WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
  * WM_MOUSEWHEEL, WM_KEYDOWN and WM_CHAR. While a click of the keys or the
  * wheel lasts (g_click_frames), the mouse and the wheel do nothing.
+ *
+ * A key gives its Windows key code (g_key_code). SDL gives no text for
+ * Backspace, Tab, Enter and Escape, where Windows gives a WM_CHAR, so the
+ * port sets their character from the key.
  */
 void input_poll(SDL_Event *e)
 {
@@ -48,13 +115,20 @@ void input_poll(SDL_Event *e)
         if (mouse_free) set_mouse(e->motion.x, e->motion.y);
         break;
     case SDL_TEXTINPUT:
-        g_key_char = (u8)e->text.text[0];
+        set_char(e->text.text);
         break;
-    case SDL_KEYDOWN:
+    case SDL_KEYDOWN: {
+        s32 vk = virtual_key(e->key.keysym.sym);
+
+        if (vk != 0) g_key_code = vk;
+        if (vk == 0x08 || vk == 0x09 || vk == 0x0d || vk == 0x1b) {
+            g_key_char = (u8)vk;
+        }
         if (key_mode(e->key.keysym.sym) != -1) {
             scrman_scroll_key(key_mode(e->key.keysym.sym), 1);
         }
         break;
+    }
     case SDL_MOUSEWHEEL:
         /* One notch is one frame. Up is mode 1. SDL gives 0 for part of a notch. */
         if (mouse_free && e->wheel.y != 0) {

@@ -58,6 +58,10 @@ _Avoid_: character image, letter
 A small picture that a widget draws beside its text: the tick or one of the three arrows.
 _Avoid_: icon, symbol
 
+**Text entry**:
+A widget that takes typed text, such as the first name of the manager. A click, Tab or Enter starts or ends the editing.
+_Avoid_: input field, edit box, text field
+
 ### Verification
 
 **Differential test**:

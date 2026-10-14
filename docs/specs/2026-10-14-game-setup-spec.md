@@ -29,6 +29,12 @@ Port the full database load of the original, its dates and random numbers, text 
 - The large-count path of `FUN_0090cfc0` uses the x87 at the precision of the control word. The port uses doubles, which match 53-bit precision (control word 0x27f, the Windows default). The test sets 0x27f in the emulator. At 64-bit precision some large-count numbers differ: 2 of 160 runs of 1,000 numbers failed. That the game runs with 0x27f is an inference: it uses DirectDraw, and no code that changes the control word was read.
 - Left out of slice 1: the error boxes of the date constructor (Date.cpp 0x34, 0x3b, 0x72, 0x79; the port clears `g_left_held` and corrects the value as the original does), and the other `srand` calls (0x686b34, 0x696b8c, 0x90de58, 0x90dfff), which belong to the engine specs. `pick_background` now draws from `random_number`.
 - The leagues suite still replaces the date constructor of the original with a return, since the league table dates (`FUN_00667150`) are not ported. Slice 4 or the engine specs should port them with `date_init` and drop that stub.
+- Text entry (slice 3) does not need the text timers `FUN_00569610`, so they are not ported. The cursor of a text entry does not blink in the original: `gui_text` draws it at the cursor place. The 100 ms timer swaps the two colours of a widget with flag 0x1000, and the 1 s timer turns the text of a widget with flag 0x800. Neither is a text entry flag.
+- The hit test `FUN_00560490` has a second sweep of the rows after a text entry in a row finishes (`0x560adb`). It starts after the last area, so it never runs. The port leaves it out.
+- The keys of the port map to the Windows key codes of a US keyboard. Alt and F10 give no key code: Windows sends them as WM_SYSKEYDOWN, which the window procedure does not read. SDL gives no text for Backspace, Tab, Enter and Escape, so the port sets their WM_CHAR character from the key. Ctrl with a letter gives no control character, and a typed character above U+00FF gives none. The original takes the character in the Windows code page. The port takes Latin-1, which is the same for 0xA0 to 0xFF.
+- The error boxes of `FUN_005617c0` (a widget with no text entry flag) and `FUN_005eed50` (a NULL text) are left out. The port lets the button go, as the original does after the box. A text limit above 255 overruns a stack buffer in the original. The port keeps 255 characters.
+- The picture branch of set text `FUN_005eed50` is ported but has no differential case: no text entry is a picture widget.
+- Three widget fields and one screen manager field have names now: `text_limit` (widget +0x40), `text_changed` (+0x180), `text_source` is writable (+0x54), and `passed_focus` (screen manager +0x12f533).
 
 ## Testing
 One seam: the differential test, with the tracer harness of the inventory moved into `tests/diff`.
@@ -69,7 +75,7 @@ Merge danger: two-way door. Blast radius: all data of the game.
 Blocked by: none
 Delivers: `FUN_005617c0` with the key and character input of the window procedure.
 Merge danger: two-way door. Blast radius: every text field.
-- [ ] Random keys and characters on text widgets give the same text, cursor and screen as the original.
+- [x] Random keys and characters on text widgets give the same text, cursor and screen as the original.
 
 ### 4. Setup screens
 Blocked by: 1, 2, 3
