@@ -135,7 +135,7 @@ class FunctionWriter:
 
     # Calls
     def call_direct(self, target, ret):
-        self.e(f"esp -= 4; W32(esp, {h(ret)}); SYNC(); {self.names(target)}(); LOAD();")
+        self.e(f"esp -= 4; W32(esp, {h(ret)}); SYNC(); {self.names(target)}(); LOAD(); RT_AFTER_CALL();")
 
     # Main loop
     def write(self):
@@ -186,9 +186,10 @@ class FunctionWriter:
             "    uint8_t *const M = g_mem;",
             "    uint32_t eax = cpu.eax, ecx = cpu.ecx, edx = cpu.edx, ebx = cpu.ebx;",
             "    uint32_t esp = cpu.esp, ebp = cpu.ebp, esi = cpu.esi, edi = cpu.edi;",
+            "    const uint32_t esp0 = esp;   /* for RT_AFTER_CALL: the frame is gone once esp passes it */",
             "    uint32_t ad = 0, t0 = 0, t1 = 0, t2 = 0, t3 = 0; uint64_t q0 = 0; double d0 = 0;",
             "    Flags F = {K_RAW | SZ4, 0, 0, 2, 0};",
-            "    (void)ad; (void)t0; (void)t1; (void)t2; (void)t3; (void)q0; (void)d0; (void)M;",
+            "    (void)esp0; (void)ad; (void)t0; (void)t1; (void)t2; (void)t3; (void)q0; (void)d0; (void)M;",
         ]
         if f.entry != addrs[0]:
             head.append(f"    goto L_{f.entry:x};")
@@ -666,11 +667,11 @@ class FunctionWriter:
             return True
         imp = self.import_name(op)
         if imp:
-            self.e(f"esp -= 4; W32(esp, {h(ret)}); SYNC(); {imp}(); LOAD();")
+            self.e(f"esp -= 4; W32(esp, {h(ret)}); SYNC(); {imp}(); LOAD(); RT_AFTER_CALL();")
             return True
         self.features.add("indirect calls")
         self.setup_mem(insn)
-        self.e(f"t0 = {self.rd(insn, op)}; esp -= 4; W32(esp, {h(ret)}); SYNC(); rt_call(t0); LOAD();")
+        self.e(f"t0 = {self.rd(insn, op)}; esp -= 4; W32(esp, {h(ret)}); SYNC(); rt_call(t0); LOAD(); RT_AFTER_CALL();")
         return True
 
     def i_lcall(self, insn, ops):
@@ -702,7 +703,7 @@ class FunctionWriter:
             self.e("}")
             return False
         self.features.add("indirect jumps")
-        self.e(f"t0 = {self.rd(insn, op)}; SYNC(); rt_call(t0); return;")
+        self.e(f"t0 = {self.rd(insn, op)}; SYNC(); rt_jump(t0); return;")
         return False
 
     def i_ret(self, insn, ops):
@@ -816,6 +817,10 @@ class FunctionWriter:
             self.e("W16(ad, fpu.cw);")
         elif m == "fnstsw":
             self.e("W16(ad, fstatus());")
+        elif m == "fnsave":
+            self.e("rt_fnsave(M, ad);")
+        elif m == "frstor":
+            self.e("rt_frstor(M, ad);")
         else:
             raise Unhandled(m)
         return True

@@ -33,5 +33,7 @@ Every import of the original, grouped by library, with its calls, its arguments 
 
 ### 3. Whole program
 All code recompiled, the runtime with all imports, the game starting on SDL.
-- [ ] The recompiled game shows the start screen.
+- [x] The recompiled game shows the start screen.
+- Build: `cmake --build build --target cm0102_recomp`, then `build/cm0102_recomp` (or `--exe <cm0102.exe>`). A run without a person: `SDL_VIDEODRIVER=dummy RECOMP_SCRIPT="8000 click 277 177; 20000 dump s.bmp; 21000 quit"` (src/recomp_rt/win/user32.c).
+- 2026-10-14, scripted run: Start New Game, Select League(s), the CD check, Enter Name, Select Nationality, Select Team (Arsenal), Take Control, Finish. The game reached Monday 16.7.01 with news. A person has not played it yet.
 - [ ] Manual check: a new game starts and a day passes.
