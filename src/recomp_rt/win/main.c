@@ -2,14 +2,16 @@
  *
  * Usage: cm0102_recomp [--game <folder>] [options of the original, for example -windowed]
  * The game folder holds the player's own cm0102.exe, Data and Pictures. It is the registry value
- * Location, the base of every path and the CD drive D:\ (files.c). Default: the first folder above the
- * program that holds cm0102.exe and Data, else the current folder. The game folder is read only:
+ * Location, the base of every path and the CD drive D:\ (files.c). Default: Contents/Resources/game
+ * inside the app bundle, else the first folder above the program that holds cm0102.exe and Data, else
+ * the current folder. The game folder is read only:
  * every write goes to ~/Library/Application Support/cm0102 (files.c).
  * Environment: RECOMP_TRACE=1 (print import calls), RECOMP_SCRIPT and RECOMP_DUMP
  * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr). */
 #include "win.h"
 
 #include <SDL.h>
+#include <libgen.h>
 #include <mach-o/dyld.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -43,12 +45,20 @@ static int has_game(const char *dir)
     return stat(p, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
-/* The default game folder: look upwards from the program, else the current folder. */
+/* The default game folder: inside the app bundle (Contents/Resources/game) first, then upwards from the
+ * program, else the current folder. */
 static void default_game_dir(char *out, size_t room)
 {
     char exe[1024], real[1024];
     uint32_t n = sizeof exe;
     if (_NSGetExecutablePath(exe, &n) == 0 && realpath(exe, real)) {
+        char bundle[1200], bundle_real[1024], mac_os[1024];
+        snprintf(mac_os, sizeof mac_os, "%s", real);
+        snprintf(bundle, sizeof bundle, "%s/../Resources/game", dirname(mac_os));
+        if (realpath(bundle, bundle_real) && has_game(bundle_real)) {
+            snprintf(out, room, "%s", bundle_real);
+            return;
+        }
         for (char *slash; (slash = strrchr(real, '/')) != NULL;) {
             *slash = 0;
             if (!real[0]) break;

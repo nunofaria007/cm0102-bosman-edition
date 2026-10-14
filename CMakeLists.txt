@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(cm0102-mac C)
+project(cm0102-mac VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -95,7 +95,7 @@ if(APPLE)
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Championship Manager 01/02"
         MACOSX_BUNDLE_GUI_IDENTIFIER "uk.co.sigames.cm0102"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     )
 endif()
 
@@ -160,7 +160,8 @@ if(EXISTS "${CM0102_EXE}")
     add_dependencies(cm0102_recomp recomp_gen)
     target_include_directories(cm0102_recomp PRIVATE src/recomp_rt src/recomp_rt/win "${RECOMP_OUT}/gen"
         ${SDL2_INCLUDE_DIRS})
-    target_compile_definitions(cm0102_recomp PRIVATE CM0102_DEFAULT_EXE="${CM0102_EXE}")
+    target_compile_definitions(cm0102_recomp PRIVATE CM0102_DEFAULT_EXE="${CM0102_EXE}"
+        CM0102_VERSION="${PROJECT_VERSION}")
     # The generated C: exact integer wrap, no strict aliasing, no warnings (it is not read by people).
     set_source_files_properties(${RECOMP_GEN} PROPERTIES GENERATED TRUE COMPILE_OPTIONS "-O1;-w")
     target_compile_options(cm0102_recomp PRIVATE -fno-strict-aliasing -fwrapv -O1)
@@ -169,4 +170,30 @@ if(EXISTS "${CM0102_EXE}")
     target_link_libraries(cm0102_recomp PRIVATE ${SDL2_LIBRARIES} m)
 else()
     message(STATUS "cm0102_recomp: ${CM0102_EXE} not found, so the recompiled game is not built")
+endif()
+
+# The Mac download (docs/specs/2026-10-14-re-signed-edition-release-spec.md, slice 5).
+#   cmake -B build -DCM0102_GAME_DIR=<clean files folder> [-DCM0102_ICNS=<icon.icns>] ...
+#   cmake --build build --target mac_dmg
+# tools/mac/make_app.sh builds the app for arm64 and x86_64, joins them with lipo, bundles SDL2, signs ad
+# hoc and writes the .dmg. tools/mac/check_package.py checks the result (target mac_check).
+if(APPLE AND TARGET cm0102_recomp)
+    set(CM0102_GAME_DIR "" CACHE PATH "Folder with the clean files (cm0102.exe, Data, Pictures) for the Mac app")
+    set(CM0102_ICNS "" CACHE FILEPATH "Optional .icns file for the app icon. No icon is committed.")
+    set(CM0102_SDL2_PREFIX_ARM64 "/opt/homebrew" CACHE PATH "SDL2 prefix (lib and include) built for arm64")
+    set(CM0102_SDL2_PREFIX_X86_64 "" CACHE PATH "SDL2 prefix built for x86_64. Empty: the app is arm64 only")
+    set(CM0102_APP_OUT "${CMAKE_BINARY_DIR}/mac" CACHE PATH "Output folder of the .app and .dmg")
+    add_custom_target(mac_dmg
+        COMMAND "${CMAKE_SOURCE_DIR}/tools/mac/make_app.sh"
+            --game "${CM0102_GAME_DIR}" --exe "${CM0102_EXE}" --icns "${CM0102_ICNS}"
+            --sdl2-arm64 "${CM0102_SDL2_PREFIX_ARM64}" --sdl2-x86_64 "${CM0102_SDL2_PREFIX_X86_64}"
+            --out "${CM0102_APP_OUT}" --version "${PROJECT_VERSION}"
+        COMMENT "Making the Mac app and .dmg"
+        VERBATIM USES_TERMINAL)
+    add_custom_target(mac_check
+        COMMAND "${RECOMP_PYTHON}" -I "${CMAKE_SOURCE_DIR}/tools/mac/check_package.py"
+            "${CM0102_APP_OUT}/CM-01-02-Re-Signed-Edition-${PROJECT_VERSION}-mac.dmg"
+            --version "${PROJECT_VERSION}"
+        COMMENT "Checking the Mac download"
+        VERBATIM USES_TERMINAL)
 endif()

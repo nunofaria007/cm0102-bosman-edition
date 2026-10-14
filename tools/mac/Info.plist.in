@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleExecutable</key><string>cm0102_recomp</string>
+    <key>CFBundleIdentifier</key><string>io.github.maxevans60.cm0102-re-signed-edition</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleName</key><string>CM 01/02 Re-Signed</string>
+    <key>CFBundleDisplayName</key><string>CM 01/02: Re-Signed Edition</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>@VERSION@</string>
+    <key>CFBundleVersion</key><string>@VERSION@</string>
+    <key>LSApplicationCategoryType</key><string>public.app-category.sports-games</string>
+    <key>LSMinimumSystemVersion</key><string>11.0</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSHumanReadableCopyright</key><string>An unofficial fan project, not affiliated with Sports Interactive, SEGA, Eidos or Square Enix.</string>
+</dict>
+</plist>
