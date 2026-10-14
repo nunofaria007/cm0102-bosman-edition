@@ -21,6 +21,7 @@ add_executable(cm0102
     src/si/area.c
     src/si/scrman.c
     src/si/screen_stack.c
+    src/si/scrman_input.c
     src/cm3/database.c
 )
 
@@ -43,6 +44,7 @@ add_executable(port_driver
     src/si/area.c
     src/si/scrman.c
     src/si/screen_stack.c
+    src/si/scrman_input.c
 )
 target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})
 target_link_libraries(port_driver PRIVATE ${SDL2_LIBRARIES})

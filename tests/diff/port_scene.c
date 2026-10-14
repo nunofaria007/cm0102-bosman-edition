@@ -9,6 +9,7 @@
 #include "port_driver.h"
 #include "gui_utils.h"
 #include "scrman.h"
+#include "scrman_input.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -535,6 +536,26 @@ bool scene_command(const char *cmd, const char *args)
     if (!strcmp(cmd, "draw_globals")) {
         g_no_backgrounds = index;
         g_darken_screens = second;
+        return true;
+    }
+    if (!strcmp(cmd, "mouse")) {
+        long long v[5];
+
+        if (sscanf(args, "%lld %lld %lld %lld %lld", &v[0], &v[1], &v[2],
+                   &v[3], &v[4]) != 5) {
+            return false;
+        }
+        g_mouse_x = (s32)v[0];
+        g_mouse_y = (s32)v[1];
+        g_left_held = (s32)v[2];
+        g_right_held = (s32)v[3];
+        g_cursor_kind = (s32)v[4];
+        return true;
+    }
+    if (!strcmp(cmd, "hit")) {
+        display_on_flip = record_flip;
+        printf("%d %d %d\n", scrman_hit_test(&g_manager), g_cursor_kind,
+               g_left_held);
         return true;
     }
     if (!strcmp(cmd, "tick")) {

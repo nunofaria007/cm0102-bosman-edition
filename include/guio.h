@@ -85,6 +85,13 @@ void widget_init(widget_t *widget, struct area *areas, widget_t *widgets,
  */
 void widget_release(widget_t *widget);
 
+/*
+ * FUN_005eec20 and FUN_005eecb0. Turns the highlight of a button on or off,
+ * notes the time, and draws and flips the widget again when its style has a
+ * panel. The area of the widget records which widget it highlights.
+ */
+void widget_set_highlight(widget_t *widget, bool on);
+
 /* FUN_005ee590. `redraw` drops the saved screen and captures it again. */
 void widget_draw(widget_t *widget, bool redraw);
 

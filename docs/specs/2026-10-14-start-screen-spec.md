@@ -41,6 +41,9 @@ One seam: the differential test.
 - The main loop waits for Windows messages in the original, so it has no differential case. Its check is manual: start the app, see the start screen, click items, and quit with "Exit Game".
 
 Found while building slice 1:
+- The hit test of the port leaves out three paths of the original: text entry (widget flag 0x08), the scrollbar click, and the opening of a popup area. A widget with a popup area acts as a plain button, and the rows of an area past those in view are not tested, since only an area with a scrollbar has them. The start screen uses none of these.
+- An area with no widget makes the original read a widget before its array in the hit test. The port reads the field before the list, as the original does, but no test case has such an area.
+- The hit test gives the widget under the mouse on every frame while the button is held, as in the original.
 - The node keeps a slot value as a pointer-sized number, because a slot holds a number or a pointer. The original keeps 32 bits.
 - With no current screen, the original ends the program in set slot, get slot and the screen queries. The port returns without effect, 0 or 1.
 
@@ -76,6 +79,6 @@ Merge danger: two-way door. Blast radius: the start screen.
 Blocked by: 3
 Delivers: the mouse globals from SDL, the poll and the mode 0 hit test, the main loop, the input function of the start screen, and the app start on the start screen.
 Merge danger: two-way door. Blast radius: the app start.
-- [ ] The hit test returns the same widget as the original for random mouse states.
+- [x] The hit test returns the same widget as the original for random mouse states.
 - [ ] The app opens on the start screen, a menu item rebuilds it, and "Exit Game" quits. Manual check.
 - [ ] The full differential test passes.

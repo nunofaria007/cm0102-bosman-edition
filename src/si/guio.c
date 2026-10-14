@@ -4,6 +4,7 @@
 #include "gui_text.h"
 #include "gui_utils.h"
 #include "scrman.h"
+#include "display.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -268,5 +269,27 @@ void widget_draw(widget_t *widget, bool redraw)
                  widget->y2 + dy, widget->text_flags, widget->font,
                  widget->text_colour, widget->text, widget->cursor);
         if (stop) *stop = 1;
+    }
+}
+
+void widget_set_highlight(widget_t *widget, bool on)
+{
+    widget->highlighted = on;
+    widget->tick = g_tick;
+    if ((widget->style & (GUI_PANEL_FILL | GUI_PANEL_BORDER)) &&
+        !((widget->flags & WIDGET_STAYS_RAISED) &&
+          widget->colour == widget->highlight_colour)) {
+        if (widget->saved) gui_blit(widget->x1, widget->y1, widget->saved);
+        widget_draw(widget, false);
+        display_flip(widget->x1, widget->y1, widget->x2, widget->y2);
+    }
+    if (widget->area == -1) return;
+
+    area_t *area = &widget->areas[widget->area];
+
+    if (on) {
+        area->unknown_210 = widget->index;
+    } else if (area->unknown_210 == widget->index) {
+        area->unknown_210 = -1;
     }
 }
