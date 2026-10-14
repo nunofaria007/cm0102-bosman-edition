@@ -113,7 +113,7 @@ Merge danger: two-way door. Documents only.
 Blocked by: 3
 Delivers: the game draws at 1280x800 by default, with the background made from the official one; the settings file switches to classic mode.
 Merge danger: two-way door. Blast radius: every screen of the game.
-- [ ] Smoke run in both modes passes
+- [x] Smoke run in both modes passes
 - [x] Max plays a new game in widescreen mode (2026-10-14, the clean-files Mac build)
 
 ### 5. Mac app

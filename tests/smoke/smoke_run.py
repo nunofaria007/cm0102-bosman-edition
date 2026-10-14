@@ -42,8 +42,8 @@ STEPS = [
     "11500 click 277 177",                  # Start New Game
     "14000 dump {d}/3-leagues.bmp",
     "14500 click 705 572",                  # Next (England is selected)
-    "34000 move 399 330",
-    "35000 click 399 330",                  # "CD Not Required": Ok
+    "34000 move 399 330 | 638 328",
+    "35000 click 399 330 | 638 328",        # "CD Not Required": Ok (the box is not scaled in widescreen)
     "46000 type Test",
     "48000 click 560 310",
     "49000 type Smoke",
@@ -55,7 +55,7 @@ STEPS = [
     "72000 click 705 572",                  # Manager Status: Finish
     "95000 dump {d}/4-news.bmp",
     "95500 click 45 165",                   # manager menu (the manager's name)
-    "97500 click 150 427",                  # Go on Holiday
+    "97500 click 150 427 | 199 474",        # Go on Holiday (popup items keep their size in widescreen)
     "100000 click 705 572",                 # Please Confirm: Yes
     "130000 dump {d}/5-holiday.bmp",
     "131000 quit",
@@ -72,8 +72,11 @@ def scaled_steps(mode, shots):
     w, h = SIZES[mode]
     out = []
     for step in STEPS:
+        step, _, wide = step.partition("|")  # "| x y": the widescreen position, where it does not scale
         parts = step.format(d=shots).split()
-        if parts[1] in ("click", "move", "down", "up", "rclick"):
+        if wide and mode == "widescreen":
+            parts[2:4] = wide.split()
+        elif parts[1] in ("click", "move", "down", "up", "rclick"):
             parts[2] = str(int(parts[2]) * w // 800)
             parts[3] = str(int(parts[3]) * h // 600)
         out.append(" ".join(parts))
