@@ -9,8 +9,8 @@
 #include "setup.h"
 #include "utils.h"
 #include "guio.h"
+#include "random.h"
 #include <sys/stat.h>
-#include <time.h>
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +22,7 @@ extern void input_init(void);
 extern void input_poll(SDL_Event *e);
 extern cm_image_t *rgn_load(const char *path);
 extern void rgn_free(cm_image_t *img);
+extern char *os_find_file_ci(const char *dir, const char *name);
 
 static bool g_running = true;
 static bool g_demo = false;
@@ -127,13 +128,36 @@ static void run_game(const char *pictures_dir)
     screen_stack_run(&g_screen_stack);
 }
 
-/* Usage: cm0102 [--data <folder>] [--pictures <folder>] [--demo] [picture.rgn] */
+/*
+ * The cm0102.exe next to the data folder, for the random number table when
+ * --exe is missing.
+ */
+static const char *find_exe(const char *data_dir)
+{
+    static char path[1024];
+    char dir[1024];
+    char *found;
+
+    snprintf(dir, sizeof(dir), "%s/..", data_dir);
+    found = os_find_file_ci(dir, "cm0102.exe");
+    snprintf(path, sizeof(path), "%s", found ? found : "cm0102.exe");
+    free(found);
+    return path;
+}
+
+/*
+ * Usage: cm0102 [--data <folder>] [--pictures <folder>] [--exe <path>]
+ *               [--seed <number>] [--demo] [picture.rgn]
+ */
 int main(int argc, char *argv[])
 {
     const char *data_dir = NULL;
     const char *pictures_dir = NULL;
     const char *picture = NULL;
+    const char *exe_path = NULL;
+    s32 seed = 0;
     static char default_pictures[1024];
+    static char error[512];
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--demo")) {
@@ -142,9 +166,14 @@ int main(int argc, char *argv[])
             data_dir = argv[++i];
         } else if (!strcmp(argv[i], "--pictures") && i + 1 < argc) {
             pictures_dir = argv[++i];
+        } else if (!strcmp(argv[i], "--exe") && i + 1 < argc) {
+            exe_path = argv[++i];
+        } else if (!strcmp(argv[i], "--seed") && i + 1 < argc) {
+            seed = (s32)strtol(argv[++i], NULL, 10);
         } else if (argv[i][0] == '-') {
             fprintf(stderr, "Usage: cm0102 [--data <folder>] "
-                            "[--pictures <folder>] [--demo] [picture.rgn]\n");
+                            "[--pictures <folder>] [--exe <path>] "
+                            "[--seed <number>] [--demo] [picture.rgn]\n");
             return 2;
         } else {
             picture = argv[i];
@@ -184,7 +213,14 @@ int main(int argc, char *argv[])
             return 1;
         }
         g_data_dir = data_dir;
-        srand((unsigned)time(NULL));
+        if (!exe_path) exe_path = find_exe(data_dir);
+        if (!random_load_table(exe_path, error, sizeof(error))) {
+            fprintf(stderr, "%s\n", error);
+            display_shutdown();
+            return 1;
+        }
+        /* FUN_0081b890 seeds when the start screen opens: "-seed", else the time. */
+        random_seed(seed);
         run_game(pictures_dir);
         g_running = false;
     } else if (picture) {

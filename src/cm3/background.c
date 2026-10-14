@@ -1,4 +1,5 @@
 #include "background.h"
+#include "random.h"
 #include "screen_stack.h"
 #include "utils.h"
 #include <stdio.h>
@@ -236,10 +237,9 @@ void pics_free(void)
     g_pics_loaded = false;
 }
 
-/* FUN_0090cfc0 for a count of 0 to 0x7fff. */
 static s16 random_below(s32 n)
 {
-    return n > 0 ? (s16)(rand() % n) : 0;
+    return (s16)random_number(n);       /* FUN_0090cfc0 */
 }
 
 void pick_background(void)

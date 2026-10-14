@@ -26,6 +26,8 @@ add_executable(cm0102
     src/si/gui_menu.c
     src/si/progress_box.c
     src/si/utils.c
+    src/si/date.c
+    src/si/random.c
     src/cm3/background.c
     src/cm3/menubar.c
     src/cm3/file_screens.c
@@ -49,6 +51,7 @@ add_executable(port_driver
     tests/diff/port_progress.c
     tests/diff/port_scroll.c
     tests/diff/port_select.c
+    tests/diff/port_dates.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
@@ -66,6 +69,8 @@ add_executable(port_driver
     src/si/gui_menu.c
     src/si/progress_box.c
     src/si/utils.c
+    src/si/date.c
+    src/si/random.c
     src/cm3/background.c
     src/cm3/menubar.c
     src/cm3/file_screens.c

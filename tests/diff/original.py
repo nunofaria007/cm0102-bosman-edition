@@ -91,6 +91,7 @@ class Original:
     def __init__(self, exe_path, data_dir):
         self.uc = Uc(UC_ARCH_X86, UC_MODE_32)
         self.error = None
+        self.exe_path = exe_path
         self._load_pe(exe_path)
         uc = self.uc
         uc.mem_map(STACK_BASE, STACK_SIZE)

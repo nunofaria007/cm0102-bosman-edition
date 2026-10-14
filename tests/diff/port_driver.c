@@ -6,6 +6,7 @@
 #include "gui_font.h"
 #include "gui_text.h"
 #include "gui_utils.h"
+#include "port_dates.h"
 #include "port_driver.h"
 #include "port_scene.h"
 #include "port_stack.h"
@@ -214,7 +215,8 @@ int main(void)
                    !leagues_command(cmd, args) &&
                    !progress_command(cmd, args) &&
                    !scroll_command(cmd, args) &&
-                   !select_command(cmd, args)) {
+                   !select_command(cmd, args) &&
+                   !dates_command(cmd, args)) {
             fprintf(stderr, "port_driver: bad command: %s", line);
             return 1;
         }

@@ -53,9 +53,8 @@ void pics_free(void);
  * FUN_0041bfb0. When the title of the current screen is "\" or empty, makes
  * it the path of a random picture of sections 0 to 5, except stadiums. With
  * no picture, the title becomes ":". Any other title stays, so a rebuild
- * keeps its picture. The original takes its random numbers from a pool in
- * its data. The port uses rand(). The first call loads pics.cfg when no
- * pics_load came before.
+ * keeps its picture. The random numbers come from random_number, as in the
+ * original. The first call loads pics.cfg when no pics_load came before.
  */
 void pick_background(void);
 
