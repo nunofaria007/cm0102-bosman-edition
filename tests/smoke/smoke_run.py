@@ -2,12 +2,16 @@
 """Smoke run: the recompiled game plays the start screen, a new game and some days without a person.
 
 Usage:
-    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--record]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen] [--record]
 
-The run uses a new empty save folder (HOME is a temporary folder), so the game first shows its
-settings. It saves five screens. With --record it writes them to the reference folder. Without it,
-it compares them with the reference pictures there. The reference pictures stay outside git,
-because they show the original's screens.
+The run uses a new empty save folder (RECOMP_USER_DIR is a temporary folder), so the game first shows its
+settings. Before the start it writes settings.txt with the mode (default: classic). It saves five
+screens. With --record it writes them to <reference folder>/<mode>. Without it, it compares them with
+the reference pictures there. The reference pictures stay outside git, because they show the
+original's screens.
+
+Widescreen mode draws at 1280x800 and the runtime scales every area by 1280/800 across and 800/600
+down, so the run scales each click and the date box by the same factors.
 
 Screens and checks:
     1 settings   the first-start settings screen: up to 20% of pixels differ (random background)
@@ -28,7 +32,7 @@ import subprocess
 import sys
 import tempfile
 
-# Classic mode, 800x600. Times in ms from the window opening. The database load after
+# Positions for classic mode, 800x600. Times in ms from the window opening. The database load after
 # Select League(s) takes about 20 s, so the steps after it wait with a margin.
 STEPS = [
     "8000 dump {d}/1-settings.bmp",
@@ -58,6 +62,28 @@ STEPS = [
 ]
 DATE_BOX = (0, 15, 90, 55)  # x0, y0, x1, y1 of the day and date in the left bar
 SCREENS = [("1-settings", 0.20), ("2-setup", 0.0), ("3-leagues", 0.0), ("4-news", 0.0), ("5-holiday", None)]
+
+
+SIZES = {"classic": (800, 600), "widescreen": (1280, 800)}
+
+
+def scaled_steps(mode, shots):
+    """The steps with their x y positions scaled from 800x600 to the mode's screen size."""
+    w, h = SIZES[mode]
+    out = []
+    for step in STEPS:
+        parts = step.format(d=shots).split()
+        if parts[1] in ("click", "move", "down", "up", "rclick"):
+            parts[2] = str(int(parts[2]) * w // 800)
+            parts[3] = str(int(parts[3]) * h // 600)
+        out.append(" ".join(parts))
+    return out
+
+
+def scaled_box(mode):
+    w, h = SIZES[mode]
+    x0, y0, x1, y1 = DATE_BOX
+    return (x0 * w // 800, y0 * h // 600, x1 * w // 800, y1 * h // 600)
 
 
 def read_bmp(path):
@@ -93,20 +119,31 @@ def main(argv):
         return 2
     program, game, ref = os.path.abspath(argv[1]), os.path.abspath(argv[2]), os.path.abspath(argv[3])
     record = "--record" in argv[4:]
+    mode = "classic"
+    if "--mode" in argv[4:]:
+        mode = argv[argv.index("--mode") + 1]
+    if mode not in SIZES:
+        print(f"unknown mode {mode}: use classic or widescreen")
+        return 2
+    ref = os.path.join(ref, mode)
     with tempfile.TemporaryDirectory(prefix="cm0102-smoke-") as work:
         shots = os.path.join(work, "shots")
         home = os.path.join(work, "home")
         os.mkdir(shots)
         os.mkdir(home)
+        user = os.path.join(work, "user")  # RECOMP_USER_DIR: the same on Mac and Windows
+        os.makedirs(user)
+        with open(os.path.join(user, "settings.txt"), "w") as f:
+            f.write(f"display = {mode}\n")
         env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", RECOMP_NO_BOX="1",
-                   RECOMP_SCRIPT="; ".join(s.format(d=shots) for s in STEPS))
+                   RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots)))
+        env["RECOMP_USER_DIR"] = user
         r = subprocess.run([program, "--game", game], env=env, capture_output=True, text=True, timeout=300)
         if r.returncode != 0:
             print(r.stderr[-2000:])
             print(f"FAIL: the game ended with code {r.returncode}")
             return 1
-        if record:
-            os.makedirs(ref, exist_ok=True)
+        os.makedirs(ref, exist_ok=True)
         failed = 0
         for name, allowed in SCREENS:
             got = os.path.join(shots, name + ".bmp")
@@ -117,7 +154,7 @@ def main(argv):
                 continue
             if allowed is None:
                 # The date must move on from the first news screen.
-                moved = differing_share(got, os.path.join(shots, "4-news.bmp"), DATE_BOX)
+                moved = differing_share(got, os.path.join(shots, "4-news.bmp"), scaled_box(mode))
                 ok = moved > 0.02
                 print(f"{'ok   ' if ok else 'FAIL '} {name}: {moved:.0%} of the date box changed since 4-news")
             elif record:
