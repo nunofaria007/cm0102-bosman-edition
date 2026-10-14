@@ -1,5 +1,5 @@
 # Select League(s)
-Status: In build
+Status: Shipped 2026-10-14
 
 ## Problem
 "Start New Game" on the start screen only rebuilds the screen. The port reads no data of the original, and its lists cannot scroll.
@@ -100,5 +100,5 @@ Blocked by: 1, 2
 Delivers: the progress bar, "Start New Game", the build and input of "Select League(s)", and the link from the start screen.
 Merge danger: two-way door. Blast radius: the path from the start screen.
 - [x] The build and each click give the same screen manager, screen and counters as the original.
-- [ ] Manual check: the list shows 27 nations, scrolls to the end, and selects and clears.
+- [x] Manual check: the list shows 27 nations, scrolls to the end, and selects and clears. Done by Max, 2026-10-14.
 - [x] The full differential test passes.
