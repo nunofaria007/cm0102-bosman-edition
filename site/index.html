@@ -112,13 +112,13 @@ a { color: inherit; }
 .sub { font-family: "Orbitron", sans-serif; font-weight: 900; color: var(--accent); text-transform: uppercase; letter-spacing: .03em; font-size: 1.25rem; margin: 0 0 18px; display: flex; align-items: center; gap: .6em; }
 .sub svg { width: 1.1em; height: 1.1em; fill: #fff; }
 
-.release { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: stretch; }
+.release { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: stretch; }
 .release ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .release li { padding-left: 1.4em; position: relative; font-size: 1.125rem; line-height: 1.45; }
 .release li::before { content: ""; position: absolute; left: 0; top: .45em; width: .55em; height: .55em; background: var(--accent); }
 .release .later li::before { background: #7a7a86; }
 .release .later { margin-top: 28px; color: var(--muted); }
-.shot { position: relative; aspect-ratio: 4 / 3; }
+.shot { position: relative; aspect-ratio: 4 / 3; min-width: 0; width: 100%; }
 .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; border: 2px solid #2433b8; }
 .shot figcaption { font-size: var(--step-small); color: var(--muted); margin-top: 10px; }
 .downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 32px; }
@@ -133,7 +133,12 @@ a { color: inherit; }
 .dl:hover { background: var(--red); border-color: #fff; transform: translateY(-2px); }
 .dl:hover small { color: #fff; }
 
-.steps { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.steps, .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.plans ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.plans li { padding-left: 1.4em; position: relative; font-size: 1.125rem; line-height: 1.45; }
+.plans li::before { content: ""; position: absolute; left: 0; top: .45em; width: .55em; height: .55em; background: var(--accent); }
+.follow { text-align: center; margin: 28px 0 0; font-size: 1.125rem; }
+.follow a { color: var(--accent); }
 .steps ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 18px; }
 .steps li { counter-increment: s; display: grid; grid-template-columns: 2.4em 1fr; gap: 12px; font-size: 1.125rem; line-height: 1.45; }
 .steps li::before {
@@ -194,7 +199,7 @@ a { color: inherit; }
   .hero .flank.right { padding-bottom: 40px; }
   .screen { padding: 56px 16px; }
   .bar { padding: 14px 12px; margin-bottom: 28px; }
-  .release, .steps, .downloads { grid-template-columns: 1fr; }
+  .release, .steps, .plans, .downloads { grid-template-columns: 1fr; }
   .shot { aspect-ratio: auto; }
   .shot img { position: static; height: auto; }
   .panel { padding: 20px; }
@@ -216,6 +221,7 @@ a { color: inherit; }
     <a class="mark" href="#top">CM 01/02<span class="long"> Bosman Edition</span></a>
     <ul>
       <li><a href="#release">Release</a></li>
+      <li><a href="#next">Coming next</a></li>
       <li><a href="#install">Install</a></li>
       <li><a href="#questions">Questions</a></li>
     </ul>
@@ -261,6 +267,36 @@ a { color: inherit; }
         <img src="assets/s1@2x.png" width="1600" height="1200" alt="The Setup Game screen: Start New Game, Quick Start Game, Restore Saved Game and the other options." loading="lazy">
       </figure>
     </div>
+  </div>
+</section>
+
+<section class="screen" id="next" aria-labelledby="next-title">
+  <div class="inner">
+    <h2 class="bar" id="next-title">Coming <em>next</em></h2>
+    <div class="plans">
+      <div class="panel" data-in>
+        <h3 class="sub">Version 0.2.0</h3>
+        <ul>
+          <li>Sound.</li>
+          <li>Click a player's or club's name to open their profile.</li>
+          <li>Your assistant can pick the team for you.</li>
+          <li>Attributes coloured by value, as in the newer games.</li>
+          <li>Faster days on holiday and at the end of a season.</li>
+          <li>Space to continue, keyboard shortcuts and full screen.</li>
+          <li>Sharper text on Retina and 4K screens.</li>
+          <li>Keep your saves in iCloud Drive or Dropbox.</li>
+        </ul>
+      </div>
+      <div class="panel" data-in>
+        <h3 class="sub">Version 0.3.0</h3>
+        <ul>
+          <li>Compare two players side by side.</li>
+          <li>A squad depth chart.</li>
+          <li>A best XI view.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="follow" data-in>Every new feature can be switched off, and none of them change match results. <a href="https://github.com/maxevans60/cm0102-bosman-edition/milestones">Follow progress on GitHub</a>.</p>
   </div>
 </section>
 
