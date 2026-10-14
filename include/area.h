@@ -96,8 +96,39 @@ void area_layout(area_t *area);
  */
 void area_draw(area_t *area, bool redraw);
 
-/* FUN_004031a0. Frees the saved screen of the area and of its scrollbar. */
+/*
+ * FUN_004031a0. Frees the saved screen of the area and of its scrollbar, and
+ * clears g_key_scrollbar when it is the scrollbar of this area.
+ */
 void area_release(area_t *area);
+
+/*
+ * DAT_00ad9c58. The scrollbar that the keys and the wheel use
+ * (scrman_scroll_key). The scrollbar setup of area_layout (FUN_00403600)
+ * sets it, so it is the scrollbar of the last area laid out with one.
+ */
+extern area_scrollbar_t *g_key_scrollbar;
+
+/* FUN_00403c80. Draws the scrollbar, after it saves the screen under it. */
+void area_draw_scrollbar(area_t *area);
+
+/*
+ * FUN_00403ee0. Moves the first row in view by `rows` (down for a positive
+ * number), as far as the list goes, then places, draws and flips the rows in
+ * view. Up, it goes back to the first widget of the row it reaches. Does not
+ * touch the scrollbar. The original then sends the row to the network
+ * players (FUN_00800330). The port does not.
+ */
+void area_scroll(area_t *area, s32 rows);
+
+/* FUN_004032e0. The row of the first widget in view, or 0 with no scrollbar. */
+s32 area_shown_row(const area_t *area);
+
+/*
+ * FUN_00403320. Sets the row that the next layout shows first (scroll_to),
+ * limited to 0 and the last row that fills the area.
+ */
+void area_set_scroll_to(area_t *area, s32 row);
 
 /* FUN_00403760. Top-left corner at which a popup area opens. */
 void area_popup_position(const area_t *area, s32 *x, s32 *y);

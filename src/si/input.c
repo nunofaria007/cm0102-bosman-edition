@@ -19,24 +19,54 @@ static void set_mouse(s32 x, s32 y)
     g_mouse_y = y < 0 ? 0 : y > CM_INTERNAL_HEIGHT - 1 ? CM_INTERNAL_HEIGHT - 1 : y;
 }
 
+/* The key modes of the window procedure for VK_PRIOR to VK_DOWN, -1 = none. */
+static s32 key_mode(SDL_Keycode key)
+{
+    switch (key) {
+    case SDLK_PAGEUP: return 3;
+    case SDLK_PAGEDOWN: return 2;
+    case SDLK_END: return 4;
+    case SDLK_HOME: return 5;
+    case SDLK_UP: return 1;
+    case SDLK_DOWN: return 0;
+    default: return -1;
+    }
+}
+
 /*
  * Sets the mouse globals of the original as its window procedure does for
- * WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP and
- * WM_CHAR.
+ * WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
+ * WM_MOUSEWHEEL, WM_KEYDOWN and WM_CHAR. While a click of the keys or the
+ * wheel lasts (g_click_frames), the mouse and the wheel do nothing.
  */
 void input_poll(SDL_Event *e)
 {
+    bool mouse_free = g_click_frames == 0;
+
     switch (e->type) {
     case SDL_MOUSEMOTION:
-        set_mouse(e->motion.x, e->motion.y);
+        if (mouse_free) set_mouse(e->motion.x, e->motion.y);
         break;
     case SDL_TEXTINPUT:
         g_key_char = (u8)e->text.text[0];
         break;
+    case SDL_KEYDOWN:
+        if (key_mode(e->key.keysym.sym) != -1) {
+            scrman_scroll_key(key_mode(e->key.keysym.sym), 1);
+        }
+        break;
+    case SDL_MOUSEWHEEL:
+        /* One notch is one frame. Up is mode 1. SDL gives 0 for part of a notch. */
+        if (mouse_free && e->wheel.y != 0) {
+            scrman_scroll_key(e->wheel.y > 0 ? 1 : 0,
+                              e->wheel.y > 0 ? e->wheel.y : -e->wheel.y);
+        }
+        break;
     default:
         break;
     }
-    if (e->type == SDL_MOUSEBUTTONDOWN || e->type == SDL_MOUSEBUTTONUP) {
+    if (mouse_free &&
+        (e->type == SDL_MOUSEBUTTONDOWN || e->type == SDL_MOUSEBUTTONUP)) {
         bool down = e->type == SDL_MOUSEBUTTONDOWN;
 
         set_mouse(e->button.x, e->button.y);

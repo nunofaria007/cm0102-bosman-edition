@@ -43,6 +43,13 @@ Port the path from "Start New Game" to the first screen with real data: the "Loa
 - Channels 1 to 15 have no records in a local game, and their record word is 0. The original then applies opcode 7 to the local screen manager too (0x80317b), and the port does the same. A channel outside -1 to 15 does nothing in the port. The original reads past its records there.
 - The original fails on opcode 7 with a NULL text (`strlen` at 0x803123). The port does nothing.
 - The fourth argument of the progress calls in the two loops and the last call of the loader is a register of the loader. Its value is unknown. Every channel from -1 to 15 gives the same box for one local player, so the port's load can pass -1.
+- The key and wheel scrollbar `DAT_00ad9c58` points to the scrollbar struct of an area (area +0xb7a). The scrollbar setup `FUN_00403600` sets it, so it is the scrollbar of the last area laid out with one. The area release `FUN_004031a0` clears it when it points to that area. The port keeps it as `g_key_scrollbar`.
+- The scroll `FUN_00403ee0` ends with a write for network players (`FUN_00800330`, net buffer `DAT_00ae28f8`). The port leaves it out. Without room in that buffer, the original shows an error box and lets the button go.
+- The second pass of the hit test only walks the rows again (area +0xb78), as text entry is not ported.
+- An SDL wheel event with y = 0 (part of a notch) does nothing. In the original, a wheel delta under 120 gives `FUN_005621f0(0, 0)`, which holds the button until the next real button-up.
+- The port does not keep the key code `DAT_00b67a04`, as text entry is not ported. Keys Left and Right do nothing, as in the original.
+- `FUN_00803320` uses the record of channel `+0x382a`. The port has one channel.
+- The differential test stubs the text timers `FUN_00569610` and the cursor `FUN_005e8170` to run the poll `FUN_0055f620` of the original. The window procedure and the pump have no differential test. The test models the countdown of the pump from the assembly.
 
 ## Testing
 One seam: the differential test.
@@ -72,7 +79,7 @@ Merge danger: two-way door. Blast radius: the data of every later screen.
 Blocked by: none
 Delivers: scrollbar click, thumb drag, scroll, scroll position, keys and wheel.
 Merge danger: two-way door. Blast radius: every list.
-- [ ] Random clicks, drags and keys on areas with scrollbars give the same state, screen and flips as the original.
+- [x] Random clicks, drags and keys on areas with scrollbars give the same state, screen and flips as the original.
 
 ### 3. "Select League(s)"
 Blocked by: 1, 2

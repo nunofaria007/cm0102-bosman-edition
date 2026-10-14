@@ -10,6 +10,7 @@
 #include "port_scene.h"
 #include "port_stack.h"
 #include "port_start.h"
+#include "port_scroll.h"
 #include "port_helpers.h"
 #include "port_leagues.h"
 #include "port_progress.h"
@@ -210,7 +211,8 @@ int main(void)
         } else if (!scene_command(cmd, args) && !stack_command(cmd, args) &&
                    !helpers_command(cmd, args) && !start_command(cmd, args) &&
                    !leagues_command(cmd, args) &&
-                   !progress_command(cmd, args)) {
+                   !progress_command(cmd, args) &&
+                   !scroll_command(cmd, args)) {
             fprintf(stderr, "port_driver: bad command: %s", line);
             return 1;
         }

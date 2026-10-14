@@ -500,3 +500,12 @@ s16 screen_free_button(screen_stack_t *st, s32 x1, s32 y1, s32 x2, s32 y2,
                                 0, 0, style, colour, colour, text_flags, font,
                                 text_colour, text, 0, id, data, -1);
 }
+
+s32 screen_stack_shown_row(const screen_stack_t *st, s16 area)
+{
+    const screen_record_t *rec = &st->record;
+
+    if (rec->player != 0) return area == rec->unknown_22 ? rec->unknown_24 : 0;
+    if (area == -1) return 0;
+    return area_shown_row(&rec->screen_manager->areas[area]);
+}
