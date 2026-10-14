@@ -83,4 +83,12 @@ void win_com_release(void);
 /* Logging of import calls. */
 #define WIN_TRACE(...) do { if (win_trace) fprintf(stderr, __VA_ARGS__); } while (0)
 
+/* Clickable names and cursors (names.c). The SDL types stay out of this header. */
+struct SDL_Renderer;
+struct SDL_Surface;
+int win_cursor_shape(uint32_t handle);          /* an SDL_SystemCursor for a cursor handle of the game */
+void names_after_poll(void);                    /* after each input poll: the name under the mouse */
+void names_draw(struct SDL_Renderer *renderer); /* the line under it, on the shown frame */
+void names_draw_surface(struct SDL_Surface *s); /* the same line on a screen dump */
+
 #endif
