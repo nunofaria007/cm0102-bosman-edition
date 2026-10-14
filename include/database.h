@@ -480,6 +480,10 @@ typedef struct {
 s32 database_table_info(s32 table, s32 *rows, s32 *record_size, db_link_t *links, s32 max);
 void database_record_bytes(s32 table, s32 row, u8 *out);
 
+/* The number of tables whose fields do not cover the record of the
+   original once each, in order. 0 when the layouts are right. */
+s32 database_check_layouts(void);
+
 /*
  * For database.c and database_links.c only: FUN_00549f70 with weekday -1
  * for a valid day (1..31) and month (0..11), and the switch of

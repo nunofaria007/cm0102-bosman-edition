@@ -24,6 +24,18 @@ Port the full database load of the original, its dates and random numbers, text 
 - Pointers between records are real pointers in the port. The differential test turns each pointer of both programs into a row index and compares the tables byte for byte otherwise.
 - Three agents build at once, each in its own worktree: dates and random numbers, the database load, and text entry. One agent then builds the setup screens. One review pair runs at the end.
 - Commits are local. Nothing is pushed.
+- Database load (slice 2). Each table is a native struct. Until the id pass a pointer field holds its id. The port keeps the two ids that the id pass leaves in pointer fields: club +0x5b above the club comp count (it clears +0x60) and stadium +0x48 above the stadium count (it clears +0x38).
+- Database load, left out:
+  - The copy of the .lng files and the language check `FUN_00535930` (0x52861f..0x5286fc).
+  - The language block of a newer index.dat (0x528848) and the eng.lng names of the key ids (0x603c52). The port fails the load when index.dat has the extra byte.
+  - The non-shared sizing of a saved game (0x5289c7) and the reads from a stream.
+  - The format-1 converters of the club, player, non-player and club comp readers (`FUN_0054dc90`, `FUN_0054f150`, `FUN_0054e9a0`, `FUN_0054ffd0`) and the 110-byte staff reader `FUN_0054e630`. The shipped data does not use them. The port fails the load there.
+  - The error boxes and log lines of the readers, the id pass and the key id checks (0x6043ac..0x60ba6e), and `FUN_0053dba0`. The delete of duff.out (0x52d205).
+  - `FUN_00540a50` after 0x540b1b: the reserve team lookup over about 500 key club ids for a club of Spain, Germany or Portugal. The load calls it with need_league 1, and every club of the files has +0x244 = 0, so the load never reaches it. The port returns 0 there.
+- The staff pass calls `FUN_0090cfc0` for a staff row with no nation, no club and no national club, and for a missing name when no common name is empty. The shipped data reaches neither (the test checks it). Until slice 1 merges, a stand-in in `src/cm3/database_links.c` returns 0.
+- `FUN_0053b4f0` and `FUN_0053b3d0` return NULL for a club without a nation, and the original then reads through NULL. The port skips these clubs.
+- The database test also loads a changed copy of the shipped data in a temp folder, so that it reaches the branches of the id pass and the staff pass that the shipped data does not. In its byte compare a pointer becomes its row, a pointer into another table 0x80000000 | table << 24 | row, and an id that the id pass keeps 0x40000000 | id.
+- The key ids are 1,284 globals: 0x9cf178..0x9d0524 without 0x9d0300 and 0x9d034c (never used), and 0xb63c9c..0xb63d00. `tools/research/gen_key_ids.py` reads their name chains from the original into `src/cm3/key_ids_table.c`.
 
 ## Testing
 One seam: the differential test, with the tracer harness of the inventory moved into `tests/diff`.
@@ -57,8 +69,8 @@ Merge danger: two-way door. Blast radius: every later random choice and date.
 Blocked by: 0
 Delivers: the loader, the readers, the reserve rows, the conversion, the preferences table, the id pass, the staff pass, the national clubs and the key ids.
 Merge danger: two-way door. Blast radius: all data of the game.
-- [ ] Every table equals the original after the load.
-- [ ] The about 1,100 key id globals equal the original.
+- [x] Every table equals the original after the load.
+- [x] The about 1,100 key id globals equal the original.
 
 ### 3. Text entry
 Blocked by: none

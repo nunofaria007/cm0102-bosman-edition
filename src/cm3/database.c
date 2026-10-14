@@ -315,22 +315,45 @@ static void record_from_bytes(const db_layout_t *layout, void *record, const u8 
     }
 }
 
-/*
- * The row of a pointer in the table that a field points into, -1 for NULL,
- * and the value itself for a pointer field that holds an id.
- */
-static s32 pointer_row(const void *p, s32 target)
+/* The row of a pointer in a table, or -1. The staff and player tables have
+   1,325 rows past their count. */
+static s32 row_in(const void *p, s32 table)
 {
-    const db_layout_t *t = &layouts[target];
+    const db_layout_t *t = &layouts[table];
     uintptr_t base = (uintptr_t)*t->base;
     uintptr_t at = (uintptr_t)p;
+    s32 rows = *t->count + (table == DB_STAFF || table == DB_PLAYER ? DB_SPARE_ROWS : 0);
 
-    if (!p) return -1;
-    if (base && at >= base && at < base + (uintptr_t)*t->count * t->native &&
+    if (base && at >= base && at < base + (uintptr_t)rows * t->native &&
         (at - base) % t->native == 0) {
         return (s32)((at - base) / t->native);
     }
-    return DB_ID(p);
+    return -1;
+}
+
+/*
+ * The row of a pointer in the table that a field points into, and -1 for
+ * NULL. A pointer into another table, as the staff pass makes for a missing
+ * first or second name, gives 0x80000000 | table << 24 | row. A pointer
+ * field that still holds an id after the id pass gives 0x40000000 | id, so
+ * that an id is never taken for the row of the same number.
+ */
+static s32 pointer_row(const void *p, s32 target)
+{
+    s32 row;
+
+    if (!p) return -1;
+    row = row_in(p, target);
+    if (row >= 0) return row;
+    for (s32 table = 0; table < DB_TABLE_IDS; table++) {
+        if (table == DB_NAT_CLUB || table == DB_NATION_COMP || table == DB_NATION_COMP_HISTORY ||
+            !layouts[table].fields) {
+            continue;
+        }
+        row = row_in(p, table);
+        if (row >= 0) return (s32)(0x80000000u | (u32)table << 24 | (u32)row);
+    }
+    return (s32)(0x40000000u | (u32)DB_ID(p));
 }
 
 static void record_to_bytes(const db_layout_t *layout, const void *record, u8 *bytes)
@@ -371,6 +394,27 @@ s32 database_table_info(s32 table, s32 *rows, s32 *record_size, db_link_t *links
         n++;
     }
     return n;
+}
+
+s32 database_check_layouts(void)
+{
+    s32 bad = 0;
+
+    for (s32 table = 0; table < DB_TABLE_IDS; table++) {
+        const db_layout_t *layout = &layouts[table];
+        s32 end = 0;
+
+        if (!layout->fields) continue;
+        for (s32 i = 0; i < layout->field_count; i++) {
+            const db_field_t *f = &layout->fields[i];
+            size_t native = f->target < 0 ? f->size : f->count * sizeof(void *);
+
+            if (f->file != end || f->native + native > layout->native) break;
+            end += f->size;
+        }
+        if (end != layout->size) bad++;
+    }
+    return bad;
 }
 
 void database_record_bytes(s32 table, s32 row, u8 *out)

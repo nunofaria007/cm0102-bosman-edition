@@ -12,6 +12,8 @@ UTILS = "src/si/utils.c"
 # Equivalent breaks, left out because no test can see them:
 # - "if (!f) return true;" in read_index: the load then fails at the first table, as before.
 # - "North america" for "North America": the match ignores case.
+# - A field of the nation or continent layout at a wrong offset: the port reads and writes the
+#   record with the same layout. The database_layouts test of breaks/database.py catches it.
 
 # name, file, text to find (once in the file), text to put in its place
 BREAKS = [
@@ -21,12 +23,10 @@ BREAKS = [
      "    if (ok && fread(&extra, 1, 1, f) != 1) ok = false;"),
     ("load: nation format", DB, "    case DB_NATION:                                      /* FUN_0054d740 */\n", ""),
     ("load: offset", DB, "    ok = fseek(f, entry->offset, SEEK_SET) == 0 &&", "    ok = fseek(f, 0, SEEK_SET) == 0 &&"),
-    ("continent: code", DB, "RAW(continent_t, 0x1f, code)", "RAW(continent_t, 0x1e, code)"),
     ("continent: double", DB, "RAW(continent_t, 0xbe, unknown_be)", "RAW(continent_t, 0xb6, unknown_be)"),
     ("nation: second name", DB, "RAW(nation_t, 0x038, second_name)", "RAW(nation_t, 0x004, second_name)"),
     ("nation: city", DB, "PTRS(nation_t, 0x07a, city, DB_CITY)", "PTRS(nation_t, 0x07e, city, DB_CITY)"),
     ("nation: colours", DB, "PTRS(nation_t, 0x090, colours, DB_COLOUR)", "PTRS(nation_t, 0x094, colours, DB_COLOUR)"),
-    ("nation: flags", DB, "RAW(nation_t, 0x11c, league_flags)", "RAW(nation_t, 0x11d, league_flags)"),
     ("nation: rival link", DB, "            n->rivals[k] = id < 0 || id >= g_nation_count ? NULL : &g_nations[id];",
      "            n->rivals[k] = id <= 0 || id >= g_nation_count ? NULL : &g_nations[id];"),
     ("nation: continent link", DB, "        n->continent = id < 0 || id >= g_continent_count ? NULL : &g_continents[id];",

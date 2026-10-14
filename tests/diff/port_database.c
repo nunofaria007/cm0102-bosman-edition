@@ -60,6 +60,8 @@ bool database_command(const char *cmd, const char *args)
         for (s32 k = 0; k < KEY_NATION_COUNT; k++) printf("%d ", g_key_nations[k]);
         for (s32 k = 0; k < KEY_CONTINENT_COUNT; k++) printf("%d ", g_key_continents[k]);
         printf("\n");
+    } else if (!strcmp(cmd, "db_layouts")) {
+        printf("%d\n", database_check_layouts());
     } else if (!strcmp(cmd, "db_free")) {
         database_free();
     } else if (!strcmp(cmd, "db_counts")) {
