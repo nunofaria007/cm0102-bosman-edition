@@ -25,7 +25,7 @@ Release 0.2.0 adds those comforts and sound, without changing a single match res
 ## Decisions
 Settled in the interview of 2026-10-14 (Q50 to Q58).
 
-- **Scope:** 0.2.0 holds issues #11 to #21 and #23 (positions on the match tactics screen, added by Max after the interview). The new screens (#22: player comparison, squad depth, best XI) are release 0.3.0.
+- **Scope:** 0.2.0 holds issues #11 to #21 and #23 (position, condition and match rating together on the tactics screen, added by Max after the interview). The new screens (#22: player comparison, squad depth, best XI) are release 0.3.0.
 - **Options:** every option is a line in the settings file. No new in-game options screen in 0.2.0. The site lists each option with its default.
 - **Defaults:** on: Space to continue, shortcuts, sharp picture, sound, clickable names, attribute colours, faster days. Off: assistant selection. The save folder defaults to the current folder.
 - **Faithful logic:** no feature may change match results or the game's decisions. Faster days must leave a save that is byte for byte the same as normal days, given the same start and the same input.
@@ -121,11 +121,11 @@ Delivers: days that pass without redrawing every screen.
 Merge danger: two-way door, but it touches the day loop. Blast radius: every saved game. The same-save check is the guard.
 - [ ] The same-save check passes with faster days on and off
 
-### 11. Positions on the match tactics screen (#23)
+### 11. Position, condition and match rating together (#23)
 Blocked by: 1, 5
-Delivers: each player's position beside his name on the tactics screen during a match. First check whether the View drop-down already offers it; if so, the change is a default.
+Delivers: an option, on by default, that shows the View drop-down's Position(s), Condition and Match Rating columns side by side beside each name on the tactics screen. The drop-down already offers each one alone (Max checked). Widescreen has room; in classic mode, if three columns do not fit, the option applies in widescreen only.
 Merge danger: two-way door. Blast radius: the tactics screen.
-- [ ] Screenshot of the tactics screen in a match with positions shown
+- [ ] Screenshot of the tactics screen in a match with all three columns, in both modes
 
 ### 12. Release 0.2.0
 Blocked by: 2 to 11
