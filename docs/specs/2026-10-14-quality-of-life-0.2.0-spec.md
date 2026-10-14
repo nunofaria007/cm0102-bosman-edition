@@ -49,6 +49,7 @@ Settled in the interview of 2026-10-14 (Q50 to Q58).
 - A volume slider or music.
 - Network play and printing.
 - Any change to the match engine, AI decisions or the database.
+- A "more frequent" violent conduct option. The events are already in the game, always on and rare; Max chose to leave them as they are (Q61, 2026-10-14). See `docs/research/2026-10-14-violent-conduct-inventory.md`.
 
 ## Open decisions
 None.
