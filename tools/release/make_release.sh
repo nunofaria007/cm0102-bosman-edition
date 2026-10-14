@@ -50,7 +50,7 @@ CHECK_ARGS=(--manifest "$MANIFEST")
 
 echo "== Mac"
 "$REPO/tools/mac/make_app.sh" --game "$GAME" --sdl2-arm64 "$SDL_MAC/mac-arm64" --sdl2-x86_64 "$SDL_MAC/mac-x86_64" \
-    --out "$REPO/build/mac"
+    --out "$REPO/build/mac" --dmg-logo "$SITE/logo.png"
 DMG="$REPO/build/mac/CM-01-02-Bosman-Edition-$VERSION-mac.dmg"
 python3 -I "$REPO/tools/mac/check_package.py" "$DMG" ${CHECK_ARGS[@]+"${CHECK_ARGS[@]}"}
 cp "$DMG" "$OUT/"

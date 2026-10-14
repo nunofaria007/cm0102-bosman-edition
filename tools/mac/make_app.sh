@@ -9,6 +9,7 @@
 #                   Contents/Resources/game. Required. For a local test use a scratch copy of the fan
 #                   pack. Never put the fan pack in a download.
 #   --exe           The cm0102.exe that the recompiler reads. Default: <game>/cm0102.exe.
+#   --dmg-logo      Optional: the logo PNG for the .dmg window background (not in git).
 #   --icns          Optional icon. The script copies it to Contents/Resources/AppIcon.icns. No icon is
 #                   committed to git. Empty: the script makes the original's ball icon from --exe.
 #   --sdl2-arm64    Prefix with lib/ and include/ of SDL2 for arm64. Default /opt/homebrew.
@@ -21,12 +22,13 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GAME=""; EXE=""; ICNS=""; SDL_ARM64="/opt/homebrew"; SDL_X86_64=""; OUT="$REPO/build/mac"; VERSION=""
+GAME=""; EXE=""; ICNS=""; DMG_LOGO=""; SDL_ARM64="/opt/homebrew"; SDL_X86_64=""; OUT="$REPO/build/mac"; VERSION=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --game) GAME="${2:-}"; shift 2 ;;
         --exe) EXE="${2:-}"; shift 2 ;;
         --icns) ICNS="${2:-}"; shift 2 ;;
+        --dmg-logo) DMG_LOGO="${2:-}"; shift 2 ;;
         --sdl2-arm64) SDL_ARM64="${2:-}"; shift 2 ;;
         --sdl2-x86_64) SDL_X86_64="${2:-}"; shift 2 ;;
         --out) OUT="${2:-}"; shift 2 ;;
@@ -166,12 +168,26 @@ codesign --force --sign - "$APP/Contents/MacOS/cm0102_recomp"
 codesign --force --sign - "$APP"
 codesign --verify --strict "$APP"
 
-# 5. The .dmg with a link to Applications.
+# 5. The .dmg with a link to Applications. With dmgbuild (pip, in the venv) the window gets the
+#    background picture (tools/mac/dmg_background.py) and a fixed layout (tools/mac/dmg_settings.py).
+#    Without it, a plain .dmg.
 trash "$DMG"
-STAGE="$(mktemp -d "$OUT/dmg.XXXXXX")"
-cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+PY="$HOME/.venvs/cm0102/bin/python"
+[ -x "$PY" ] || PY=python3
+if "$PY" -c "import dmgbuild, PIL" 2>/dev/null; then
+    BG="$OUT/dmg-background.tiff"
+    LOGO_ARGS=()
+    [ -n "$DMG_LOGO" ] && LOGO_ARGS=(--logo "$DMG_LOGO")
+    "$PY" "$REPO/tools/mac/dmg_background.py" "$BG" ${LOGO_ARGS[@]+"${LOGO_ARGS[@]}"} >/dev/null
+    "$PY" -m dmgbuild -s "$REPO/tools/mac/dmg_settings.py" -D app="$APP" -D background="$BG" \
+        "$APP_NAME $VERSION" "$DMG" >/dev/null
+else
+    echo "make_app.sh: dmgbuild or Pillow is missing, so the .dmg window has no background." >&2
+    STAGE="$(mktemp -d "$OUT/dmg.XXXXXX")"
+    cp -R "$APP" "$STAGE/"
+    ln -s /Applications "$STAGE/Applications"
+    hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+    echo "Staging folder $STAGE can be moved to the Trash."
+fi
 echo "App: $APP"
 echo "Dmg: $DMG"
-echo "Staging folder $STAGE can be moved to the Trash."
