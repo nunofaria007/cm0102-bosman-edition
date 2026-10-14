@@ -1,18 +1,19 @@
 /* cm0102_recomp: runs the recompiled original from its entry point, WinMainCRTStartup (0x947a13).
  *
- * Usage: cm0102_recomp [--exe <cm0102.exe>] [options of the original, for example -windowed]
- * The exe is the player's own cm0102.exe; its folder is the game folder (Data, Pictures, ...), which
- * the registry value Location gives to WinMain, and the CD drive D:\ (files.c).
- * Environment: CM0102_EXE (the exe), RECOMP_TRACE=1 (print import calls), RECOMP_SCRIPT and RECOMP_DUMP
+ * Usage: cm0102_recomp [--game <folder>] [options of the original, for example -windowed]
+ * The game folder holds the player's own cm0102.exe, Data and Pictures. It is the registry value
+ * Location, the base of every path and the CD drive D:\ (files.c). Default: the first folder above the
+ * program that holds cm0102.exe and Data, else the current folder. The game folder is read only:
+ * every write goes to ~/Library/Application Support/cm0102 (files.c).
+ * Environment: RECOMP_TRACE=1 (print import calls), RECOMP_SCRIPT and RECOMP_DUMP
  * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr). */
 #include "win.h"
 
 #include <SDL.h>
+#include <mach-o/dyld.h>
 #include <stdlib.h>
-
-#ifndef CM0102_DEFAULT_EXE
-#define CM0102_DEFAULT_EXE "cm0102.exe"
-#endif
+#include <sys/stat.h>
+#include <unistd.h>
 
 char win_game_dir[1024];
 char win_exe_path[1024];
@@ -32,18 +33,75 @@ static void at_end(void)
     if (dump) win_dump_screen(dump);
 }
 
+static int has_game(const char *dir)
+{
+    char p[1200];
+    struct stat st;
+    snprintf(p, sizeof p, "%s/cm0102.exe", dir);
+    if (stat(p, &st) || !S_ISREG(st.st_mode)) return 0;
+    snprintf(p, sizeof p, "%s/Data", dir);
+    return stat(p, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+/* The default game folder: look upwards from the program, else the current folder. */
+static void default_game_dir(char *out, size_t room)
+{
+    char exe[1024], real[1024];
+    uint32_t n = sizeof exe;
+    if (_NSGetExecutablePath(exe, &n) == 0 && realpath(exe, real)) {
+        for (char *slash; (slash = strrchr(real, '/')) != NULL;) {
+            *slash = 0;
+            if (!real[0]) break;
+            if (has_game(real)) { snprintf(out, room, "%s", real); return; }
+        }
+    }
+    if (!getcwd(out, room)) snprintf(out, room, ".");
+}
+
 int main(int argc, char **argv)
 {
-    const char *exe = getenv("CM0102_EXE") ? getenv("CM0102_EXE") : CM0102_DEFAULT_EXE;
+    char game[1024] = "";
     int first = 1;
-    if (argc > 2 && !strcmp(argv[1], "--exe")) { exe = argv[2]; first = 3; }
-    if (!realpath(exe, win_exe_path)) {
-        fprintf(stderr, "cm0102_recomp: cannot find %s. Give the path of your cm0102.exe with --exe.\n", exe);
+    if (argc > 1 && !strcmp(argv[1], "--game")) {
+        if (argc < 3) {
+            fprintf(stderr, "cm0102_recomp: --game needs the folder of the original game.\n");
+            return 2;
+        }
+        snprintf(game, sizeof game, "%s", argv[2]);
+        first = 3;
+    } else {
+        default_game_dir(game, sizeof game);
+    }
+    char exe_path[1100];
+    snprintf(exe_path, sizeof exe_path, "%s/cm0102.exe", game);
+    if (!realpath(game, win_game_dir) || !realpath(exe_path, win_exe_path)) {
+        fprintf(stderr, "cm0102_recomp: cannot find cm0102.exe in the folder %s. "
+                        "Give the folder of the original game with --game <folder>.\n", game);
         return 2;
     }
-    snprintf(win_game_dir, sizeof win_game_dir, "%s", win_exe_path);
-    char *slash = strrchr(win_game_dir, '/');
-    if (slash) *slash = 0;
+    const char *home = getenv("HOME");
+    if (!home || !*home) {
+        fprintf(stderr, "cm0102_recomp: HOME is not set, so the user folder is unknown.\n");
+        return 2;
+    }
+    snprintf(win_user_dir, sizeof win_user_dir, "%s/Library/Application Support/cm0102", home);
+    {
+        char tmp[1100];
+        snprintf(tmp, sizeof tmp, "%s", win_user_dir);
+        for (char *p = tmp + 1; ; p++) {
+            if (*p != '/' && *p) continue;
+            char c = *p;
+            *p = 0;
+            mkdir(tmp, 0755);
+            if (!c) break;
+            *p = c;
+        }
+        struct stat st;
+        if (stat(win_user_dir, &st) || !S_ISDIR(st.st_mode)) {
+            fprintf(stderr, "cm0102_recomp: cannot create the user folder %s.\n", win_user_dir);
+            return 2;
+        }
+    }
     win_trace = getenv("RECOMP_TRACE") && *getenv("RECOMP_TRACE");
 
     /* The command line as Windows gives it: the quoted program path, then the options. */

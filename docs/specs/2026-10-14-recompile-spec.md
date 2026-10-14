@@ -20,6 +20,8 @@ A recompiler translates every x86 instruction of `cm0102.exe` into C that works 
 - The CD check: the runtime reports a CD drive `D:\` that holds the player's own `cm0102.exe`. None of the 35 copies of the check is patched.
 - Network play: the WSOCK32 imports return the errors that Windows gives with no network. The original then takes its own failure path. The start screen keeps "Network Play".
 - Printing (GDI32, WINSPOOL, comdlg32) returns failure for now.
+- The game folder: `--game <folder>` names the folder of the original. It is the registry value Location and the base of every path. Default: the first folder above the program with `cm0102.exe` and `Data`, else the current folder. A folder without `cm0102.exe` stops the program with a message that names `--game`.
+- Writes go to the user folder `~/Library/Application Support/cm0102`, never to the game folder. Any file that the game opens for writing, creates, renames or deletes, and any folder it creates, lives there under the same relative path. A read looks in the user folder first, then in the game folder. A file search lists both, the user folder winning on equal names. Delete and rename act only in the user folder: a delete of a file that exists only in the game folder fails, and a rename of such a file copies it to the new name in the user folder. A file of the game folder that the game opens for update is copied to the user folder first. A path outside the game folder maps to `_outside/<path>` in the user folder. (src/recomp_rt/win/files.c)
 - Commits are local. Nothing is pushed.
 
 ## Slices
@@ -34,6 +36,6 @@ Every import of the original, grouped by library, with its calls, its arguments 
 ### 3. Whole program
 All code recompiled, the runtime with all imports, the game starting on SDL.
 - [x] The recompiled game shows the start screen.
-- Build: `cmake --build build --target cm0102_recomp`, then `build/cm0102_recomp` (or `--exe <cm0102.exe>`). A run without a person: `SDL_VIDEODRIVER=dummy RECOMP_SCRIPT="8000 click 277 177; 20000 dump s.bmp; 21000 quit"` (src/recomp_rt/win/user32.c).
+- Build: `cmake --build build --target cm0102_recomp`, then `build/cm0102_recomp` (or `--game <folder>`). A run without a person: `SDL_VIDEODRIVER=dummy RECOMP_SCRIPT="8000 click 277 177; 20000 dump s.bmp; 21000 quit"` (src/recomp_rt/win/user32.c).
 - 2026-10-14, scripted run: Start New Game, Select League(s), the CD check, Enter Name, Select Nationality, Select Team (Arsenal), Take Control, Finish. The game reached Monday 16.7.01 with news. A person has not played it yet.
 - [ ] Manual check: a new game starts and a day passes.
