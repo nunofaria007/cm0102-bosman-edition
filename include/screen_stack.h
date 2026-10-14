@@ -128,4 +128,36 @@ s32 screen_stack_cannot_go_back(const screen_stack_t *st, s32 any);
 /* FUN_00803d50. Flagged screens of every record. */
 s32 screen_stack_flagged(const screen_stack_t *st);
 
+/*
+ * The message pump of the original (FUN_0068d520): it sets the mouse globals
+ * and the tick. The app sets it. It returns false when the window closes.
+ */
+extern bool (*g_screen_pump)(void);
+
+/* Results of an input function. 0 and up keep the screen. */
+#define SCREEN_HOME          -1
+#define SCREEN_BACK          -2
+#define SCREEN_FORWARD       -3
+#define SCREEN_REBUILD       -4
+#define SCREEN_CONTINUE      -5
+#define SCREEN_CONTINUE_AWAY -6
+#define SCREEN_QUIT          -7
+#define SCREEN_CONTINUE_8    -8
+#define SCREEN_POP           -9
+#define SCREEN_POP_CHAIN     -10
+#define SCREEN_REBUILD_11    -11
+#define SCREEN_QUIT_12       -12
+#define SCREEN_CONTINUE_ANY  -13
+
+/*
+ * FUN_007fc7e0 for one local player. Each pass builds and draws the current
+ * screen when it needs it, pumps the events, polls the input, calls the input
+ * function with the clicked widget or -1, and acts on the result. The loop
+ * ends on SCREEN_QUIT, on a continue with no flagged screen left, or when the
+ * window closes. Then it calls the exit function of every screen and frees
+ * the stack. Returns 1 when the last result was SCREEN_CONTINUE. The original
+ * shows "Processing, Please Wait ..." at the end. The port does not.
+ */
+s32 screen_stack_run(screen_stack_t *st);
+
 #endif

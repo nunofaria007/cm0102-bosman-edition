@@ -1,4 +1,6 @@
 #include "screen_stack.h"
+#include "scrman_input.h"
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -234,4 +236,196 @@ s32 screen_stack_cannot_go_back(const screen_stack_t *st, s32 any)
 s32 screen_stack_flagged(const screen_stack_t *st)
 {
     return st->record.flagged;
+}
+
+bool (*g_screen_pump)(void);
+
+static void leave_current(screen_record_t *rec)
+{
+    if (rec->current && rec->current->leave) rec->current->leave();
+}
+
+/* Frees the last screen and makes the one before it current and last. */
+static void drop_last(screen_record_t *rec)
+{
+    screen_node_t *node = rec->last;
+
+    rec->current = rec->last = node->prev;
+    rec->last->next = NULL;
+    free_node(rec, node);
+}
+
+/*
+ * -9: frees screens from the last one back to the first flagged one. Returns
+ * false when it reaches the first screen: the result then becomes -5.
+ */
+static bool pop(screen_record_t *rec)
+{
+    for (;;) {
+        screen_node_t *node = rec->last;
+        bool flagged = node->flag != 0;
+
+        if (!node->prev) {
+            rec->flagged = 0;
+            return false;
+        }
+        drop_last(rec);
+        if (flagged) {
+            rec->flagged--;
+            return true;
+        }
+    }
+}
+
+/* -10: frees the chain of flagged screens that ends the stack. */
+static bool pop_chain(screen_record_t *rec)
+{
+    screen_node_t *node = rec->last;
+
+    while (node && !(node->flag && (!node->prev || !node->prev->flag))) {
+        node = node->prev;
+    }
+    if (!node || node == rec->first) {
+        rec->flagged = 0;
+        return false;
+    }
+    while (rec->last != node->prev) {
+        if (rec->last->flag) rec->flagged--;
+        drop_last(rec);
+    }
+    return true;
+}
+
+/* -5, -6, -8 and -13. Returns true when a pending flagged screen takes over. */
+static bool next_flagged(screen_record_t *rec, s32 result)
+{
+    if (rec->flagged <= 0) return false;
+    for (screen_node_t *node = rec->last; node; node = node->prev) {
+        if (node->flag && (result == SCREEN_CONTINUE_ANY || !node->exit)) {
+            rec->current = node;
+            rec->rebuild = 1;
+            return true;
+        }
+    }
+    return false;
+}
+
+s32 screen_stack_run(screen_stack_t *st)
+{
+    screen_record_t *rec = &st->record;
+    scrman_t *sm = rec->screen_manager;
+    s32 result = 0;
+
+    sm->darken_screen = 0;
+    rec->away = rec->done = rec->rebuild ? 0 : 1;
+    if (rec->rebuild) rec->started = (s32)time(NULL);
+
+    for (;;) {
+        if (rec->rebuild && rec->current) {
+            g_left_held = g_right_held = 0;
+            rec->rebuild = 0;
+            scrman_reset(sm, true);
+            sm->skip_draw = 1;
+            rec->current->build();
+            sm->skip_draw = 0;
+            sm->darken_screen = 0;
+            scrman_draw(sm, screen_stack_title(st), -1, -1, -1, -1);
+        }
+        if (g_screen_pump && !g_screen_pump()) {
+            result = SCREEN_QUIT;
+            break;
+        }
+
+        s16 clicked = rec->away ? -1 : scrman_poll(sm);
+
+        /* The original shows an error box here (scrman.cpp 455). */
+        if (!rec->current) break;
+        if (!rec->away) {
+            s32 id = clicked != -1 ? sm->widgets[clicked].unknown_08 : 0;
+
+            if (st->hook && id == st->hook_id) {
+                st->hook(0);
+                result = SCREEN_REBUILD;
+            } else {
+                result = rec->current->input(clicked);
+            }
+        }
+
+    act:
+        switch (result) {
+        case SCREEN_HOME:
+            leave_current(rec);
+            if (rec->first) {
+                rec->current = rec->first;
+                rec->rebuild = 1;
+            }
+            break;
+        case SCREEN_BACK:
+            leave_current(rec);
+            if (rec->current->prev && !rec->current->flag) {
+                rec->current = rec->current->prev;
+                rec->rebuild = 1;
+            }
+            break;
+        case SCREEN_FORWARD:
+            leave_current(rec);
+            if (rec->current->next) {
+                rec->current = rec->current->next;
+                rec->rebuild = 1;
+            }
+            break;
+        case SCREEN_REBUILD:
+        case SCREEN_REBUILD_11:
+            rec->rebuild = 1;
+            break;
+        case SCREEN_POP:
+        case SCREEN_POP_CHAIN:
+            leave_current(rec);
+            if (!(result == SCREEN_POP ? pop(rec) : pop_chain(rec))) {
+                result = SCREEN_CONTINUE;
+                goto act;
+            }
+            result = rec->current->input(-1);
+            if (result == 0) {
+                rec->rebuild = 1;
+                break;
+            }
+            goto act;
+        case SCREEN_CONTINUE:
+        case SCREEN_CONTINUE_AWAY:
+        case SCREEN_CONTINUE_8:
+        case SCREEN_CONTINUE_ANY:
+            if (next_flagged(rec, result)) {
+                result = 0;
+                break;
+            }
+            if (result == SCREEN_CONTINUE_AWAY) {
+                rec->done = 1;
+                rec->away = 1;
+            } else if (!rec->away) {
+                rec->done = !rec->done;
+            }
+            rec->rebuild = 1;
+            break;
+        default:
+            /* The original redraws the whole screen after a click here. */
+            if (clicked != -1 && !rec->rebuild) {
+                scrman_draw(sm, screen_stack_title(st), -1, -1, -1, -1);
+            }
+            break;
+        }
+        /* -12 also ends a network game in the original, and does nothing more here. */
+        if (rec->done || result == SCREEN_QUIT) break;
+    }
+
+    for (screen_node_t *node = rec->first; node; node = node->next) {
+        if (node->exit) node->exit();
+    }
+    leave_current(rec);
+    scrman_reset(sm, true);
+    rec->current = NULL;
+    rec->rebuild = 0;
+    screen_stack_free_all(st);
+    sm->darken_screen = 1;
+    return result == SCREEN_CONTINUE;
 }
