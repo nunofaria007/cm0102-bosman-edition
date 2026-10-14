@@ -55,6 +55,8 @@ a { color: inherit; }
 .btn svg { width: 1.1em; height: 1.1em; fill: currentColor; }
 .marks { display: inline-flex; gap: .5em; align-items: center; }
 .marks svg { width: 1.1em; height: 1.1em; fill: currentColor; }
+.marks a { display: inline-flex; color: inherit; transition: transform .2s var(--ease-out), color .2s; }
+.marks a:hover { color: var(--accent); transform: translateY(-2px); }
 
 /* Navigation */
 .nav {
@@ -110,13 +112,14 @@ a { color: inherit; }
 .sub { font-family: "Orbitron", sans-serif; font-weight: 900; color: var(--accent); text-transform: uppercase; letter-spacing: .03em; font-size: 1.25rem; margin: 0 0 18px; display: flex; align-items: center; gap: .6em; }
 .sub svg { width: 1.1em; height: 1.1em; fill: #fff; }
 
-.release { display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; align-items: start; }
+.release { display: grid; grid-template-columns: 1fr 1.15fr; gap: 32px; align-items: stretch; }
 .release ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .release li { padding-left: 1.4em; position: relative; font-size: 1.125rem; line-height: 1.45; }
 .release li::before { content: ""; position: absolute; left: 0; top: .45em; width: .55em; height: .55em; background: var(--accent); }
 .release .later li::before { background: #7a7a86; }
 .release .later { margin-top: 28px; color: var(--muted); }
-.shot img { width: 100%; image-rendering: auto; border: 2px solid #2433b8; }
+.shot { position: relative; min-height: 280px; }
+.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; border: 2px solid #2433b8; }
 .shot figcaption { font-size: var(--step-small); color: var(--muted); margin-top: 10px; }
 .downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 32px; }
 .dl {
@@ -184,6 +187,8 @@ a { color: inherit; }
   .screen { padding: 56px 16px; }
   .bar { padding: 14px 12px; margin-bottom: 28px; }
   .release, .steps, .downloads { grid-template-columns: 1fr; }
+  .shot { min-height: 0; }
+  .shot img { position: static; height: auto; }
   .panel { padding: 20px; }
   .faq summary { padding: 16px 18px; font-size: 1.125rem; }
   .faq details p { padding: 0 18px 18px; font-size: 1.0625rem; }
@@ -217,7 +222,7 @@ a { color: inherit; }
   </div>
   <div class="flank right">
     <div class="fact">Free download<br>Version <span data-version>0.1.0</span>
-      <div class="marks" aria-label="For Mac and Windows"><svg aria-hidden="true"><use href="#apple"/></svg><svg aria-hidden="true"><use href="#win"/></svg></div>
+      <div class="marks"><a data-link="mac" href="#release" aria-label="Download for Mac"><svg aria-hidden="true"><use href="#apple"/></svg></a><a data-link="win" href="#release" aria-label="Download for Windows"><svg aria-hidden="true"><use href="#win"/></svg></a></div>
     </div>
   </div>
 </header>
@@ -241,11 +246,11 @@ a { color: inherit; }
           <li>A normal installer for 64-bit Windows.</li>
         </ul>
         <ul class="later">
-          <li>Not in this version yet: sound, network play and printing.</li>
+          <li>Not in this version yet: sound and network play.</li>
         </ul>
       </div>
       <figure class="shot" data-in style="margin:0">
-        <img src="assets/s1.png" width="800" height="600" alt="The Setup Game screen: Start New Game, Quick Start Game, Restore Saved Game and the other options." loading="lazy">
+        <img src="assets/wide.png" width="1280" height="800" alt="The Setup Game screen: Start New Game, Quick Start Game, Restore Saved Game and the other options." loading="lazy">
       </figure>
     </div>
   </div>
@@ -337,7 +342,7 @@ document.documentElement.classList.add('js');
       var files = { mac: find(/\.dmg$/i), win: find(/setup\.exe$/i) };
       ['mac', 'win'].forEach(function (k) {
         var f = files[k]; if (!f) return;
-        var a = document.querySelector('[data-link="' + k + '"]'); if (a) a.href = f.browser_download_url;
+        document.querySelectorAll('[data-link="' + k + '"]').forEach(function (a) { a.href = f.browser_download_url; });
         var n = document.querySelector('[data-note="' + k + '"]'); if (n) n.textContent = 'Version ' + ver + ', ' + Math.round(f.size / 1048576) + ' MB';
       });
       var mine = isMac ? files.mac : isWin ? files.win : null;
