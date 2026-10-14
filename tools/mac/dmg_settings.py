@@ -22,4 +22,4 @@ default_view = "icon-view"
 icon_size = 112
 text_size = 13
 arrange_by = None
-hide_extensions = [app_name]
+# No hide_extensions: it sets Finder info on the app, which breaks codesign --verify --strict.
