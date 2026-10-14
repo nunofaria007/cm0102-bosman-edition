@@ -1,4 +1,5 @@
 #include "screen_stack.h"
+#include "gui_utils.h"
 #include "scrman_input.h"
 #include <time.h>
 #include <stdio.h>
@@ -341,7 +342,7 @@ s32 screen_stack_run(screen_stack_t *st)
         /* The original shows an error box here (scrman.cpp 455). */
         if (!rec->current) break;
         if (!rec->away) {
-            s32 id = clicked != -1 ? sm->widgets[clicked].unknown_08 : 0;
+            s16 id = screen_stack_clicked_id(st, clicked);
 
             if (st->hook && id == st->hook_id) {
                 st->hook(0);
@@ -385,7 +386,9 @@ s32 screen_stack_run(screen_stack_t *st)
                 result = SCREEN_CONTINUE;
                 goto act;
             }
+            st->after_pop = 1;
             result = rec->current->input(-1);
+            st->after_pop = 0;
             if (result == 0) {
                 rec->rebuild = 1;
                 break;
@@ -428,4 +431,59 @@ s32 screen_stack_run(screen_stack_t *st)
     screen_stack_free_all(st);
     sm->darken_screen = 1;
     return result == SCREEN_CONTINUE;
+}
+
+screen_stack_t g_screen_stack;
+
+s16 screen_stack_clicked_id(const screen_stack_t *st, s16 clicked)
+{
+    const scrman_t *sm = st->record.screen_manager;
+    s16 id = clicked != -1 ? (s16)sm->widgets[clicked].unknown_08 : 0;
+
+    return id ? id : st->injected_id;
+}
+
+s16 screen_heading(screen_stack_t *st, u16 colour, u16 text_colour,
+                   const char *text)
+{
+    return scrman_widget_create(st->record.screen_manager, 1, 100, 10, 790,
+                                70, 0, 0, 0x30, colour, 0, 0xc, 7,
+                                text_colour, text, 0, 0, 0, -1);
+}
+
+s16 screen_sub_heading(screen_stack_t *st, const char *text)
+{
+    return scrman_widget_create(st->record.screen_manager, 1, 100, 80, 790,
+                                125, 0, 0, 2, 0, 0, 0xc, 6, GUI_COLOUR_YELLOW,
+                                text, 0, 0, 0, -1);
+}
+
+s16 screen_cell_button(screen_stack_t *st, s16 area, s32 column, s32 row,
+                       u32 style, u16 colour, u32 text_flags, s16 font,
+                       u16 text_colour, const char *text, s32 id,
+                       intptr_t data)
+{
+    return scrman_widget_create(st->record.screen_manager, 2, 0, 0, 0, 0,
+                                column, row, style, colour, colour,
+                                text_flags, font, text_colour, text, 0, id,
+                                data, area);
+}
+
+s16 screen_cell_label(screen_stack_t *st, s16 area, s32 column, s32 row,
+                      u32 style, u16 colour, u32 text_flags, s16 font,
+                      u16 text_colour, const char *text)
+{
+    return scrman_widget_create(st->record.screen_manager, 1, 0, 0, 0, 0,
+                                column, row, style, colour, 0, text_flags,
+                                font, text_colour, text, 0, 0, 0, area);
+}
+
+s16 screen_free_button(screen_stack_t *st, s32 x1, s32 y1, s32 x2, s32 y2,
+                       u32 style, u16 colour, u32 text_flags, s16 font,
+                       u16 text_colour, const char *text, s32 id,
+                       intptr_t data)
+{
+    return scrman_widget_create(st->record.screen_manager, 2, x1, y1, x2, y2,
+                                0, 0, style, colour, colour, text_flags, font,
+                                text_colour, text, 0, id, data, -1);
 }

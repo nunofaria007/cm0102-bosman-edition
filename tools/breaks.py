@@ -24,7 +24,7 @@ def run(command):
 
 def build():
     # make compares file times to the second, so a quick edit can leave a stale object file.
-    for stale in glob.glob(os.path.join(REPO, "build/CMakeFiles/*/src/si/*.o")):
+    for stale in glob.glob(os.path.join(REPO, "build/CMakeFiles/*/src/*/*.o")):
         os.remove(stale)
     result = run(["cmake", "--build", "build"])
     return result.returncode == 0, result.stdout + result.stderr

@@ -1,0 +1,38 @@
+"""Deliberate breaks of the screen helpers. Each one must fail a suite. See tools/breaks.py."""
+SUITES = ["start_text", "start_helpers", "start_menu", "start_bars"]
+
+# name, file, text to find (once in the file), text to put in its place
+BREAKS = [
+    ("text: spaces", "src/si/langlib.c", "        dst[n] = ' ';\n", "        dst[n] = '_';\n"),
+    ("text: return", "src/si/langlib.c", "    return dst + n;", "    return dst;"),
+    ("text: note start", "src/si/langlib.c", "        if (c == '<') {", "        if (c == '{') {"),
+    ("text: note end kept", "src/si/langlib.c", "            if (c != '\\0') c = s[++k];\n", ""),
+    ("text: note stays", "src/si/langlib.c", "            in_note = false;\n", ""),
+    ("heading: font", "src/si/screen_stack.c", "70, 0, 0, 0x30, colour, 0, 0xc, 7,", "70, 0, 0, 0x30, colour, 0, 0xc, 6,"),
+    ("heading: box", "src/si/screen_stack.c", "return scrman_widget_create(st->record.screen_manager, 1, 100, 10, 790,", "return scrman_widget_create(st->record.screen_manager, 1, 100, 11, 790,"),
+    ("sub-heading: colour", "src/si/screen_stack.c", "125, 0, 0, 2, 0, 0, 0xc, 6, GUI_COLOUR_YELLOW,", "125, 0, 0, 2, 0, 0, 0xc, 6, GUI_COLOUR_RED,"),
+    ("cell button: highlight", "src/si/screen_stack.c", "                                column, row, style, colour, colour,\n                                text_flags, font, text_colour, text, 0, id,", "                                column, row, style, colour, 0,\n                                text_flags, font, text_colour, text, 0, id,"),
+    ("cell button: data", "src/si/screen_stack.c", "                                data, area);", "                                0, area);"),
+    ("cell label: flags", "src/si/screen_stack.c", "                                column, row, style, colour, 0, text_flags,", "                                column, row, style, colour, 0, 2,"),
+    ("free button: area", "src/si/screen_stack.c", "text_colour, text, 0, id, data, -1);", "text_colour, text, 0, id, data, 0);"),
+    ("menu: sort order", "src/si/gui_menu.c", "if (strcmp(items[i].text, items[j].text) <= 0) continue;", "if (strcmp(items[i].text, items[j].text) >= 0) continue;"),
+    ("menu: sort off", "src/si/gui_menu.c", "    if (sort) bold_mask = sort_items(copy, count, bold_mask);", "    (void)sort_items;"),
+    ("menu: mask swap", "src/si/gui_menu.c", "                mask += bit_j - bit_i;", "                mask += 0;"),
+    ("menu: centre width", "src/si/gui_menu.c", "            width = (x2 - 2 * per_row - x1 + 3) / per_row;", "            width = (x2 - 2 * per_row - x1 + 2) / per_row;"),
+    ("menu: centre left", "src/si/gui_menu.c", "            wx1 = (x2 - (width + 2) * left - x1 + 3) / 2 + x1;", "            wx1 = (x2 - (width + 2) * left - x1 + 4) / 2 + x1;"),
+    ("menu: centre always", "src/si/gui_menu.c", "        if (k % per_row == 0 && left < per_row) {", "        if (k % per_row == 0 && left <= per_row) {"),
+    ("menu: step", "src/si/gui_menu.c", "            wx1 += width + 2;", "            wx1 += width + 1;"),
+    ("menu: bold style", "src/si/gui_menu.c", "            style = 0x822;", "            style = 0x22;"),
+    ("menu: bold colour", "src/si/gui_menu.c", "            text_colour = item->colour ? item->colour : GUI_COLOUR_YELLOW;", "            text_colour = GUI_COLOUR_YELLOW;"),
+    ("menu: font", "src/si/gui_menu.c", "                             item->font == -1 ? (s16)default_font : item->font,", "                             (s16)default_font,"),
+    ("menu: rows", "src/si/gui_menu.c", "            column = 0;\n            row++;", "            column = 0;\n            row += 2;"),
+    ("menu: empty", "src/si/gui_menu.c", "    if (count <= 0 || !items || per_row == 0) return 0;", "    if (count <= 1 || !items || per_row == 0) return 0;"),
+    ("bar: weights", "src/si/gui_menu.c", "    static const u8 weights[2] = {3, 1};\n    screen_stack_t *st", "    static const u8 weights[2] = {1, 3};\n    screen_stack_t *st"),
+    ("bar: back label", "src/si/gui_menu.c", "        screen_cell_label(st, area, 0, 0, 0x30, GUI_COLOUR_GREY, 0x2c, 3,", "        screen_cell_label(st, area, 0, 0, 0x30, GUI_COLOUR_GREY, 0xc, 3,"),
+    ("bar: next id", "src/si/gui_menu.c", "GUI_COLOUR_LIGHT_GREY, text, -3, 0);", "GUI_COLOUR_LIGHT_GREY, text, -2, 0);"),
+    ("text box: row", "src/si/gui_menu.c", "        text_line(area, x1 + 5, x2 - 5, (rows - 1) / 2, font,", "        text_line(area, x1 + 5, x2 - 5, rows / 2, font,"),
+    ("text box: margin", "src/si/gui_menu.c", "        text_line(area, x1 + 5, x2 - 5, (rows - 1) / 2, font,", "        text_line(area, x1 + 4, x2 - 5, (rows - 1) / 2, font,"),
+    ("text box: centre", "src/si/gui_menu.c", "    s32 left = x1 + ((x2 - x1 + 1) - width) / 2;", "    s32 left = x1 + ((x2 - x1) - width) / 2;"),
+    ("text box: label", "src/si/gui_menu.c", "                         row, 1, 0, 0, 1, font, text_colour, text, 0, 0, 0,", "                         row, 1, 0, 0, 0, font, text_colour, text, 0, 0, 0,"),
+    ("text box: area", "src/si/gui_menu.c", "                                  (u8)rows, NULL, flags, colour, -1);", "                                  (u8)rows, NULL, flags, 0, -1);"),
+]
