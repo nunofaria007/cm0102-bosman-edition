@@ -54,7 +54,14 @@ Port the functions of the original that build, draw and empty one screen manager
 - New fields with known purpose: the widget array of the screen manager at 0x04 of a widget, the index of a widget at 0x70, and the text of the caller at 0x54 for a text entry widget. Fields with offset names: 0x7e and 0x180 of a widget, and 0xb78 of an area, which the search for the last column uses as its place in the list.
 - The screen draw of the original takes the background file name from the screen stack (`FUN_007fee80`). The port's screen draw takes the name as an argument until the screen stack exists. The port passes the name to its RGN loader unchanged.
 - When the name differs from the last one, the screen draw loads that file. When the load fails, it loads `DEFAULT_PIC.RGN` from the data folder. When the name is empty, it captures the present screen as the background.
-- The port copies the five flags that the screen draw reads. Three are fields of the screen manager: skip the draw (0x12f53d), clear the screen (0x12f4fa) and darken once (0x12f535). Two are globals of the original: `DAT_00dd6bda` forces a fixed name and `DAT_00b77c8c` gates the clear. Nothing in this work sets them. The two globals start at 0 in the port.
+- The port copies the five flags that the screen draw reads. Three are fields of the screen manager: skip the draw (0x12f53d), darken the screen to 60 percent (0x12f4fa) and fade in once (0x12f535). The interview called the last two "clear" and "darken once". The reading of the original corrected both. Two are globals of the original: `DAT_00dd6bda` replaces every background name with a backslash, and `DAT_00b77c8c` gates the darken. Nothing in this work sets them. The two globals start at 0 in the port.
+- The fade (`FUN_005e30e0`) is part of this work. It draws the box from black to its picture in 21 frames, with a flip after each, and the port copies it. A negative step count fades to black.
+- A push of the screen stack sets the title to a backslash. The screen draw then fails to load that name and shows `DEFAULT_PIC.RGN`. When that load fails too, the old background stays and the name is kept, so the next draw does not try again.
+- The original loads a background into the old image when both have the same size. The port does the same, so the image loader of the port gets a form that reuses an image.
+- With an empty name, the original captures the screen as the background. When the old background has another size, the original loses it without a free. The port frees it.
+- The original also clears the key that the input code queued (`DAT_00b67a24`). The port has no input code yet.
+- Each flip of the port calls a hook first. The differential test records each flip with its box and the screen at that time, and compares the list with the flips of the original.
+- The text function of the original writes past its line buffer for a text above 251 characters (text spec). The screen draw cases keep their texts to 251 characters.
 - The screen draw takes the four arguments of the original for the part of the screen to flip. A value of -1 in any of them flips the whole screen.
 - The demo stays a made-up screen. It builds its area and widgets through area create and widget create and draws through the screen draw.
 - Commits are local. Nothing is pushed.
@@ -104,9 +111,9 @@ Merge danger: two-way door. Blast radius: a wrong field or a wrong order in an a
 Blocked by: 2
 Delivers: the screen draw with the background load, the draw order, the five flags and the partial flip.
 Merge danger: two-way door. Blast radius: limited to what a screen shows.
-- [ ] Pixel-exact match for random screens built through the create functions.
-- [ ] Pixel-exact match for each background case: loads, fails, empty, unchanged.
-- [ ] Pixel-exact match with each flag on and off.
+- [x] Pixel-exact match for random screens built through the create functions.
+- [x] Pixel-exact match for each background case: loads, fails, empty, unchanged.
+- [x] Pixel-exact match with each flag on and off.
 
 ### 4. Demo on the screen manager
 Blocked by: 3

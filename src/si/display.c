@@ -94,9 +94,12 @@ void display_unlock(void)
     /* No-op: paired with display_lock. */
 }
 
+void (*display_on_flip)(s32 x1, s32 y1, s32 x2, s32 y2);
+
 void display_flip(s32 x1, s32 y1, s32 x2, s32 y2)
 {
-    (void)x1; (void)y1; (void)x2; (void)y2;
+    if (display_on_flip) display_on_flip(x1, y1, x2, y2);
+    if (!g_display.renderer) return;
 
     SDL_UpdateTexture(g_display.screen_tex, NULL,
                       g_display.framebuffer, g_display.pitch);

@@ -8,6 +8,7 @@
 #include "gui_utils.h"
 #include "port_driver.h"
 #include "port_scene.h"
+#include "scrman.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -149,6 +150,7 @@ int main(void)
             gui_panel(a[0], a[1], a[2], a[3], (u32)a[4], (u16)a[5]);
         } else if (!strcmp(cmd, "fonts")) {
             sscanf(args, "%1023s", path);
+            g_data_dir = strdup(path);
             printf("%d\n", gui_fonts_load(path));
         } else if (!strcmp(cmd, "font_load") || !strcmp(cmd, "font_dump")) {
             if (a[0] < 0 || a[0] >= GUI_FONT_COUNT) {

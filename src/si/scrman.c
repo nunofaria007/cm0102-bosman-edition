@@ -1,7 +1,18 @@
 #include "scrman.h"
+#include "display.h"
+#include "gui_utils.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 extern void rgn_free(cm_image_t *img);
+extern cm_image_t *rgn_load_into(const char *path, cm_image_t *reuse);
+extern char *os_find_file_ci(const char *dir, const char *name);
+
+s32 g_no_backgrounds;
+s32 g_darken_screens;
+const char *g_data_dir = "./Data";
 
 /*
  * The original also writes each reset and each area create into a buffer for
@@ -16,7 +27,7 @@ void scrman_init(scrman_t *sm, u32 arg)
     sm->unknown_12f505 = 0;
     sm->unknown_12f555 = 0;
     sm->skip_draw = 0;
-    sm->darken_once = 0;
+    sm->fade_in = 0;
     sm->laid_out = 0;
     sm->mode = 0;
     /* Differs from every file name, so the first draw loads its background. */
@@ -58,7 +69,7 @@ void scrman_reset(scrman_t *sm, bool release)
     sm->unknown_12f533 = -1;
     sm->unknown_12f551 = 0;
     sm->unknown_12f555 = 0;
-    sm->clear_screen = 0;
+    sm->darken_screen = 0;
     rgn_free(sm->unknown_12f521);
     sm->unknown_12f521 = NULL;
     sm->laid_out = 0;
@@ -122,4 +133,77 @@ s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
     if (sm->widget_count > SCRMAN_MAX_WIDGETS - 1) return index;
     sm->widget_order[sm->widget_count++] = index;
     return index;
+}
+
+/* Loads a new background when the name changes. */
+static void update_background(scrman_t *sm, const char *name)
+{
+    cm_image_t *img;
+
+    if (!strcasecmp(sm->background_name, name)) return;
+    if (name[0] == '\0') {
+        cm_image_t *capture = gui_capture(0, 0, 799, 599, sm->background);
+
+        /* The original drops a background of another size without a free. */
+        if (capture != sm->background) rgn_free(sm->background);
+        sm->background = capture;
+        sm->background_name[0] = '\0';
+        return;
+    }
+
+    snprintf(sm->background_name, sizeof(sm->background_name), "%s", name);
+    img = rgn_load_into(sm->background_name, sm->background);
+    if (!img) {
+        char *path = os_find_file_ci(g_data_dir, "DEFAULT_PIC.RGN");
+
+        img = rgn_load_into(path, sm->background);
+        free(path);
+        /* The name stays, so the next draw does not try the file again. */
+        if (!img) return;
+    }
+    if (img != sm->background) {
+        rgn_free(sm->background);
+        sm->background = img;
+    }
+}
+
+void scrman_draw(scrman_t *sm, const char *background, s16 x1, s16 y1, s16 x2,
+                 s16 y2)
+{
+    if (sm->skip_draw) return;
+    /* The original also clears the key that the input code queued. */
+    if (g_no_backgrounds && background[0] != '\0') background = "\\";
+    update_background(sm, background);
+    if (sm->background) gui_blit(0, 0, sm->background);
+
+    if (!sm->laid_out) {
+        for (s16 i = 0; i < sm->area_count; i++) {
+            area_layout(&sm->areas[sm->area_order[i]]);
+        }
+    }
+    for (s16 i = 0; i < sm->area_count; i++) {
+        area_t *area = &sm->areas[sm->area_order[i]];
+
+        if (area->shown && area->owner_widget == -1) area_draw(area, true);
+    }
+    for (s16 i = 0; i < sm->widget_count; i++) {
+        widget_draw(&sm->widgets[sm->widget_order[i]], true);
+    }
+    for (s16 i = 0; i < sm->area_count; i++) {
+        area_t *area = &sm->areas[sm->area_order[i]];
+
+        if (area->shown && area->owner_widget != -1) area_draw(area, true);
+    }
+
+    if (sm->darken_screen && g_darken_screens) gui_darken(0, 0, 799, 599);
+    if (sm->fade_in) {
+        sm->fade_in = 0;
+        gui_fade(0, 0, 799, 599, 20);
+    }
+    if (x1 == -1 || x2 == -1 || y1 == -1 || y2 == -1) {
+        display_flip(0, 0, 799, 599);
+    } else {
+        display_flip(x1, y1, x2, y2);
+    }
+    sm->laid_out = 1;
 }

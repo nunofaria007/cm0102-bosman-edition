@@ -75,6 +75,13 @@ void gui_rect(s32 x1, s32 y1, s32 x2, s32 y2, u32 style, u16 colour);
 /* FUN_005e42e0. Scales every pixel in the box to 60 percent. */
 void gui_darken(s32 x1, s32 y1, s32 x2, s32 y2);
 
+/*
+ * FUN_005e30e0. Fades the box from black to the picture now in it, in
+ * `steps` + 1 frames with a flip after each. A negative `steps` fades from
+ * the picture to black. Does nothing when the box is not fully on screen.
+ */
+void gui_fade(s32 x1, s32 y1, s32 x2, s32 y2, s32 steps);
+
 /* FUN_005e5df0. Draws the background first, then the border or line. */
 void gui_panel(s32 x1, s32 y1, s32 x2, s32 y2, u32 flags, u16 colour);
 

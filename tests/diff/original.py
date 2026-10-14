@@ -52,6 +52,11 @@ TEXT_FRAME = 0x400
 FONT_FILES = {1: "arial_narrow_10.fnt", 2: "arial_narrow_11.fnt", 3: "arial_14.fnt", 4: "arial_16.fnt",
               5: "arial_18.fnt", 6: "trade_cond_24_bold.fnt", 7: "trade_cond_28_bold.fnt"}
 
+# Calls of the screen draw that the test answers itself.
+FUN_SCREEN_TITLE = 0x7FEE80  # thiscall on the screen stack: the title of the screen, its background name
+FUN_DATA_PATH = 0x90BDE0     # (folder key, file name): the path of a file of the original
+FUN_FLIP = 0x5E2EB0          # (x1, y1, x2, y2): shows a box of the back buffer
+
 # CRT functions replaced with host-side versions.
 CRT_DELETE = 0x944C94
 CRT_NEW = 0x944CF1
@@ -120,6 +125,12 @@ class Original:
         self._replace(CRT_SPRINTF, 8, self._sprintf)
         uc.hook_add(UC_HOOK_CODE, self._on_text_entry, begin=FUN_TEXT, end=FUN_TEXT)
         self.error_lines = []
+        self.data_dir = data_dir
+        self.title = self.alloc_c_string("")
+        self._replace(FUN_SCREEN_TITLE, 0, lambda: self.title)
+        self._replace(FUN_DATA_PATH, 2, self._data_path)
+        self.flips = []
+        uc.hook_add(UC_HOOK_CODE, self._on_flip, begin=FUN_FLIP, end=FUN_FLIP)
         self._replace(FUN_ERROR_PLACE, 3, lambda name, ext, line: self.error_lines.append(line) or 0)
         self._replace(FUN_ERROR_BOX, 0, lambda: 0)
 
@@ -274,6 +285,15 @@ class Original:
             uc.reg_write(UC_X86_REG_EAX, host_function(*self._stack_args(arg_count)))
         self.uc.mem_write(addr, b"\xc3")
         self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
+
+    def _data_path(self, folder, name):
+        wanted = self.read_c_string(name).lower()
+        found = [entry for entry in os.listdir(self.data_dir) if entry.lower() == wanted]
+        return self.alloc_c_string(os.path.join(self.data_dir, found[0]) if found else wanted)
+
+    def _on_flip(self, uc, address, size, user_data):
+        box = list(struct.unpack("<4i", self.read(uc.reg_read(UC_X86_REG_ESP) + 4, 16)))
+        self.flips.append((box, self.framebuffer()))
 
     def _free(self, block):
         self.frees += 1

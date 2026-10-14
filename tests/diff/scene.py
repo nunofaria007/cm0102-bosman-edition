@@ -5,6 +5,8 @@ original, a struct format character and a count.
 """
 import struct
 
+from original import FB_SIZE
+
 AREA_SIZE, WIDGET_SIZE = 0xBF1, 0x18C
 AREA_COUNT, WIDGET_COUNT = 6, 24
 
@@ -62,13 +64,13 @@ MANAGER_FIELDS = [
     ("area_slots", 0x12E99E, "h", 1), ("widget_slots", 0x12E9A0, "h", 1),
     ("area_order", 0x12E9A2, "h", 250), ("widget_order", 0x12EB96, "h", 1200),
     ("area_count", 0x12F4F6, "h", 1), ("widget_count", 0x12F4F8, "h", 1),
-    ("clear_screen", 0x12F4FA, "i", 1),
+    ("darken_screen", 0x12F4FA, "i", 1),
     ("unknown_12f4fe", 0x12F4FE, "B", 1), ("unknown_12f4ff", 0x12F4FF, "h", 1),
     ("unknown_12f501", 0x12F501, "h", 1), ("unknown_12f503", 0x12F503, "h", 1),
     ("unknown_12f505", 0x12F505, "i", 1), ("unknown_12f509", 0x12F509, "i", 6),
     ("unknown_12f52d", 0x12F52D, "h", 1), ("unknown_12f52f", 0x12F52F, "h", 1),
     ("unknown_12f531", 0x12F531, "h", 1), ("unknown_12f533", 0x12F533, "h", 1),
-    ("darken_once", 0x12F535, "i", 1),
+    ("fade_in", 0x12F535, "i", 1),
     ("unknown_12f539", 0x12F539, "h", 1), ("unknown_12f53b", 0x12F53B, "h", 1),
     ("skip_draw", 0x12F53D, "i", 1), ("unknown_12f541", 0x12F541, "I", 1),
     ("laid_out", 0x12F545, "i", 1),
@@ -92,6 +94,10 @@ FUN_AREA_CREATE = 0x55FBA0       # thiscall, 11 arguments
 FUN_WIDGET_CREATE = 0x55F990     # thiscall, 18 arguments
 FUN_WIDGET_DRAW = 0x5EE590       # thiscall (redraw)
 G_TICK = 0xB67A08                # widget init copies it into each widget
+FUN_SCREEN_DRAW = 0x55F300       # thiscall (x1, y1, x2, y2)
+FUN_FADE = 0x5E30E0              # (x1, y1, x2, y2, steps)
+G_NO_BACKGROUNDS = 0xDD6BDA      # not 0: every background name becomes a backslash
+G_DARKEN_SCREENS = 0xB77C8C      # not 0: a screen manager with darken_screen set darkens the screen
 
 RANGES = {"B": (0, 0xFF), "h": (-0x8000, 0x7FFF), "H": (0, 0xFFFF),
           "i": (-0x80000000, 0x7FFFFFFF), "I": (0, 0xFFFFFFFF)}
@@ -300,3 +306,32 @@ class ManagerScene(Scene):
     def area_count(self):
         """The areas in use, as the original counts them."""
         return struct.unpack("<h", self.ctx.original.read(self.manager + 0x12E99E, 2))[0]
+
+    def set_draw_globals(self, no_backgrounds, darken_screens):
+        self.ctx.original.write_u32(G_NO_BACKGROUNDS, no_backgrounds)
+        self.ctx.original.write_u32(G_DARKEN_SCREENS, darken_screens)
+        self.ctx.port.send("draw_globals", no_backgrounds, darken_screens)
+
+    def draw_screen(self, name, box=(-1, -1, -1, -1)):
+        """Draws the screen in both programs. `name` is the background file name, as bytes."""
+        original = self.ctx.original
+        original.title = original.alloc_bytes(name + b"\0")
+        original.flips = []
+        original.call(FUN_SCREEN_DRAW, *box, this=self.manager)
+        self.ctx.port.send("manager_screen", *box, "-" + name.hex())
+
+    def expect_same_flips(self, case):
+        """The same boxes flipped in the same order, each with the same screen at the time."""
+        port = self.ctx.port
+        port.send("flips")
+        flips = []
+        for _ in range(int(port.reply()[0])):
+            words = [int(word) for word in port.reply()]
+            flips.append((words[:4], port.read(FB_SIZE) if words[4] else None))
+        wanted = self.ctx.original.flips
+        self.ctx.expect_equal(f"{case}: flip boxes", [box for box, _ in wanted], [box for box, _ in flips])
+        for number, ((_, a), (_, b)) in enumerate(zip(wanted, flips)):
+            if a != b:
+                pixels = sum(a[i:i + 2] != b[i:i + 2] for i in range(0, FB_SIZE, 2))
+                self.ctx.expect_equal(f"{case}: pixels that differ at flip {number}", 0, pixels, source="wanted")
+        self.ctx.original.flips = []

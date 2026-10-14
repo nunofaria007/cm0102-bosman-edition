@@ -40,7 +40,14 @@ void display_shutdown(void);
 /* Frame operations */
 void display_lock(void);
 void display_unlock(void);
+/*
+ * FUN_005e2eb0. Shows the box of the back buffer. The port shows the whole
+ * screen.
+ */
 void display_flip(s32 x1, s32 y1, s32 x2, s32 y2);
+
+/* Called at the start of each flip. The differential test sets it. */
+extern void (*display_on_flip)(s32 x1, s32 y1, s32 x2, s32 y2);
 
 /* Drawing primitives (write to back buffer) */
 void display_clear(u16 colour);

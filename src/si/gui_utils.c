@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern void rgn_free(cm_image_t *img);
+
 static inline u16 *pixel_at(s32 x, s32 y)
 {
     return &g_display.framebuffer[y * CM_INTERNAL_WIDTH + x];
@@ -343,4 +345,51 @@ cm_image_t *gui_capture(s32 x1, s32 y1, s32 x2, s32 y2, cm_image_t *reuse)
     img->field_2c = 0;
 
     return img;
+}
+
+void gui_fade(s32 x1, s32 y1, s32 x2, s32 y2, s32 steps)
+{
+    gui_rect_t c;
+    cm_image_t *img;
+    u16 **shades;
+    s32 frames = steps < 0 ? -steps : steps;
+
+    if (steps == 0 || !gui_clip(x1, y1, x2, y2, &c)) return;
+    img = gui_capture(c.x1, c.y1, c.x2, c.y2, NULL);
+    if (!img) return;
+    /* One row of shades for each colour in the picture, as in the original. */
+    shades = calloc(0x10000, sizeof(*shades));
+    if (!shades) {
+        rgn_free(img);
+        return;
+    }
+
+    for (s32 i = 0; i < img->width * img->height; i++) {
+        u16 colour = img->pixels[i];
+
+        if (shades[colour]) continue;
+        shades[colour] = malloc(((size_t)frames + 1) * sizeof(u16));
+        if (!shades[colour]) goto done;
+        for (s32 k = 0; k <= frames; k++) {
+            u16 shade = gui_scale_colour(colour, (u8)(k * 100 / frames));
+
+            shades[colour][steps < 0 ? frames - k : k] = shade;
+        }
+    }
+
+    for (s32 frame = 0; frame <= frames; frame++) {
+        const u16 *src = img->pixels;
+
+        for (s32 y = c.y1; y <= c.y2; y++) {
+            u16 *dst = pixel_at(c.x1, y);
+
+            for (s32 x = c.x1; x <= c.x2; x++) *dst++ = shades[*src++][frame];
+        }
+        display_flip(c.x1, c.y1, c.x2, c.y2);
+    }
+
+done:
+    for (s32 i = 0; i < 0x10000; i++) free(shades[i]);
+    free(shades);
+    rgn_free(img);
 }

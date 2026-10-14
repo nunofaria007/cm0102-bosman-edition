@@ -21,7 +21,7 @@ typedef struct {
     s16 widget_order[SCRMAN_MAX_WIDGETS];   /* 0x12eb96, widgets with no area */
     s16 area_count;                         /* 0x12f4f6, in area_order */
     s16 widget_count;                       /* 0x12f4f8, in widget_order */
-    s32 clear_screen;                       /* 0x12f4fa */
+    s32 darken_screen;                      /* 0x12f4fa, with g_darken_screens */
     u8 unknown_12f4fe;
     s16 unknown_12f4ff;
     s16 unknown_12f501;
@@ -35,7 +35,7 @@ typedef struct {
     s16 unknown_12f52f;
     s16 unknown_12f531;
     s16 unknown_12f533;
-    s32 darken_once;                        /* 0x12f535 */
+    s32 fade_in;                            /* 0x12f535, the next draw only */
     s16 unknown_12f539;
     s16 unknown_12f53b;
     s32 skip_draw;                          /* 0x12f53d */
@@ -87,5 +87,26 @@ s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
                          u16 highlight_colour, u32 text_flags, s16 font,
                          u16 text_colour, const char *text, s32 unknown_40,
                          s32 unknown_08, intptr_t unknown_48, s16 area);
+
+/* DAT_00dd6bda. Not 0: every background name becomes "\\", which no file has. */
+extern s32 g_no_backgrounds;
+
+/* DAT_00b77c8c. Not 0: a screen manager with darken_screen set darkens it. */
+extern s32 g_darken_screens;
+
+/* FUN_0090bde0 for the data folder of the original. The app sets it. */
+extern const char *g_data_dir;
+
+/*
+ * FUN_0055f300. Draws the background, the areas with no owner widget, the
+ * widgets with no area and the popup areas, then flips the box (-1 in any
+ * value flips the whole screen). The first draw after a reset lays the areas
+ * out. `background` is the file name of the background. The original takes it
+ * from the screen stack. A name that differs from the last one, ignoring
+ * case, loads that file, or DEFAULT_PIC.RGN of the data folder when it does
+ * not load. An empty name keeps the screen as it is as the background.
+ */
+void scrman_draw(scrman_t *sm, const char *background, s16 x1, s16 y1, s16 x2,
+                 s16 y2);
 
 #endif

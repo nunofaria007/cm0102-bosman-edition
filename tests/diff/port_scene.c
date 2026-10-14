@@ -5,6 +5,7 @@
  */
 #include "port_scene.h"
 #include "area.h"
+#include "display.h"
 #include "port_driver.h"
 #include "gui_utils.h"
 #include "scrman.h"
@@ -86,13 +87,13 @@ static const field_t manager_fields[] = {
     SCALAR(scrman_t, area_slots, true), SCALAR(scrman_t, widget_slots, true),
     ARRAY(scrman_t, area_order, true), ARRAY(scrman_t, widget_order, true),
     SCALAR(scrman_t, area_count, true), SCALAR(scrman_t, widget_count, true),
-    SCALAR(scrman_t, clear_screen, true),
+    SCALAR(scrman_t, darken_screen, true),
     SCALAR(scrman_t, unknown_12f4fe, false), SCALAR(scrman_t, unknown_12f4ff, true),
     SCALAR(scrman_t, unknown_12f501, true), SCALAR(scrman_t, unknown_12f503, true),
     SCALAR(scrman_t, unknown_12f505, true), ARRAY(scrman_t, unknown_12f509, true),
     SCALAR(scrman_t, unknown_12f52d, true), SCALAR(scrman_t, unknown_12f52f, true),
     SCALAR(scrman_t, unknown_12f531, true), SCALAR(scrman_t, unknown_12f533, true),
-    SCALAR(scrman_t, darken_once, true),
+    SCALAR(scrman_t, fade_in, true),
     SCALAR(scrman_t, unknown_12f539, true), SCALAR(scrman_t, unknown_12f53b, true),
     SCALAR(scrman_t, skip_draw, true), SCALAR(scrman_t, unknown_12f541, false),
     SCALAR(scrman_t, laid_out, true),
@@ -398,6 +399,74 @@ static bool manager_widget(const char *args)
     return true;
 }
 
+#define MAX_FLIPS 64
+
+/* The flips since the last "flips" command, each with the screen at that time. */
+static struct {
+    s32 box[4];
+    u16 *screen;
+} g_flips[MAX_FLIPS];
+static int g_flip_count;
+
+static void record_flip(s32 x1, s32 y1, s32 x2, s32 y2)
+{
+    size_t size = CM_INTERNAL_WIDTH * CM_INTERNAL_HEIGHT * sizeof(u16);
+
+    if (g_flip_count == MAX_FLIPS) return;
+    g_flips[g_flip_count].box[0] = x1;
+    g_flips[g_flip_count].box[1] = y1;
+    g_flips[g_flip_count].box[2] = x2;
+    g_flips[g_flip_count].box[3] = y2;
+    g_flips[g_flip_count].screen = malloc(size);
+    if (g_flips[g_flip_count].screen) {
+        memcpy(g_flips[g_flip_count].screen, g_display.framebuffer, size);
+    }
+    g_flip_count++;
+}
+
+/* "flips": the count, then a line and the screen for each flip. */
+static void show_flips(void)
+{
+    size_t size = CM_INTERNAL_WIDTH * CM_INTERNAL_HEIGHT * sizeof(u16);
+
+    printf("%d\n", g_flip_count);
+    for (int i = 0; i < g_flip_count; i++) {
+        printf("%d %d %d %d %d\n", g_flips[i].box[0], g_flips[i].box[1],
+               g_flips[i].box[2], g_flips[i].box[3],
+               g_flips[i].screen != NULL);
+        if (g_flips[i].screen) fwrite(g_flips[i].screen, 1, size, stdout);
+        free(g_flips[i].screen);
+    }
+    g_flip_count = 0;
+}
+
+/* "manager_screen x1 y1 x2 y2 -hex": the background name follows the "-". */
+static bool manager_screen(const char *args)
+{
+    static char name[300];
+    long long v[4];
+    size_t length = 0;
+    unsigned value;
+    char *end;
+    const char *hex;
+
+    for (int i = 0; i < 4; i++) {
+        v[i] = strtoll(args, &end, 10);
+        if (end == args) return false;
+        args = end;
+    }
+    while (*args == ' ') args++;
+    if (*args != '-') return false;
+    for (hex = args + 1; sscanf(hex, "%2x", &value) == 1; hex += 2) {
+        if (length == sizeof(name) - 1) return false;
+        name[length++] = (char)value;
+    }
+    name[length] = '\0';
+    scrman_draw(&g_manager, name, (s16)v[0], (s16)v[1], (s16)v[2],
+                (s16)v[3]);
+    return true;
+}
+
 bool scene_command(const char *cmd, const char *args)
 {
     int index = (int)strtol(args, NULL, 10);
@@ -435,6 +504,30 @@ bool scene_command(const char *cmd, const char *args)
     if (!strcmp(cmd, "manager_draw")) {
         if (index < 0 || index >= SCRMAN_MAX_WIDGETS) return false;
         widget_draw(&g_manager.widgets[index], second != 0);
+        return true;
+    }
+    if (!strcmp(cmd, "manager_screen")) {
+        display_on_flip = record_flip;
+        return manager_screen(args);
+    }
+    if (!strcmp(cmd, "fade")) {
+        long long v[5] = {0};
+
+        if (sscanf(args, "%lld %lld %lld %lld %lld", &v[0], &v[1], &v[2],
+                   &v[3], &v[4]) != 5) {
+            return false;
+        }
+        display_on_flip = record_flip;
+        gui_fade((s32)v[0], (s32)v[1], (s32)v[2], (s32)v[3], (s32)v[4]);
+        return true;
+    }
+    if (!strcmp(cmd, "flips")) {
+        show_flips();
+        return true;
+    }
+    if (!strcmp(cmd, "draw_globals")) {
+        g_no_backgrounds = index;
+        g_darken_screens = second;
         return true;
     }
     if (!strcmp(cmd, "tick")) {

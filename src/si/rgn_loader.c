@@ -36,8 +36,21 @@ static void convert_rgb555_to_rgb565(u16 *pixels, s32 count)
     }
 }
 
+cm_image_t *rgn_load_into(const char *path, cm_image_t *reuse);
+
 cm_image_t *rgn_load(const char *path)
 {
+    return rgn_load_into(path, NULL);
+}
+
+/*
+ * FUN_005e40d0. Reads the pixels into `reuse` when it has the same width and
+ * height, and returns it. The original then keeps the other header fields of
+ * `reuse`. When that read fails, `reuse` is not freed.
+ */
+cm_image_t *rgn_load_into(const char *path, cm_image_t *reuse)
+{
+    if (!path) return NULL;
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;
 
@@ -60,6 +73,19 @@ cm_image_t *rgn_load(const char *path)
     if (data_size != w * h * 2) {
         fclose(f);
         return NULL;
+    }
+
+    if (reuse && reuse->width == w && reuse->height == h) {
+        bool read = reuse->data_size == data_size &&
+                    fread(reuse->pixels, 1, (size_t)data_size, f) ==
+                        (size_t)data_size;
+
+        fclose(f);
+        if (!read) return NULL;
+        if ((u32)raw_header[9] != CM_COLOUR_RGB565) {
+            convert_rgb555_to_rgb565(reuse->pixels, w * h);
+        }
+        return reuse;
     }
 
     u16 *pixels = malloc((size_t)data_size);
