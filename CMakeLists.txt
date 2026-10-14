@@ -30,6 +30,8 @@ add_executable(cm0102
     src/cm3/file_screens.c
     src/cm3/setup.c
     src/cm3/database.c
+    src/cm3/key_index.c
+    src/cm3/key_nation.c
 )
 
 target_include_directories(cm0102 PRIVATE include ${SDL2_INCLUDE_DIRS})
@@ -42,6 +44,7 @@ add_executable(port_driver
     tests/diff/port_stack.c
     tests/diff/port_helpers.c
     tests/diff/port_start.c
+    tests/diff/port_leagues.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
@@ -61,6 +64,9 @@ add_executable(port_driver
     src/cm3/menubar.c
     src/cm3/file_screens.c
     src/cm3/setup.c
+    src/cm3/database.c
+    src/cm3/key_index.c
+    src/cm3/key_nation.c
 )
 target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})
 target_link_libraries(port_driver PRIVATE ${SDL2_LIBRARIES})

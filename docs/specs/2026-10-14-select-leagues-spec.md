@@ -29,6 +29,13 @@ Port the path from "Start New Game" to the first screen with real data: the "Loa
 - The buttons that lead past "Select League(s)" rebuild the screen until game creation is ported.
 - Two agents build slices 1 and 2 in parallel, each in its own worktree. One agent then builds slice 3. One review pair runs at the end.
 - Commits are local. Nothing is pushed.
+- Slice 1 left these parts out:
+  - The dates (+0x15, +0x2a, +0x39, through `FUN_00549f70` and `FUN_00417c10`) and the club comp pointers (+0x1e, +0x22) of the league entries of `FUN_00667150`. They need the club comp table and the date code.
+  - Every key id of `FUN_00601a40` except the 27 nations of `FUN_0060d810` and the 6 continents of the loop at 0x604278.
+  - The links of a nation to city (+0x7a), stadium (+0x80) and colours (+0x90..+0xa4). The port keeps these ids until the full loader reads their tables.
+  - The language block of `index.dat` (0x528848..0x52896f). The shipped file has none. The port fails the load when the byte before it is not 0.
+- Where the original makes a pointer outside a table, the port gives NULL: a link id at or above the record count (`FUN_005315a0` checks only for a negative id), and a key nation or continent with id -1 in the league table and in `FUN_00827d50`. The shipped data has neither.
+- The port keeps the language index `DAT_009eb2dc` at 0. The name compare `FUN_0090c1d0` has no assert string. It goes to `src/si/utils.c` next to `FUN_0090bde0` (inference).
 
 ## Testing
 One seam: the differential test.
@@ -51,8 +58,8 @@ One seam: the differential test.
 Blocked by: none
 Delivers: `index.dat`, the nation and continent tables, the league table, the default selection for English, the league order and the extra-division text.
 Merge danger: two-way door. Blast radius: the data of every later screen.
-- [ ] Every field of every nation record equals the original.
-- [ ] The league order and default flags equal the original.
+- [x] Every field of every nation record equals the original.
+- [x] The league order and default flags equal the original.
 
 ### 2. Scrollbar input
 Blocked by: none

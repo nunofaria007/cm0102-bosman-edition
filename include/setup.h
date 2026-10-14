@@ -28,4 +28,21 @@ void setup_build(void);
  */
 s32 setup_input(s32 clicked);
 
+struct nation;
+
+/* The league choice of a new game. */
+extern s32 g_leagues_to_load;              /* DAT_00ae2d00 */
+extern s32 g_selected_nations;             /* DAT_00ae2d04 */
+extern struct nation *g_first_selected;    /* DAT_00ae2d08 */
+
+/*
+ * FUN_00827d50. Clears the league flags of every nation, then selects the
+ * nation of the language index g_language_index (langlib.h): 0 and 1
+ * England, 2 France, 3 Germany, 4 Italy, 5 Spain, 6 Denmark, 7 Holland,
+ * 8 Norway, 9 Portugal, 10 Sweden, 11 Japan, 12 South Korea. Returns false
+ * for another index or no nation table, where the original shows an error
+ * box. Needs key_index_match().
+ */
+bool setup_default_leagues(void);
+
 #endif

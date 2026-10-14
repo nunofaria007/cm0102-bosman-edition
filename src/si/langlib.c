@@ -4,6 +4,7 @@
 
 #define FORMAT_MAX 0x828 /* the buffer of the stripped format, 0xb6619c */
 
+s32 g_language_index = 0;
 char g_text_buffer[0x834];
 char g_title_buffer[0x70];
 

@@ -10,6 +10,13 @@
  * The port has no language table and always takes the plain path.
  */
 
+/*
+ * DAT_009eb2dc, the language index. It is -1 in the file of the original and
+ * is set from the keyboard layout and language.ldb at start. The port has
+ * English only and keeps it at 0.
+ */
+extern s32 g_language_index;
+
 /* Scratch buffers that many screens of the original format their text into. */
 extern char g_text_buffer[0x834];   /* DAT_00de1f64 */
 extern char g_title_buffer[0x70];   /* DAT_00dd70a8 */

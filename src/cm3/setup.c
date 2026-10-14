@@ -2,6 +2,7 @@
 #include "background.h"
 #include "gui_menu.h"
 #include "gui_utils.h"
+#include "key_index.h"
 #include "langlib.h"
 #include "menubar.h"
 #include "screen_stack.h"
@@ -89,4 +90,40 @@ s32 setup_input(s32 clicked)
     result = menubar_input(clicked);
     if (result == 0) result = menubar_input_more(clicked);
     return result;
+}
+
+s32 g_leagues_to_load;
+s32 g_selected_nations;
+struct nation *g_first_selected;
+
+/* FUN_00827d50. */
+bool setup_default_leagues(void)
+{
+    /* The nation of each language index, from the jump table at 0x8280dc. */
+    static const s32 nation_of_language[13] = {
+        KEY_ENGLAND, KEY_ENGLAND, KEY_FRANCE, KEY_GERMANY, KEY_ITALY,
+        KEY_SPAIN, KEY_DENMARK, KEY_HOLLAND, KEY_NORWAY, KEY_PORTUGAL,
+        KEY_SWEDEN, KEY_JAPAN, KEY_SOUTH_KOREA,
+    };
+    nation_t *n;
+
+    /* 0x827d60: "Setup.cpp" line 0x1d88 error box when no nation table. */
+    if (!g_nations) return false;
+    for (s32 i = 0; i < g_nation_count; i++) g_nations[i].league_flags = 0;
+    g_leagues_to_load = 0;
+    g_selected_nations = 0;
+    g_first_selected = NULL;
+    /* 0x828075: "Setup.cpp" line 0x1e09 error box for another index. */
+    if ((u32)g_language_index > 12) return false;
+    /*
+     * A key id of -1 makes the original write before the start of the
+     * table. The port selects nothing then.
+     */
+    n = key_nation(nation_of_language[g_language_index]);
+    if (!n) return false;
+    n->league_flags = 2;
+    g_leagues_to_load = 1;
+    g_selected_nations = 1;
+    g_first_selected = n;
+    return true;
 }
