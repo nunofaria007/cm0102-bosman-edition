@@ -120,7 +120,7 @@ void win_windows_path(const char *host, char *out, size_t room)
     if (len == 2 && room > 3) snprintf(out, room, "C:\\");
 }
 
-/* Handles. Files are 0x100, 0x104, ...; finds are 0x2000, 0x2004, ... */
+/* Handles. Files are 0x100, 0x104, ...; finds are 0x20000, 0x20004, ... */
 #define MAX_FILES 256
 #define FILE_BASE 0x100u
 static int fds[MAX_FILES];
@@ -419,9 +419,10 @@ RT_IMPORT(FileTimeToSystemTime)
 }
 
 /* Finds. A find holds the matching names of one folder, read at FindFirstFileA. */
-#define MAX_FINDS 16
-#define FIND_BASE 0x2000u
-typedef struct { int used; char dir[2048]; char **names; int count, next; } Find;
+/* The original does not close every find (the CD check), and Windows has no small limit. */
+#define MAX_FINDS 4096
+#define FIND_BASE 0x20000u
+typedef struct { int used; char *dir; char **names; int count, next; } Find;
 static Find finds[MAX_FINDS];
 
 /* * and ? without regard to case. As on Windows, "*.*" matches every name, also one without a dot. */
@@ -469,6 +470,7 @@ static void free_find(Find *f)
 {
     for (int i = 0; i < f->count; i++) free(f->names[i]);
     free(f->names);
+    free(f->dir);
     memset(f, 0, sizeof *f);
 }
 
@@ -492,7 +494,7 @@ RT_IMPORT(FindFirstFileA)
         return;
     }
     f->used = 1;
-    snprintf(f->dir, sizeof f->dir, "%s", host);
+    f->dir = strdup(host);
     int is_root = strlen(dirpart) <= 3;
     struct dirent *e;
     while ((e = readdir(d))) {

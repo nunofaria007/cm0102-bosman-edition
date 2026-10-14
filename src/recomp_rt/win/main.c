@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     snprintf(win_game_dir, sizeof win_game_dir, "%s", win_exe_path);
     char *slash = strrchr(win_game_dir, '/');
     if (slash) *slash = 0;
-    win_trace = getenv("RECOMP_TRACE") != NULL;
+    win_trace = getenv("RECOMP_TRACE") && *getenv("RECOMP_TRACE");
 
     /* The command line as Windows gives it: the quoted program path, then the options. */
     char exe_win[1100];

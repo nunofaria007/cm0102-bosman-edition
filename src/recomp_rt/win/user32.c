@@ -4,7 +4,8 @@
  *
  * For runs without a person: RECOMP_SCRIPT holds steps "<ms> <action> [args]" separated by ';', with
  * the time since the window opened. Actions: move x y, down x y, up x y, click x y (down, then up 100 ms
- * later), rclick x y, key <virtual key>, char <code>, dump <file.bmp>, quit. RECOMP_DUMP names a file
+ * later), rclick x y, key <virtual key>, char <code>, type <text> (one character each 100 ms),
+ * dump <file.bmp>, quit. RECOMP_DUMP names a file
  * to save the screen to when the program ends. */
 #include "win.h"
 
@@ -175,8 +176,22 @@ static void load_script(void)
         int n = sscanf(item, " %llu %15s", &at, st.action);
         if (n < 2) continue;
         st.at = at;
-        if (!strcmp(st.action, "dump")) sscanf(item, " %*u %*s %511s", st.text);
+        if (!strcmp(st.action, "dump") || !strcmp(st.action, "type")) sscanf(item, " %*u %*s %511s", st.text);
         else sscanf(item, " %*u %*s %d %d", &st.a, &st.b);
+        if (!strcmp(st.action, "type")) {
+            /* One character every 100 ms: the window procedure keeps only the last WM_CHAR. */
+            size_t n = strlen(st.text);
+            steps = realloc(steps, sizeof *steps * (size_t)(step_count + (int)n + 2));
+            for (size_t i = 0; i < n; i++) {
+                Step c = st;
+                c.at = st.at + 100 * i;
+                snprintf(c.action, sizeof c.action, "char");
+                c.a = (unsigned char)st.text[i];
+                c.text[0] = 0;
+                steps[step_count++] = c;
+            }
+            continue;
+        }
         steps = realloc(steps, sizeof *steps * (size_t)(step_count + 2));
         steps[step_count++] = st;
         if (!strcmp(st.action, "click") || !strcmp(st.action, "rclick")) {
@@ -187,6 +202,12 @@ static void load_script(void)
         }
     }
     free(copy);
+    for (int i = 1; i < step_count; i++) {          /* in time order, keeping the order of equal times */
+        Step s = steps[i];
+        int j = i;
+        while (j > 0 && steps[j - 1].at > s.at) { steps[j] = steps[j - 1]; j--; }
+        steps[j] = s;
+    }
 }
 
 static void run_script(void)
