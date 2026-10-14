@@ -12,9 +12,16 @@
  * user folder (win_user_dir) under the same relative path. A read looks at U, then at H. A file opened
  * for writing, created or renamed to lives in U (a file that exists only in H is copied to U first when
  * it is opened for update). A folder is created in U. A delete or rename acts on U only. A file search
- * lists U and H, U winning on equal names. A path outside the game folder maps to U/_outside/<path>. */
+ * lists U and H, U winning on equal names. A path outside the game folder maps to U/_outside/<path>.
+ *
+ * Saved games: when the option save_folder names a folder, a file *.sav in the game folder maps to that
+ * folder (save_dir) and not to U, and a search of the game folder lists the *.sav files of that folder
+ * only. The game writes temp_save_file.sav and renames it to the name of the player, so both stay in
+ * the same folder. Other files (settings.txt, game.cfg) stay in U. The runtime never moves, copies or
+ * deletes a save of U. */
 #include "win.h"
 #include "host.h"
+#include "options.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -52,6 +59,54 @@ static int in_game_dir(const char *host, size_t gl)
     return same && (host[gl] == '/' || host[gl] == 0);
 }
 
+/* The folder for saved games from the option save_folder, or NULL for the normal folder. Resolved at the
+ * first call, after options_load. A leading ~ is the home folder. The folder is created when it is
+ * missing. When that fails, a message goes to stderr and the normal folder stays in use. */
+static void make_parents(const char *path);
+static const char *save_dir(void)
+{
+    static int done;
+    static char dir[1100];
+    if (done) return dir[0] ? dir : NULL;
+    done = 1;
+    const char *opt = options_string(OPT_SAVE_FOLDER);
+    if (!*opt) return NULL;
+    char path[1100];
+    if (opt[0] == '~' && (!opt[1] || opt[1] == '/' || opt[1] == '\\')) {
+        char home[1024];
+        if (!host_home_dir(home, sizeof home)) {
+            fprintf(stderr, "cm0102_recomp: option save_folder: the home folder is unknown, "
+                            "so the saved games stay in %s.\n", win_user_dir);
+            return NULL;
+        }
+        snprintf(path, sizeof path, "%s%s", home, opt + 1);
+    } else {
+        snprintf(path, sizeof path, "%s", opt);
+    }
+    if (HOST_FOLDS_CASE) for (char *c = path; *c; c++) if (*c == '\\') *c = '/';
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') path[--len] = 0;
+    if (!is_dir(path)) {
+        char tmp[1100];
+        snprintf(tmp, sizeof tmp, "%s/x", path);
+        make_parents(tmp);
+        host_mkdir(path);
+    }
+    if (!is_dir(path)) {
+        fprintf(stderr, "cm0102_recomp: option save_folder: cannot create the folder %s, "
+                        "so the saved games stay in %s.\n", path, win_user_dir);
+        return NULL;
+    }
+    snprintf(dir, sizeof dir, "%s", path);
+    return dir;
+}
+
+static int has_sav_ending(const char *name)
+{
+    size_t n = strlen(name);
+    return n >= 4 && !strcasecmp(name + n - 4, ".sav");
+}
+
 /* The user-folder form U of a host path H: the part below the game folder, else _outside/<H>. Names that
  * exist in U keep their spelling there. */
 static int user_form(const char *host, char *out, size_t room)
@@ -60,8 +115,12 @@ static int user_form(const char *host, char *out, size_t room)
     const char *rel;
     char base[1100];
     snprintf(base, sizeof base, "%s", win_user_dir);
-    if (in_game_dir(host, gl)) rel = host + gl;
-    else {
+    if (in_game_dir(host, gl)) {
+        rel = host + gl;
+        const char *sd = save_dir();
+        if (sd && rel[0] == '/' && !strchr(rel + 1, '/') && has_sav_ending(rel + 1))
+            snprintf(base, sizeof base, "%s", sd);      /* a saved game */
+    } else {
         snprintf(base + strlen(base), sizeof base - strlen(base), "/_outside");
         rel = host;
     }
@@ -632,7 +691,8 @@ static void free_find(Find *f)
 }
 
 /* Adds the matching names of one folder; a name already listed (ignoring case) is skipped. */
-static void find_add_dir(Find *f, const char *host, const char *mask, int is_root)
+enum { SAV_ALL, SAV_SKIP, SAV_ONLY };      /* which names of a folder a find takes: by the ending .sav */
+static void find_add_dir(Find *f, const char *host, const char *mask, int is_root, int sav)
 {
     HostDir *d = host_opendir(host);
     if (!d) return;
@@ -640,6 +700,7 @@ static void find_add_dir(Find *f, const char *host, const char *mask, int is_roo
     while ((name = host_readdir(d))) {
         if (is_root && (!strcmp(name, ".") || !strcmp(name, ".."))) continue;
         if (!wild_match(mask, name)) continue;
+        if ((sav == SAV_SKIP && has_sav_ending(name)) || (sav == SAV_ONLY && !has_sav_ending(name))) continue;
         int dup = 0;
         for (int i = 0; i < f->count && !dup; i++) dup = !strcasecmp(f->names[i], name);
         if (dup) continue;
@@ -673,8 +734,11 @@ RT_IMPORT(FindFirstFileA)
     }
     f->used = 1;
     int is_root = strlen(dirpart) <= 3;
-    find_add_dir(f, u, mask, is_root);          /* the user folder first: it wins on equal names */
-    find_add_dir(f, h, mask, is_root);
+    const char *sd = save_dir();
+    int game_dir = sd && (HOST_FOLDS_CASE ? !strcasecmp(h, win_game_dir) : !strcmp(h, win_game_dir));
+    find_add_dir(f, u, mask, is_root, game_dir ? SAV_SKIP : SAV_ALL);   /* the user folder first: it wins on equal names */
+    find_add_dir(f, h, mask, is_root, game_dir ? SAV_SKIP : SAV_ALL);
+    if (game_dir) find_add_dir(f, sd, mask, 0, SAV_ONLY);       /* the saved games of the save folder */
     WIN_TRACE("FindFirstFileA(%s) in %s + %s: %d matches\n", pattern, u, h, f->count);
     if (!f->count) {
         free_find(f);
