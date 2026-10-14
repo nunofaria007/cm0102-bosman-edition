@@ -3,6 +3,17 @@
 
 Usage:
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen] [--record]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen] [--days n]
+
+Same-save check (--same-save): the run plays the same new game three times, with -seed 1, the test
+clock (RECOMP_FIXED_CLOCK=1) and the same steps to "Go on Holiday". The runtime saves the game n game
+days (default 14) after the first news screen (RECOMP_SAVE_AFTER_DAYS) and stops. The three runs:
+    normal   every option at its default, faster_days = off
+    again    the same as normal: the runs are repeatable
+    faster   faster_days = on: faster days changes no game decision
+Each save must be byte for byte the same as the save of "normal". A failed check names the parts of
+the save file that differ. The check takes about six minutes. A later option that must not change the
+game adds a run to SAME_SAVE_RUNS.
 
 The run uses a new empty save folder (RECOMP_USER_DIR is a temporary folder), so the game first shows its
 settings. Before the start it writes settings.txt with the mode (default: classic). It saves five
@@ -31,6 +42,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 
 # Positions for classic mode, 800x600. Times in ms from the window opening. The database load after
 # Select League(s) takes about 20 s, so the steps after it wait with a margin.
@@ -116,18 +128,91 @@ def differing_share(a, b, box=None):
     return diff / ((x1 - x0) * (y1 - y0))
 
 
+# The runs of the same-save check: a name and the option lines of settings.txt (after the mode).
+SAME_SAVE_RUNS = [
+    ("normal", {"faster_days": "off"}),
+    ("again", {"faster_days": "off"}),
+    ("faster", {"faster_days": "on"}),
+]
+SAVE_NAME = "samesave.sav"
+
+
+def save_parts(path):
+    """The parts of a saved game: {name: (stored bytes, size, check word)}. The file starts with three
+    words (version, flags, count) and a table of count rows of 268 bytes: offset, size, a name of 256
+    bytes and a check word. The stored bytes of a part run from its offset to the next offset."""
+    data = open(path, "rb").read()
+    count = struct.unpack_from("<I", data, 8)[0]
+    rows = []
+    for i in range(count):
+        o = 12 + i * 268
+        offset, size = struct.unpack_from("<II", data, o)
+        name = data[o + 8:o + 264].split(b"\0")[0].decode("latin-1")
+        rows.append((offset, name, size, struct.unpack_from("<I", data, o + 264)[0]))
+    rows.sort()
+    parts = {}
+    for i, (offset, name, size, check) in enumerate(rows):
+        end = rows[i + 1][0] if i + 1 < len(rows) else len(data)
+        parts[name] = (data[offset:end], size, check)
+    return parts
+
+
+def same_save(program, game, mode, days):
+    steps = [s for s in STEPS if "5-holiday" not in s and "quit" not in s] + ["400000 quit"]
+    saves = {}
+    with tempfile.TemporaryDirectory(prefix="cm0102-same-save-") as work:
+        for name, options in SAME_SAVE_RUNS:
+            run = os.path.join(work, name)
+            user, home, shots = (os.path.join(run, d) for d in ("user", "home", "shots"))
+            for d in (user, home, shots):
+                os.makedirs(d)
+            with open(os.path.join(user, "settings.txt"), "w") as f:
+                f.write(f"display = {mode}\n")
+                for key, value in options.items():
+                    f.write(f"{key} = {value}\n")
+            env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", RECOMP_NO_BOX="1", RECOMP_USER_DIR=user,
+                       RECOMP_FIXED_CLOCK="1", RECOMP_SAVE_AFTER_DAYS=str(days),
+                       RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots)))
+            start = time.time()
+            r = subprocess.run([program, "--game", game, "-seed", "1"], env=env, capture_output=True, text=True,
+                               timeout=600)
+            save = os.path.join(user, SAVE_NAME)
+            if r.returncode != 0 or not os.path.exists(save):
+                print(r.stderr[-2000:])
+                print(f"FAIL  {name}: no saved game (code {r.returncode})")
+                return 1
+            print(f"run   {name}: saved after {days} game days in {time.time() - start:.0f} s")
+            saves[name] = save
+        failed = 0
+        first = SAME_SAVE_RUNS[0][0]
+        want = open(saves[first], "rb").read()
+        for name, _ in SAME_SAVE_RUNS[1:]:
+            if open(saves[name], "rb").read() == want:
+                print(f"ok    {name}: the save is the same as {first}")
+                continue
+            failed += 1
+            a, b = save_parts(saves[first]), save_parts(saves[name])
+            differ = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
+            print(f"FAIL  {name}: the save differs from {first} in: {', '.join(differ) or 'the file header'}")
+    print("PASS" if not failed else "FAIL")
+    return 1 if failed else 0
+
+
 def main(argv):
     if len(argv) < 4:
         print(__doc__)
         return 2
-    program, game, ref = os.path.abspath(argv[1]), os.path.abspath(argv[2]), os.path.abspath(argv[3])
-    record = "--record" in argv[4:]
     mode = "classic"
-    if "--mode" in argv[4:]:
+    if "--mode" in argv[3:]:
         mode = argv[argv.index("--mode") + 1]
     if mode not in SIZES:
         print(f"unknown mode {mode}: use classic or widescreen")
         return 2
+    if "--same-save" in argv[3:]:
+        days = int(argv[argv.index("--days") + 1]) if "--days" in argv[3:] else 14
+        return same_save(os.path.abspath(argv[1]), os.path.abspath(argv[2]), mode, days)
+    program, game, ref = os.path.abspath(argv[1]), os.path.abspath(argv[2]), os.path.abspath(argv[3])
+    record = "--record" in argv[4:]
     ref = os.path.join(ref, mode)
     with tempfile.TemporaryDirectory(prefix="cm0102-smoke-") as work:
         shots = os.path.join(work, "shots")

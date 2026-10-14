@@ -260,10 +260,38 @@ RT_IMPORT(TerminateProcess)
     exit((int)code);
 }
 
-/* Time. FILETIME counts 100 ns from 1601-01-01; the Unix epoch is 11644473600 s later. */
+/* Time. FILETIME counts 100 ns from 1601-01-01. The Unix epoch is 11644473600 s later.
+ *
+ * Test runs only: RECOMP_FIXED_CLOCK=1 makes the clocks repeatable, so that two runs with the same
+ * -seed and the same script give the same saved game. The original reads the date and time of day
+ * (GetLocalTime and GetSystemTime, through time()) to seed rand() at 0x696d51 and for timers. With
+ * the variable, these give 2001-07-14 12:00:00 UTC in every call, with a time zone offset of 0. The
+ * millisecond clock (GetSystemTimeAsFileTime, 0x947299) must still move, because the holiday hold
+ * (0x76224c) waits for it. It starts at the same date and counts the real time since the program
+ * started. Without the variable, every clock is the clock of the host. */
+#define FIXED_CLOCK_UNIX 995112000ull      /* 2001-07-14 12:00:00 UTC */
+static int fixed_clock = -1;
+static uint64_t fixed_clock_start_us;
+
+int win_fixed_clock(void)
+{
+    if (fixed_clock < 0) {
+        const char *v = getenv("RECOMP_FIXED_CLOCK");
+        fixed_clock = v && *v && strcmp(v, "0") != 0;
+        fixed_clock_start_us = host_unix_time_us();
+    }
+    return fixed_clock;
+}
+
+static uint64_t clock_us(void)
+{
+    if (win_fixed_clock()) return FIXED_CLOCK_UNIX * 1000000ull + (host_unix_time_us() - fixed_clock_start_us);
+    return host_unix_time_us();
+}
+
 uint64_t win_filetime_now(void)
 {
-    return (host_unix_time_us() + 11644473600000000ull) * 10u;
+    return (clock_us() + 11644473600000000ull) * 10u;
 }
 
 RT_IMPORT(GetSystemTimeAsFileTime)
@@ -286,10 +314,10 @@ void win_put_systemtime(uint32_t p, const struct tm *t, uint32_t ms)
 
 static void system_time(int local)
 {
-    uint64_t us = host_unix_time_us();
+    uint64_t us = win_fixed_clock() ? FIXED_CLOCK_UNIX * 1000000ull : host_unix_time_us();
     time_t s = (time_t)(us / 1000000u);
     struct tm t;
-    if (local) host_localtime(s, &t); else host_gmtime(s, &t);
+    if (local && !win_fixed_clock()) host_localtime(s, &t); else host_gmtime(s, &t);
     win_put_systemtime(rt_arg(0), &t, (uint32_t)(us % 1000000u / 1000u));
 }
 
@@ -297,7 +325,7 @@ RT_IMPORT(GetLocalTime) { system_time(1); rt_ret_stdcall(0, 1); }
 RT_IMPORT(GetSystemTime) { system_time(0); rt_ret_stdcall(0, 1); }
 
 /* The host's offset from UTC now, as one bias without daylight rules (TIME_ZONE_ID_UNKNOWN). */
-int32_t win_bias_minutes(void) { return host_bias_minutes(); }
+int32_t win_bias_minutes(void) { return win_fixed_clock() ? 0 : host_bias_minutes(); }
 
 RT_IMPORT(GetTimeZoneInformation)
 {

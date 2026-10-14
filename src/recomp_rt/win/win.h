@@ -59,6 +59,8 @@ struct tm;
 uint64_t win_filetime_now(void);
 void win_put_systemtime(uint32_t p, const struct tm *t, uint32_t ms);
 int32_t win_bias_minutes(void);
+/* 1 when RECOMP_FIXED_CLOCK is set (test runs): repeatable clocks, see kernel32.c. */
+int win_fixed_clock(void);
 
 /* The settings file of the user folder: the display mode sets rt_screen_w and rt_screen_h (display.c). */
 void win_read_settings(void);
