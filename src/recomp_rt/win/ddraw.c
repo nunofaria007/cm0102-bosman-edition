@@ -1,12 +1,8 @@
 /* DirectDraw (version 1) over SDL: IDirectDraw, IDirectDrawSurface and IDirectDrawClipper as the
- * display code of the original uses them (inventory 2.1). Every surface is 800x600 RGB565 in flat
- * memory, so Lock gives the original a pointer it can write. The primary surface is what the window
+ * display code of the original uses them (inventory 2.1). Every surface is RGB565 in flat memory, and
+ * the primary and the back buffer have the size of the screen (rt_screen_w x rt_screen_h), so Lock gives the original a pointer it can write. The primary surface is what the window
  * shows: a Blt or BltFast to it, or an Unlock of it, marks the screen changed, and user32.c presents it. */
 #include "win.h"
-
-#define SCREEN_W 800u
-#define SCREEN_H 600u
-#define PITCH (SCREEN_W * 2u)
 
 /* A surface: vtable, count, width +8, height +0xc, pitch +0x10, pixels +0x14, primary +0x18, caps +0x1c. */
 #define S_W 8u
@@ -163,12 +159,13 @@ static void dd_CreateClipper(void)
     rt_ret_stdcall(0, 4);
 }
 
-/* CreateSurface(desc, &surface, outer). The primary (caps 0x200) and any other surface are 800x600. */
+/* CreateSurface(desc, &surface, outer). The primary (caps 0x200) has the size of the screen; another
+ * surface has the size in its desc, else the size of the screen. */
 static void dd_CreateSurface(void)
 {
     uint32_t desc = rt_arg(1), out = rt_arg(2);
     uint32_t flags = rd32(g_mem, desc + 4), caps = rd32(g_mem, desc + 0x68);
-    uint32_t w = SCREEN_W, h = SCREEN_H;
+    uint32_t w = rt_screen_w, h = rt_screen_h;
     if (!(caps & 0x200) && (flags & 6) == 6) {
         w = rd32(g_mem, desc + 0xc);
         h = rd32(g_mem, desc + 8);

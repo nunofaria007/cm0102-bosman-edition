@@ -282,6 +282,13 @@ void rt_fatal(const char *fmt, ...) __attribute__((noreturn, format(printf, 1, 2
  * recompiler reads these lines to leave it out. RT_IMPORT is the same for an import, by name. */
 #define RT_REPLACE(addr, name) void f_##addr(void)
 #define RT_IMPORT(name) void imp_##name(void)
+/* RT_WRAP marks a function that the runtime wraps: the recompiler writes the translation as o_<addr>,
+ * and every call goes to the runtime's f_<addr>, which can change the arguments and call o_<addr>. */
+#define RT_WRAP(addr, name) void f_##addr(void)
+
+/* The size of the screen that the original draws: 800x600 in classic mode, 1280x800 in widescreen
+ * mode. The constants of tools/recomp/widescreen.py read these. */
+extern uint32_t rt_screen_w, rt_screen_h;
 
 /* Arguments and return for replacements: esp points at the return address. */
 static inline uint32_t rt_arg(int i) { return rd32(g_mem, cpu.esp + 4 + 4 * (uint32_t)i); }

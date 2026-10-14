@@ -60,11 +60,14 @@ uint64_t win_filetime_now(void);
 void win_put_systemtime(uint32_t p, const struct tm *t, uint32_t ms);
 int32_t win_bias_minutes(void);
 
+/* The settings file of the user folder: the display mode sets rt_screen_w and rt_screen_h (display.c). */
+void win_read_settings(void);
+
 /* Window, input and screen (user32.c, ddraw.c). */
 void win_video_init(void);
 void win_present(void);                /* show the primary surface */
 void win_poll_events(void);            /* SDL events to the message queue */
-uint32_t win_back_buffer(void);        /* flat address of the 800x600 RGB565 back buffer, or 0 */
+uint32_t win_back_buffer(void);        /* flat address of the RGB565 back buffer, or 0 */
 void win_dump_screen(const char *path);
 extern uint32_t win_wndproc;
 extern uint32_t win_hwnd;

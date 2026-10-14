@@ -1,6 +1,7 @@
 /* USER32 over SDL: the window, the message queue fed from SDL events, the window procedure call
  * (DispatchMessageA calls the original's 0x68d630), cursors and the message box. Also the screen:
- * the SDL window shows the primary DirectDraw surface (ddraw.c) as an 800x600 RGB565 texture.
+ * the SDL window shows the primary DirectDraw surface (ddraw.c) as an RGB565 texture of the screen size
+ * (rt_screen_w x rt_screen_h). The picture keeps its shape in a window of any size.
  *
  * For runs without a person: RECOMP_SCRIPT holds steps "<ms> <action> [args]" separated by ';', with
  * the time since the window opened. Actions: move x y, down x y, up x y, click x y (down, then up 100 ms
@@ -69,13 +70,14 @@ void win_video_init(void)
 {
     if (window) return;
     window = SDL_CreateWindow("CM 01/02: Re-Signed Edition " CM0102_VERSION, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              800, 600, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+                              (int)rt_screen_w, (int)rt_screen_h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!window) rt_fatal("SDL_CreateWindow: %s", SDL_GetError());
     renderer = SDL_CreateRenderer(window, -1, 0);
     if (!renderer) renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (!renderer) rt_fatal("SDL_CreateRenderer: %s", SDL_GetError());
-    SDL_RenderSetLogicalSize(renderer, 800, 600);
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, 800, 600);
+    SDL_RenderSetLogicalSize(renderer, (int)rt_screen_w, (int)rt_screen_h);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING,
+                                (int)rt_screen_w, (int)rt_screen_h);
     if (!texture) rt_fatal("SDL_CreateTexture: %s", SDL_GetError());
     SDL_StartTextInput();
     opened_at = SDL_GetTicks64();
@@ -85,7 +87,7 @@ static void present_now(void)
 {
     uint32_t px = win_primary_pixels();
     if (!renderer || !px) return;
-    SDL_UpdateTexture(texture, NULL, g_mem + px, 1600);
+    SDL_UpdateTexture(texture, NULL, g_mem + px, (int)rt_screen_w * 2);
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
@@ -104,7 +106,8 @@ void win_dump_screen(const char *path)
 {
     uint32_t px = win_primary_pixels();
     if (!px) { fprintf(stderr, "recomp: no screen to save to %s\n", path); return; }
-    SDL_Surface *s = SDL_CreateRGBSurfaceWithFormatFrom(g_mem + px, 800, 600, 16, 1600, SDL_PIXELFORMAT_RGB565);
+    SDL_Surface *s = SDL_CreateRGBSurfaceWithFormatFrom(g_mem + px, (int)rt_screen_w, (int)rt_screen_h, 16,
+                                                        (int)rt_screen_w * 2, SDL_PIXELFORMAT_RGB565);
     SDL_Surface *rgb = s ? SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_RGB24, 0) : NULL;
     if (!rgb || SDL_SaveBMP(rgb, path)) fprintf(stderr, "recomp: cannot save %s: %s\n", path, SDL_GetError());
     else fprintf(stderr, "recomp: screen saved to %s\n", path);
@@ -386,11 +389,11 @@ RT_IMPORT(CloseWindow) { rt_ret_stdcall(1, 1); }
 RT_IMPORT(ChangeDisplaySettingsA) { rt_ret_stdcall(0, 2); }
 RT_IMPORT(GetDesktopWindow) { rt_ret_stdcall(DESKTOP_HWND, 0); }
 
-/* The screen and the window are both 800x600 with no frame. */
+/* The screen and the window both have the screen size, with no frame. */
 RT_IMPORT(GetSystemMetrics)
 {
     uint32_t i = rt_arg(0);
-    rt_ret_stdcall(i == 0 ? 800u : i == 1 ? 600u : 0u, 1);
+    rt_ret_stdcall(i == 0 ? rt_screen_w : i == 1 ? rt_screen_h : 0u, 1);
 }
 
 RT_IMPORT(GetWindowRect)
@@ -398,8 +401,8 @@ RT_IMPORT(GetWindowRect)
     uint32_t r = rt_arg(1);
     wr32(g_mem, r, 0);
     wr32(g_mem, r + 4, 0);
-    wr32(g_mem, r + 8, 800);
-    wr32(g_mem, r + 12, 600);
+    wr32(g_mem, r + 8, rt_screen_w);
+    wr32(g_mem, r + 12, rt_screen_h);
     rt_ret_stdcall(1, 2);
 }
 
@@ -409,8 +412,8 @@ RT_IMPORT(BeginPaint)
     uint32_t ps = rt_arg(1);
     memset(g_mem + ps, 0, 64);
     wr32(g_mem, ps, 0x00020001u);
-    wr32(g_mem, ps + 16, 800);
-    wr32(g_mem, ps + 20, 600);
+    wr32(g_mem, ps + 16, rt_screen_w);
+    wr32(g_mem, ps + 20, rt_screen_h);
     rt_ret_stdcall(0x00020001u, 2);
 }
 RT_IMPORT(EndPaint) { rt_ret_stdcall(1, 2); }

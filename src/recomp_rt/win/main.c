@@ -8,7 +8,8 @@
  * read only: every write goes to the user folder (files.c): ~/Library/Application Support/cm0102 on
  * macOS, %APPDATA%\cm0102 on Windows.
  * Environment: RECOMP_TRACE=1 (print import calls), RECOMP_SCRIPT and RECOMP_DUMP
- * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr). */
+ * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr), RECOMP_USER_DIR (another user folder,
+ * for test runs). */
 #include "win.h"
 #include "host.h"
 
@@ -90,7 +91,9 @@ int main(int argc, char **argv)
                         "Give the folder of the original game with --game <folder>.\n", game);
         return 2;
     }
-    if (!host_user_dir(win_user_dir, sizeof win_user_dir)) return 2;
+    const char *user = getenv("RECOMP_USER_DIR");   /* test runs keep the player's save folder clean */
+    if (user && *user) snprintf(win_user_dir, sizeof win_user_dir, "%s", user);
+    else if (!host_user_dir(win_user_dir, sizeof win_user_dir)) return 2;
     {
         char tmp[1100];
         snprintf(tmp, sizeof tmp, "%s", win_user_dir);
@@ -109,6 +112,7 @@ int main(int argc, char **argv)
         }
     }
     win_trace = getenv("RECOMP_TRACE") && *getenv("RECOMP_TRACE");
+    win_read_settings();
 
     /* The command line as Windows gives it: the quoted program path, then the options. */
     char exe_win[1100];

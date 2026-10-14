@@ -6,6 +6,10 @@ Before a call the locals go back into `cpu` and after it they come back. Memory 
 """
 from capstone import x86_const as X
 
+from widescreen import PATCHES
+
+PATCHED = set()     # the addresses of PATCHES that a translation used
+
 REG32 = ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
 LOW16 = {"ax": "eax", "cx": "ecx", "dx": "edx", "bx": "ebx", "sp": "esp", "bp": "ebp", "si": "esi", "di": "edi"}
 LOW8 = {"al": "eax", "cl": "ecx", "dl": "edx", "bl": "ebx"}
@@ -37,9 +41,11 @@ def h(v):
 
 
 class FunctionWriter:
-    def __init__(self, func, image, names):
-        """names(addr) gives the C name of the function at a call target."""
+    def __init__(self, func, image, names, own_name=None):
+        """names(addr) gives the C name of the function at a call target. own_name is the name of the
+        C function to write, when it is not names(entry): the body of a wrapped function."""
         self.f = func
+        self.own_name = own_name
         self.image = image
         self.names = names
         self.out = []
@@ -159,6 +165,8 @@ class FunctionWriter:
             try:
                 falls = self.insn(insn)
                 self.handled += 1
+                if a in PATCHES:
+                    self.patch(body, mark, a)
             except Unhandled as exc:
                 del body[mark:]
                 self.unhandled.append((a, text, str(exc)))
@@ -179,7 +187,7 @@ class FunctionWriter:
                     lines.append(f"    SYNC(); {self.names(x)}(); return;")
                 else:
                     lines.append(f"    rt_fell_off({h(x)});")
-        name = self.names(f.entry)
+        name = self.own_name or self.names(f.entry)
         head = [
             f"void {name}(void)",
             "{",
@@ -194,6 +202,15 @@ class FunctionWriter:
         if f.entry != addrs[0]:
             head.append(f"    goto L_{f.entry:x};")
         return "\n".join(head + lines + ["}"]) + "\n"
+
+    def patch(self, body, mark, a):
+        """Replaces the constant of the instruction at a with its run-time value (widescreen.py)."""
+        value, expr = PATCHES[a]
+        text = h(value)
+        if not any(text in line for line in body[mark:]):
+            raise SystemExit(f"widescreen.py: the instruction at {a:#x} has no constant {value}")
+        body[mark:] = [line.replace(text, expr) for line in body[mark:]]
+        PATCHED.add(a)
 
     # One instruction. Returns True when execution can continue at the next address.
     def insn(self, insn):
