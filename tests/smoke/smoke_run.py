@@ -51,7 +51,7 @@ import time
 # Positions for classic mode, 800x600. Times in ms from the window opening. The database load after
 # Select League(s) takes about 20 s, so the steps after it wait with a margin.
 STEPS = [
-    "1000 click 400 300",                   # the intro: a click ends the logos and their sounds
+    "1000 click 400 300",                   # the intro: a click ends the logos and their sounds (INTRO_CLICK)
     "8000 dump {d}/1-settings.bmp",
     "8200 click 522 272",                   # settings: Background Changes Off
     "8500 click 662 524",                   # settings: Ok
@@ -84,11 +84,11 @@ SCREENS = [("1-settings", 0.20), ("2-setup", 0.0), ("3-leagues", 0.0), ("4-news"
 SIZES = {"classic": (800, 600), "widescreen": (1280, 800)}
 
 
-def scaled_steps(mode, shots):
+def scaled_steps(mode, shots, steps=STEPS):
     """The steps with their x y positions scaled from 800x600 to the mode's screen size."""
     w, h = SIZES[mode]
     out = []
-    for step in STEPS:
+    for step in steps:
         step, _, wide = step.partition("|")  # "| x y": the widescreen position, where it does not scale
         parts = step.format(d=shots).split()
         if wide and mode == "widescreen":
@@ -141,6 +141,8 @@ SAME_SAVE_RUNS = [
     ("silent", {"faster_days": "off", "sound": "off"}),
 ]
 SAVE_NAME = "samesave.sav"
+INTRO_CLICK = "1000 click 400 300"
+INTRO_WAIT = 20000  # ms
 
 
 def save_parts(path):
@@ -164,7 +166,11 @@ def save_parts(path):
 
 
 def same_save(program, game, mode, days):
-    steps = [s for s in STEPS if "5-holiday" not in s and "quit" not in s] + ["400000 quit"]
+    # No click ends the intro: with sound the intro takes about 19 s, without it 5.5 s, but both runs
+    # load and free the same sounds. A click would skip the second sound in one run only, and the
+    # memory of the two games would differ. So every step waits 20 s longer.
+    steps = [s for s in STEPS if "5-holiday" not in s and "quit" not in s and s != INTRO_CLICK]
+    steps = [f"{int(s.split(' ', 1)[0]) + INTRO_WAIT} {s.split(' ', 1)[1]}" for s in steps] + ["400000 quit"]
     saves = {}
     with tempfile.TemporaryDirectory(prefix="cm0102-same-save-") as work:
         for name, options in SAME_SAVE_RUNS:
@@ -179,7 +185,7 @@ def same_save(program, game, mode, days):
             env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", RECOMP_NO_BOX="1",
                        RECOMP_USER_DIR=user,
                        RECOMP_FIXED_CLOCK="1", RECOMP_SAVE_AFTER_DAYS=str(days),
-                       RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots)))
+                       RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots, steps)))
             start = time.time()
             r = subprocess.run([program, "--game", game, "-seed", "1"], env=env, capture_output=True, text=True,
                                timeout=600)
