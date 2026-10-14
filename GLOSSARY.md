@@ -63,3 +63,21 @@ _Avoid_: icon, symbol
 **Differential test**:
 A test that runs one function of the original in an emulator, runs the same function of the port, and compares the results.
 _Avoid_: emulation test, golden test
+
+### Data
+
+**Nation table**:
+The nations of the original's database, loaded from nation.dat, one record for each nation.
+_Avoid_: country list
+
+**League table**:
+The 35 leagues that a new game can include, with the nation of each and whether it is selected.
+_Avoid_: competition list, division table
+
+**Key nation**:
+A nation that the original finds by name after the load, such as England for the default league.
+_Avoid_: main nation
+
+**Progress bar**:
+The box that shows how far a long step has gone, such as "Loading database".
+_Avoid_: loading screen
