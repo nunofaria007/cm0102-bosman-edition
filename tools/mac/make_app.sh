@@ -10,7 +10,7 @@
 #                   pack. Never put the fan pack in a download.
 #   --exe           The cm0102.exe that the recompiler reads. Default: <game>/cm0102.exe.
 #   --icns          Optional icon. The script copies it to Contents/Resources/AppIcon.icns. No icon is
-#                   committed to git. Empty or missing: the app has no icon.
+#                   committed to git. Empty: the script makes the original's ball icon from --exe.
 #   --sdl2-arm64    Prefix with lib/ and include/ of SDL2 for arm64. Default /opt/homebrew.
 #   --sdl2-x86_64   Prefix of SDL2 built for x86_64. If given, the app is universal. If empty, the app is
 #                   arm64 only and the script says so.
@@ -136,6 +136,10 @@ else
 fi
 
 sed -e "s/@VERSION@/$VERSION/g" "$REPO/tools/mac/Info.plist.in" > "$APP/Contents/Info.plist"
+if [ -z "$ICNS" ]; then  # The ball icon from the player's own exe (tools/icon/make_icons.py).
+    python3 -I "$REPO/tools/icon/make_icons.py" "$EXE" "$OUT/icons" >/dev/null
+    ICNS="$OUT/icons/cm0102.icns"
+fi
 if [ -n "$ICNS" ]; then
     cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
     /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP/Contents/Info.plist"

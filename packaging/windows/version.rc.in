@@ -1,6 +1,9 @@
 // The exe properties of the Windows build. CMake fills in the version (packaging/windows/windows.cmake).
 #include <winver.h>
 
+// The first icon resource is the one Windows shows for the exe and its shortcuts.
+1 ICON "@CM0102_ICO@"
+
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
 PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0

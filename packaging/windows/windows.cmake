@@ -7,7 +7,14 @@ enable_language(RC)
 
 # The exe properties carry the one version number of the project.
 set(CM0102_PRODUCT "CM 01/02: Re-Signed Edition")
+# The icon is the original's ball, taken from the player's own cm0102.exe at build time (not in git).
+set(CM0102_ICO "${CMAKE_BINARY_DIR}/icons/cm0102.ico")
+add_custom_command(OUTPUT "${CM0102_ICO}"
+    COMMAND python3 -I "${CMAKE_SOURCE_DIR}/tools/icon/make_icons.py" "${CM0102_EXE}" "${CMAKE_BINARY_DIR}/icons"
+    DEPENDS "${CM0102_EXE}" "${CMAKE_SOURCE_DIR}/tools/icon/make_icons.py"
+    COMMENT "Making the icon from ${CM0102_EXE}" VERBATIM)
 configure_file("${CMAKE_CURRENT_LIST_DIR}/version.rc.in" "${CMAKE_BINARY_DIR}/version.rc" @ONLY)
+set_source_files_properties("${CMAKE_BINARY_DIR}/version.rc" PROPERTIES OBJECT_DEPENDS "${CM0102_ICO}")
 target_sources(cm0102_recomp PRIVATE "${CMAKE_BINARY_DIR}/version.rc")
 
 # SDL2 and the C runtime go into the exe, so that it needs no DLL beside it. The exe has no symbols.
@@ -25,7 +32,8 @@ add_custom_target(windows_installer
         "-DEXE=$<TARGET_FILE:cm0102_recomp>"
         "-DGAME_DIR=${CM0102_GAME_DIR}"
         "-DOUT_FILE=${CMAKE_BINARY_DIR}/${CM0102_SETUP}"
+        "-DICON=${CM0102_ICO}"
         "${CMAKE_CURRENT_LIST_DIR}/installer.nsi"
-    DEPENDS cm0102_recomp "${CMAKE_CURRENT_LIST_DIR}/installer.nsi"
+    DEPENDS cm0102_recomp "${CMAKE_CURRENT_LIST_DIR}/installer.nsi" "${CM0102_ICO}"
     COMMENT "Making ${CM0102_SETUP}"
     VERBATIM)

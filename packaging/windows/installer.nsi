@@ -4,6 +4,7 @@
 ;   EXE       the 64-bit cm0102_recomp.exe
 ;   GAME_DIR  the folder of the clean files (cm0102.exe, Data, Pictures and the rest)
 ;   OUT_FILE  the setup exe to write
+;   ICON      optional: the original's ball icon (tools/icon/make_icons.py), for the setup exe
 ;
 ; Layout: $INSTDIR holds the program and the uninstaller, $INSTDIR\game the clean files. The program
 ; finds the game folder beside itself. Saves go to %APPDATA%\cm0102, which an update keeps. The
@@ -55,6 +56,10 @@ VIAddVersionKey /LANG=1033 "FileDescription" "${PRODUCT} ${VERSION} Setup"
 VIAddVersionKey /LANG=1033 "Comments" "An unofficial port of Championship Manager 01/02"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "An unofficial fan project"
 
+!ifdef ICON
+  !define MUI_ICON "${ICON}"
+  !define MUI_UNICON "${ICON}"
+!endif
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${PROGRAM}"
 !define MUI_FINISHPAGE_RUN_TEXT "Start ${PRODUCT}"
