@@ -1,5 +1,5 @@
 # Bosman Edition 0.1.0 release
-Status: In build
+Status: Shipped 2026-10-14 (v0.1.0 pre-release)
 
 ## Problem
 The recompiled game runs only on Max's Mac, from a build folder, with the fan pack beside it. Other people cannot download it and play. It draws only at 800x600.
@@ -137,12 +137,12 @@ Merge danger: two-way door. Blast radius: the Mac build, which the smoke run gua
 Blocked by: 2, 4, 5, 6
 Delivers: one script that builds both downloads, runs the package check, writes `CHANGELOG.md`, tags and uploads a GitHub pre-release.
 Merge danger: one-way door. It publishes the original's data. Review rule applies, and Max approves the upload.
-- [ ] Package check passes on both downloads
-- [ ] Pre-release 0.1.0 on GitHub with both files
+- [x] Package check passes on both downloads
+- [x] Pre-release 0.1.0 on GitHub with both files
 
 ### 8. Site
 Blocked by: 4 for the screenshot; links to 7
 Delivers: the site on GitHub Pages with download links to the latest release.
 Merge danger: one-way door. The site is public.
-- [ ] The taste skill's inspector shows no FAIL, except the picture count: Max asked for one screenshot only
-- [ ] Download links point at the latest release
+- [x] The taste skill's inspector shows no FAIL, except the picture count: Max asked for one screenshot only
+- [x] Download links point at the latest release
