@@ -70,6 +70,14 @@ void win_poll_events(void);            /* SDL events to the message queue */
 uint32_t win_back_buffer(void);        /* flat address of the RGB565 back buffer, or 0 */
 void win_dump_screen(const char *path);
 extern uint32_t win_wndproc;
+
+/* Places on the screen of the game for the keys (keys.c). Each gives the place to click in *x, *y and
+ * returns 1, or returns 0 when the key has nothing to press now. */
+extern uint32_t keys_display;                  /* the screen manager of the last input poll */
+int keys_typing(void);                         /* 1 while a text entry takes keys */
+int keys_continue_game(int *x, int *y);        /* Continue Game in the left bar */
+int keys_back(int *x, int *y);                 /* the Back arrow in the left bar */
+int keys_outside_popup(int *x, int *y);        /* a place outside the open popup */
 extern uint32_t win_hwnd;
 
 /* COM (com.c). An object starts with its vtable and a reference count at +4. The list of methods ends
