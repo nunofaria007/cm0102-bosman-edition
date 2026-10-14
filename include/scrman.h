@@ -111,4 +111,11 @@ extern const char *g_data_dir;
 void scrman_draw(scrman_t *sm, char *background, s16 x1, s16 y1, s16 x2,
                  s16 y2);
 
+/*
+ * FUN_0055f2c0. When darken_screen is 0: sets it, darkens the whole screen
+ * to 60 percent and flips it. The progress box calls it before its first
+ * step. The next rebuild of the main loop clears the flag.
+ */
+void scrman_darken_once(scrman_t *sm);
+
 #endif
