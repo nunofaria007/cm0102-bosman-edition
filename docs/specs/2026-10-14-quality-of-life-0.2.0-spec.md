@@ -18,7 +18,7 @@ Release 0.2.0 adds those comforts and sound, without changing a single match res
 8. As a player reading news, I want to click a player's or club's name to open the profile, and Back to return to the news.
 9. As a player on any screen, I want the same clickable names on squads, transfers and match reports.
 10. As a player scouting, I want attribute numbers coloured by value, so that I see strengths at once.
-11. As a player on holiday or at the end of a season, I want days to pass faster.
+11. As a player on holiday, I want days to pass faster.
 12. As a player, I want the same results with or without these features, so that the game stays the 2002 game.
 13. As a player who prefers the original, I want to switch each comfort off in the settings file.
 
@@ -95,7 +95,7 @@ Merge danger: two-way door. Documents only.
 Blocked by: 5
 Delivers: two unattended runs with the same `-seed`, the same script and the same start give byte-identical saves. Research B found that runs drift today (first suspect `srand(time())` at 0x696d51). A test-only fixed clock is allowed; play is unchanged.
 Merge danger: two-way door. Test runs only.
-- [ ] Two normal runs to a fixed date give identical saves
+- [x] Two normal runs to a fixed date give identical saves
 
 ### 6. Assistant selection (#12)
 Blocked by: 1, 5, 5b
@@ -124,9 +124,9 @@ Merge danger: two-way door. Blast radius: attribute screens.
 
 ### 10. Faster days (#20)
 Blocked by: 1, 5, 5b
-Delivers: days that pass without redrawing every screen.
+Delivers: days that pass faster on holiday: the original holds each holiday screen for at least 2 seconds of real time, and the option ends that hold at once. Continue Game has no such hold. Measured: about 1.75 s per game day off, 0.45 s on, with identical saves.
 Merge danger: two-way door, but it touches the day loop. Blast radius: every saved game. The same-save check is the guard.
-- [ ] The same-save check passes with faster days on and off
+- [x] The same-save check passes with faster days on and off
 
 ### 11. Position, condition and match rating together during matches (#23)
 Blocked by: 1, 5

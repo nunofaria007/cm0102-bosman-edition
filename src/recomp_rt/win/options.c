@@ -36,7 +36,7 @@ static const OptionDef defs[OPT_COUNT] = {
     [OPT_ATTRIBUTE_COLOURS] = {"attribute_colours", KIND_SWITCH, "on", NULL,
         "attribute_colours = on colours attribute numbers by value."},
     [OPT_FASTER_DAYS] = {"faster_days", KIND_SWITCH, "on", NULL,
-        "faster_days = on makes days pass faster on holiday and at the end of a season."},
+        "faster_days = on makes days pass faster while you are on holiday."},
     [OPT_MATCH_COLUMNS] = {"match_columns", KIND_SWITCH, "on", NULL,
         "match_columns = on shows position, condition and match rating together on the match screens."},
 };
