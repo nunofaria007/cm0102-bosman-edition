@@ -3,7 +3,8 @@
  * Usage: cm0102_recomp [--game <folder>] [options of the original, for example -windowed]
  * The game folder holds the player's own cm0102.exe, Data and Pictures. It is the registry value
  * Location, the base of every path and the CD drive D:\ (files.c). Default: the first folder above the
- * program that holds cm0102.exe and Data, else the current folder.
+ * program that holds cm0102.exe and Data, else the current folder. The game folder is read only:
+ * every write goes to ~/Library/Application Support/cm0102 (files.c).
  * Environment: RECOMP_TRACE=1 (print import calls), RECOMP_SCRIPT and RECOMP_DUMP
  * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr). */
 #include "win.h"
@@ -77,6 +78,29 @@ int main(int argc, char **argv)
         fprintf(stderr, "cm0102_recomp: cannot find cm0102.exe in the folder %s. "
                         "Give the folder of the original game with --game <folder>.\n", game);
         return 2;
+    }
+    const char *home = getenv("HOME");
+    if (!home || !*home) {
+        fprintf(stderr, "cm0102_recomp: HOME is not set, so the user folder is unknown.\n");
+        return 2;
+    }
+    snprintf(win_user_dir, sizeof win_user_dir, "%s/Library/Application Support/cm0102", home);
+    {
+        char tmp[1100];
+        snprintf(tmp, sizeof tmp, "%s", win_user_dir);
+        for (char *p = tmp + 1; ; p++) {
+            if (*p != '/' && *p) continue;
+            char c = *p;
+            *p = 0;
+            mkdir(tmp, 0755);
+            if (!c) break;
+            *p = c;
+        }
+        struct stat st;
+        if (stat(win_user_dir, &st) || !S_ISDIR(st.st_mode)) {
+            fprintf(stderr, "cm0102_recomp: cannot create the user folder %s.\n", win_user_dir);
+            return 2;
+        }
     }
     win_trace = getenv("RECOMP_TRACE") && *getenv("RECOMP_TRACE");
 

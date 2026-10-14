@@ -4,7 +4,13 @@
  * C:\Users\max\Downloads\Game. D:\ is the CD drive: the folder that holds the player's own cm0102.exe,
  * which the CD check looks for (inventory 4.6). A relative path starts at the current folder, which
  * WinMain sets from the registry value Location. Each part of a path is matched without regard to case,
- * as Windows does; a part that does not exist keeps its spelling (a new file). */
+ * as Windows does; a part that does not exist keeps its spelling (a new file).
+ *
+ * Writes: the game folder is never changed. A path has two host forms: H in the game folder and U in the
+ * user folder (win_user_dir) under the same relative path. A read looks at U, then at H. A file opened
+ * for writing, created or renamed to lives in U (a file that exists only in H is copied to U first when
+ * it is opened for update). A folder is created in U. A delete or rename acts on U only. A file search
+ * lists U and H, U winning on equal names. A path outside the game folder maps to U/_outside/<path>. */
 #include "win.h"
 
 #include <ctype.h>
@@ -19,6 +25,82 @@
 #include <unistd.h>
 
 char win_cwd[1024] = "C:\\";
+char win_user_dir[1024];
+
+static int exists(const char *p) { struct stat st; return stat(p, &st) == 0; }
+static int is_dir(const char *p) { struct stat st; return stat(p, &st) == 0 && S_ISDIR(st.st_mode); }
+
+/* The spelling of a name in a folder, ignoring case: found = the entry, or empty. */
+static void ci_lookup(const char *dir, const char *part, char *found, size_t room)
+{
+    found[0] = 0;
+    DIR *d = opendir(dir[0] ? dir : "/");
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (!strcmp(e->d_name, part)) { snprintf(found, room, "%s", e->d_name); break; }
+        if (!found[0] && !strcasecmp(e->d_name, part)) snprintf(found, room, "%s", e->d_name);
+    }
+    closedir(d);
+}
+
+/* The user-folder form U of a host path H: the part below the game folder, else _outside/<H>. Names that
+ * exist in U keep their spelling there. */
+static int user_form(const char *host, char *out, size_t room)
+{
+    size_t gl = strlen(win_game_dir);
+    const char *rel;
+    char base[1100];
+    snprintf(base, sizeof base, "%s", win_user_dir);
+    if (!strncmp(host, win_game_dir, gl) && (host[gl] == '/' || host[gl] == 0)) rel = host + gl;
+    else {
+        snprintf(base + strlen(base), sizeof base - strlen(base), "/_outside");
+        rel = host;
+    }
+    char copy[2048];
+    snprintf(copy, sizeof copy, "%s", rel);
+    size_t len = (size_t)snprintf(out, room, "%s", base);
+    char *save = NULL;
+    for (char *part = strtok_r(copy, "/", &save); part; part = strtok_r(NULL, "/", &save)) {
+        char found[256];
+        ci_lookup(out, part, found, sizeof found);
+        len += (size_t)snprintf(out + len, room - len, "/%s", found[0] ? found : part);
+        if (len >= room) return 0;
+    }
+    return 1;
+}
+
+/* Creates every folder above the last part of a path. */
+static void make_parents(const char *path)
+{
+    char buf[2048];
+    snprintf(buf, sizeof buf, "%s", path);
+    for (char *p = buf + 1; *p; p++) {
+        if (*p != '/') continue;
+        *p = 0;
+        mkdir(buf, 0755);
+        *p = '/';
+    }
+}
+
+static int copy_file(const char *from, const char *to)
+{
+    int in = open(from, O_RDONLY);
+    if (in < 0) return -1;
+    make_parents(to);
+    int out = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (out < 0) { close(in); return -1; }
+    char buf[65536];
+    ssize_t r;
+    int ok = 0;
+    while ((r = read(in, buf, sizeof buf)) > 0) {
+        if (write(out, buf, (size_t)r) != r) { ok = -1; break; }
+    }
+    if (r < 0) ok = -1;
+    close(in);
+    close(out);
+    return ok;
+}
 
 void win_error_from_errno(void)
 {
@@ -96,16 +178,8 @@ int win_host_path(const char *winpath, char *out, size_t room)
         /* Windows drops trailing dots and spaces of a name. */
         size_t pl = strlen(part);
         while (pl > 1 && (part[pl - 1] == '.' || part[pl - 1] == ' ')) part[--pl] = 0;
-        char found[256] = "";
-        DIR *d = opendir(len ? out : "/");
-        if (d) {
-            struct dirent *e;
-            while ((e = readdir(d))) {
-                if (!strcmp(e->d_name, part)) { snprintf(found, sizeof found, "%s", e->d_name); break; }
-                if (!found[0] && !strcasecmp(e->d_name, part)) snprintf(found, sizeof found, "%s", e->d_name);
-            }
-            closedir(d);
-        }
+        char found[256];
+        ci_lookup(len ? out : "", part, found, sizeof found);
         len += (size_t)snprintf(out + len, room - len, "/%s", found[0] ? found : part);
         if (len >= room) return 0;
     }
@@ -118,6 +192,13 @@ void win_windows_path(const char *host, char *out, size_t room)
     size_t len = (size_t)snprintf(out, room, "C:%s", host);
     for (size_t i = 0; i < len && i < room; i++) if (out[i] == '/') out[i] = '\\';
     if (len == 2 && room > 3) snprintf(out, room, "C:\\");
+}
+
+
+/* Both host forms of a Windows path: H in the game folder, U in the user folder. */
+static int win_paths(const char *name, char *h, char *u, size_t room)
+{
+    return win_host_path(name, h, room) && user_form(h, u, room);
 }
 
 /* Handles. Files are 0x100, 0x104, ...; finds are 0x20000, 0x20004, ... */
@@ -154,8 +235,8 @@ RT_IMPORT(CreateFileA)
 {
     const char *name = win_str(rt_arg(0));
     uint32_t access = rt_arg(1), disposition = rt_arg(4);
-    char host[2048];
-    if (!win_host_path(name, host, sizeof host)) {
+    char h[2048], u[2048];
+    if (!win_paths(name, h, u, sizeof h)) {
         win_last_error = ERROR_PATH_NOT_FOUND;
         rt_ret_stdcall(INVALID_HANDLE, 7);
         return;
@@ -168,15 +249,38 @@ RT_IMPORT(CreateFileA)
     case 4: flags |= O_CREAT; break;                    /* OPEN_ALWAYS */
     case 5: flags |= O_TRUNC; break;                    /* TRUNCATE_EXISTING */
     }
-    struct stat st;
-    int existed = stat(host, &st) == 0;
-    if (existed && S_ISDIR(st.st_mode)) {
+    int in_u = exists(u), in_h = exists(h);
+    int existed = in_u || in_h;
+    int write_intent = (access & 0x40000000u) || disposition == 1 || disposition == 2 || disposition == 5;
+    if (disposition == 4 && !existed) write_intent = 1;
+    const char *target = in_u || !write_intent ? (in_u ? u : h) : u;
+    if (existed && is_dir(in_u ? u : h)) {
         win_last_error = ERROR_ACCESS_DENIED;
         rt_ret_stdcall(INVALID_HANDLE, 7);
         return;
     }
-    int fd = open(host, flags, 0644);
-    WIN_TRACE("CreateFileA(%s -> %s, %#x, %u) = %d\n", name, host, access, disposition, fd);
+    if (disposition == 1 && existed) {
+        win_last_error = ERROR_FILE_EXISTS;
+        rt_ret_stdcall(INVALID_HANDLE, 7);
+        return;
+    }
+    if (write_intent) {
+        target = u;
+        if (!in_u && in_h && disposition != 2 && disposition != 5) {
+            /* Update of a file of the game folder: work on a copy in the user folder. */
+            if (copy_file(h, u)) { win_error_from_errno(); rt_ret_stdcall(INVALID_HANDLE, 7); return; }
+        } else if (flags & O_CREAT) {
+            make_parents(u);
+        } else if (!in_u && !in_h) {
+            win_last_error = ERROR_FILE_NOT_FOUND;
+            rt_ret_stdcall(INVALID_HANDLE, 7);
+            return;
+        }
+        if (!in_u && in_h && (disposition == 2 || disposition == 5)) make_parents(u);
+        if (disposition == 5 && !in_u) flags |= O_CREAT;
+    }
+    int fd = open(target, flags, 0644);
+    WIN_TRACE("CreateFileA(%s -> %s, %#x, %u) = %d\n", name, target, access, disposition, fd);
     if (fd < 0) {
         win_error_from_errno();
         rt_ret_stdcall(INVALID_HANDLE, 7);
@@ -291,9 +395,9 @@ RT_IMPORT(CloseHandle)
 RT_IMPORT(GetFileAttributesA)
 {
     const char *name = win_str(rt_arg(0));
-    char host[2048];
+    char h[2048], u[2048];
     struct stat st;
-    if (!win_host_path(name, host, sizeof host) || stat(host, &st)) {
+    if (!win_paths(name, h, u, sizeof h) || (stat(u, &st) && stat(h, &st))) {
         win_last_error = ERROR_FILE_NOT_FOUND;
         rt_ret_stdcall(0xffffffffu, 1);
         return;
@@ -301,11 +405,17 @@ RT_IMPORT(GetFileAttributesA)
     rt_ret_stdcall(S_ISDIR(st.st_mode) ? 0x10u : 0x20u, 1);
 }
 
+/* Delete and rename act on the user folder only. A file that exists only in the game folder stays. */
 RT_IMPORT(DeleteFileA)
 {
     const char *name = win_str(rt_arg(0));
-    char host[2048];
-    int ok = win_host_path(name, host, sizeof host) && unlink(host) == 0;
+    char h[2048], u[2048];
+    int ok = 0;
+    if (win_paths(name, h, u, sizeof h)) {
+        if (exists(u)) ok = unlink(u) == 0;
+        else if (exists(h)) { errno = EACCES; }
+        else errno = ENOENT;
+    }
     WIN_TRACE("DeleteFileA(%s) = %d\n", name, ok);
     if (!ok) win_error_from_errno();
     rt_ret_stdcall((uint32_t)ok, 1);
@@ -313,28 +423,53 @@ RT_IMPORT(DeleteFileA)
 
 RT_IMPORT(MoveFileA)
 {
-    char from[2048], to[2048];
-    struct stat st;
-    int ok = win_host_path(win_str(rt_arg(0)), from, sizeof from) && win_host_path(win_str(rt_arg(1)), to, sizeof to);
-    if (ok && stat(to, &st) == 0) { win_last_error = ERROR_ALREADY_EXISTS; ok = 0; }
-    else if (ok && rename(from, to)) { win_error_from_errno(); ok = 0; }
+    char fh[2048], fu[2048], th[2048], tu[2048];
+    int ok = win_paths(win_str(rt_arg(0)), fh, fu, sizeof fh) && win_paths(win_str(rt_arg(1)), th, tu, sizeof th);
+    if (ok && (exists(tu) || exists(th))) { win_last_error = ERROR_ALREADY_EXISTS; ok = 0; }
+    else if (ok && exists(fu)) {
+        make_parents(tu);
+        if (rename(fu, tu)) { win_error_from_errno(); ok = 0; }
+    } else if (ok && exists(fh) && !is_dir(fh)) {
+        /* The source is in the game folder: the new name appears in the user folder. */
+        if (copy_file(fh, tu)) { win_error_from_errno(); ok = 0; }
+    } else if (ok) {
+        errno = exists(fh) ? EACCES : ENOENT;
+        win_error_from_errno();
+        ok = 0;
+    }
+    WIN_TRACE("MoveFileA(%s, %s) = %d\n", win_str(rt_arg(0)), win_str(rt_arg(1)), ok);
     rt_ret_stdcall((uint32_t)ok, 2);
 }
 
 RT_IMPORT(CreateDirectoryA)
 {
-    char host[2048];
-    int ok = win_host_path(win_str(rt_arg(0)), host, sizeof host) && mkdir(host, 0755) == 0;
-    if (!ok) win_last_error = errno == EEXIST ? ERROR_ALREADY_EXISTS : ERROR_PATH_NOT_FOUND;
+    char h[2048], u[2048], parent[2048];
+    int ok = win_paths(win_str(rt_arg(0)), h, u, sizeof h);
+    if (ok && (exists(u) || exists(h))) { win_last_error = ERROR_ALREADY_EXISTS; rt_ret_stdcall(0, 2); return; }
+    if (ok) {
+        char *slash;
+        snprintf(parent, sizeof parent, "%s", h);
+        slash = strrchr(parent, '/');
+        if (slash && slash != parent) *slash = 0;
+        int parent_h = is_dir(parent);
+        snprintf(parent, sizeof parent, "%s", u);
+        slash = strrchr(parent, '/');
+        if (slash) *slash = 0;
+        if (!parent_h && !is_dir(parent)) ok = 0, win_last_error = ERROR_PATH_NOT_FOUND;
+        else {
+            make_parents(u);
+            ok = mkdir(u, 0755) == 0;
+            if (!ok) win_last_error = ERROR_PATH_NOT_FOUND;
+        }
+    } else win_last_error = ERROR_PATH_NOT_FOUND;
     rt_ret_stdcall((uint32_t)ok, 2);
 }
 
 RT_IMPORT(SetCurrentDirectoryA)
 {
     const char *name = win_str(rt_arg(0));
-    char host[2048], full[1024];
-    struct stat st;
-    if (!win_host_path(name, host, sizeof host) || stat(host, &st) || !S_ISDIR(st.st_mode)) {
+    char h[2048], u[2048], full[1024];
+    if (!win_paths(name, h, u, sizeof h) || !(is_dir(u) || is_dir(h))) {
         win_last_error = ERROR_PATH_NOT_FOUND;
         rt_ret_stdcall(0, 1);
         return;
@@ -422,7 +557,7 @@ RT_IMPORT(FileTimeToSystemTime)
 /* The original does not close every find (the CD check), and Windows has no small limit. */
 #define MAX_FINDS 4096
 #define FIND_BASE 0x20000u
-typedef struct { int used; char *dir; char **names; int count, next; } Find;
+typedef struct { int used; char **names; char **paths; int count, next; } Find;
 static Find finds[MAX_FINDS];
 
 /* * and ? without regard to case. As on Windows, "*.*" matches every name, also one without a dot. */
@@ -448,11 +583,10 @@ static int wild_match(const char *pat, const char *s)
 }
 
 /* WIN32_FIND_DATAA: attributes 0, times 4/0xc/0x14, size 0x1c/0x20, name 0x2c, short name 0x130. */
-static void fill_find_data(Find *f, uint32_t data, const char *name)
+static void fill_find_data(Find *f, uint32_t data, int idx)
 {
-    char path[2400];
     struct stat st;
-    snprintf(path, sizeof path, "%s/%s", f->dir, name);
+    const char *path = f->paths[idx];
     memset(g_mem + data, 0, 0x140);
     if (stat(path, &st) == 0) {
         wr32(g_mem, data, S_ISDIR(st.st_mode) ? 0x10u : 0x20u);
@@ -463,22 +597,44 @@ static void fill_find_data(Find *f, uint32_t data, const char *name)
         wr32(g_mem, data + 0x1c, (uint32_t)((uint64_t)st.st_size >> 32));
         wr32(g_mem, data + 0x20, (uint32_t)st.st_size);
     }
-    win_put_str(data + 0x2c, name, 260);
+    win_put_str(data + 0x2c, f->names[idx], 260);
 }
 
 static void free_find(Find *f)
 {
-    for (int i = 0; i < f->count; i++) free(f->names[i]);
+    for (int i = 0; i < f->count; i++) { free(f->names[i]); free(f->paths[i]); }
     free(f->names);
-    free(f->dir);
+    free(f->paths);
     memset(f, 0, sizeof *f);
+}
+
+/* Adds the matching names of one folder; a name already listed (ignoring case) is skipped. */
+static void find_add_dir(Find *f, const char *host, const char *mask, int is_root)
+{
+    DIR *d = opendir(host);
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        if (is_root && (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))) continue;
+        if (!wild_match(mask, e->d_name)) continue;
+        int dup = 0;
+        for (int i = 0; i < f->count && !dup; i++) dup = !strcasecmp(f->names[i], e->d_name);
+        if (dup) continue;
+        f->names = realloc(f->names, sizeof(char *) * (size_t)(f->count + 1));
+        f->paths = realloc(f->paths, sizeof(char *) * (size_t)(f->count + 1));
+        char path[2400];
+        snprintf(path, sizeof path, "%s/%s", host, e->d_name);
+        f->names[f->count] = strdup(e->d_name);
+        f->paths[f->count++] = strdup(path);
+    }
+    closedir(d);
 }
 
 RT_IMPORT(FindFirstFileA)
 {
     const char *pattern = win_str(rt_arg(0));
     uint32_t data = rt_arg(1);
-    char full[1024], dirpart[1024], host[2048];
+    char full[1024], dirpart[1024], h[2048], u[2048];
     full_path(pattern, full, sizeof full);
     char *slash = strrchr(full, '\\');
     const char *mask = slash + 1;
@@ -487,31 +643,23 @@ RT_IMPORT(FindFirstFileA)
     int i;
     for (i = 0; i < MAX_FINDS; i++) if (!finds[i].used) { f = &finds[i]; break; }
     if (!f) rt_fatal("too many finds");
-    DIR *d = win_host_path(dirpart, host, sizeof host) ? opendir(host) : NULL;
-    if (!d) {
+    if (!win_paths(dirpart, h, u, sizeof h) || !(is_dir(u) || is_dir(h))) {
         win_last_error = ERROR_PATH_NOT_FOUND;
         rt_ret_stdcall(INVALID_HANDLE, 2);
         return;
     }
     f->used = 1;
-    f->dir = strdup(host);
     int is_root = strlen(dirpart) <= 3;
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        if (is_root && (!strcmp(e->d_name, ".") || !strcmp(e->d_name, ".."))) continue;
-        if (!wild_match(mask, e->d_name)) continue;
-        f->names = realloc(f->names, sizeof(char *) * (size_t)(f->count + 1));
-        f->names[f->count++] = strdup(e->d_name);
-    }
-    closedir(d);
-    WIN_TRACE("FindFirstFileA(%s) in %s: %d matches\n", pattern, host, f->count);
+    find_add_dir(f, u, mask, is_root);          /* the user folder first: it wins on equal names */
+    find_add_dir(f, h, mask, is_root);
+    WIN_TRACE("FindFirstFileA(%s) in %s + %s: %d matches\n", pattern, u, h, f->count);
     if (!f->count) {
         free_find(f);
         win_last_error = ERROR_FILE_NOT_FOUND;
         rt_ret_stdcall(INVALID_HANDLE, 2);
         return;
     }
-    fill_find_data(f, data, f->names[0]);
+    fill_find_data(f, data, 0);
     f->next = 1;
     rt_ret_stdcall(FIND_BASE + 4 * (uint32_t)i, 2);
 }
@@ -531,7 +679,7 @@ RT_IMPORT(FindNextFileA)
         rt_ret_stdcall(0, 2);
         return;
     }
-    fill_find_data(f, rt_arg(1), f->names[f->next++]);
+    fill_find_data(f, rt_arg(1), f->next++);
     rt_ret_stdcall(1, 2);
 }
 
