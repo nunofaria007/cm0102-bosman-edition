@@ -6,7 +6,7 @@ Before a call the locals go back into `cpu` and after it they come back. Memory 
 """
 from capstone import x86_const as X
 
-from widescreen import PATCHES
+from widescreen import INSNS, PATCHES
 
 PATCHED = set()     # the addresses of PATCHES that a translation used
 
@@ -163,7 +163,10 @@ class FunctionWriter:
             self.e(f"/* {a:x}: {text} */")
             mark = len(body)
             try:
-                falls = self.insn(insn)
+                if a in INSNS:
+                    falls = self.replace_insn(insn)
+                else:
+                    falls = self.insn(insn)
                 self.handled += 1
                 if a in PATCHES:
                     self.patch(body, mark, a)
@@ -202,6 +205,15 @@ class FunctionWriter:
         if f.entry != addrs[0]:
             head.append(f"    goto L_{f.entry:x};")
         return "\n".join(head + lines + ["}"]) + "\n"
+
+    def replace_insn(self, insn):
+        """Writes the C code of widescreen.py INSNS in place of the instruction."""
+        text, code = INSNS[insn.address]
+        if (insn.mnemonic + " " + insn.op_str).strip() != text:
+            raise SystemExit(f"widescreen.py: the instruction at {insn.address:#x} is not {text}")
+        self.e(code)
+        PATCHED.add(insn.address)
+        return True
 
     def patch(self, body, mark, a):
         """Replaces the constant of the instruction at a with its run-time value (widescreen.py)."""
