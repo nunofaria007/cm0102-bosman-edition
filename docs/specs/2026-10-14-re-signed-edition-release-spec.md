@@ -127,9 +127,11 @@ Merge danger: two-way door.
 Blocked by: none (it takes the clean files from slice 2 when they exist)
 Delivers: the runtime builds for 64-bit Windows; an NSIS installer that installs, starts and uninstalls.
 Merge danger: two-way door. Blast radius: the Mac build, which the smoke run guards.
-- [ ] The Mac build and its smoke run are unchanged
-- [ ] The installer installs and the game starts under CrossOver
-- [ ] Saves go to `%APPDATA%\cm0102`
+- [x] The Mac build and its smoke run are unchanged
+- [x] The installer installs and the game starts under CrossOver
+- [x] Saves go to `%APPDATA%\cm0102`
+- Build: download the SDL2 2.x mingw development release (`SDL2-devel-2.x-mingw.tar.gz`) from github.com/libsdl-org/SDL, then `cmake -B build-win -DCMAKE_TOOLCHAIN_FILE=packaging/windows/mingw-w64-x86_64.cmake -DSDL2_DIR=<SDL2>/x86_64-w64-mingw32/lib/cmake/SDL2 -DCM0102_EXE=<exe> -DCM0102_GAME_DIR=<clean files>` and `cmake --build build-win -j --target windows_installer`.
+- The runtime reaches the system through `src/recomp_rt/host.h`: `host/posix.c` on the Mac, `host/win32.c` on Windows. The installer puts the program in `C:\Program Files\CM 01-02 Re-Signed Edition` and the clean files in its folder `game`, which the program finds beside itself. The uninstaller asks before it deletes the saves. A silent uninstall (`/S`) keeps them.
 
 ### 7. Release 0.1.0
 Blocked by: 2, 4, 5, 6
