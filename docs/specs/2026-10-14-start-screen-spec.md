@@ -1,5 +1,5 @@
 # Screen stack and the start screen
-Status: In build
+Status: Shipped 2026-10-14
 
 ## Problem
 The port draws areas and widgets through the screen manager, but no screen of the original exists in it. The app shows a made-up demo. Nothing reacts to the mouse, and nothing moves from one screen to the next.
@@ -106,5 +106,5 @@ Blocked by: 3
 Delivers: the mouse globals from SDL, the poll and the mode 0 hit test, the main loop, the input function of the start screen, and the app start on the start screen.
 Merge danger: two-way door. Blast radius: the app start.
 - [x] The hit test returns the same widget as the original for random mouse states.
-- [ ] The app opens on the start screen, a menu item rebuilds it, and "Exit Game" quits. Manual check.
+- [x] The app opens on the start screen, a menu item rebuilds it, and "Exit Game" quits. Manual check by Max, 2026-10-14.
 - [x] The full differential test passes.
