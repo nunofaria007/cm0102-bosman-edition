@@ -118,7 +118,7 @@ a { color: inherit; }
 .release li::before { content: ""; position: absolute; left: 0; top: .45em; width: .55em; height: .55em; background: var(--accent); }
 .release .later li::before { background: #7a7a86; }
 .release .later { margin-top: 28px; color: var(--muted); }
-.shot { position: relative; min-height: 280px; }
+.shot { position: relative; aspect-ratio: 4 / 3; }
 .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; border: 2px solid #2433b8; }
 .shot figcaption { font-size: var(--step-small); color: var(--muted); margin-top: 10px; }
 .downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 32px; }
@@ -175,6 +175,11 @@ a { color: inherit; }
   .js [data-in], .js .hero h1 img, .js .hero h1 .edition, .js .hero .flank { opacity: 1 !important; transform: none !important; }
 }
 
+@media (max-width: 1000px) {
+  .release { grid-template-columns: 1fr; }
+  .shot { aspect-ratio: auto; }
+  .shot img { position: static; height: auto; }
+}
 /* Phone */
 @media (max-width: 760px) {
   .nav { grid-template-columns: 1fr auto; padding: 14px 16px; }
@@ -187,8 +192,6 @@ a { color: inherit; }
   .screen { padding: 56px 16px; }
   .bar { padding: 14px 12px; margin-bottom: 28px; }
   .release, .steps, .downloads { grid-template-columns: 1fr; }
-  .shot { min-height: 0; }
-  .shot img { position: static; height: auto; }
   .panel { padding: 20px; }
   .faq summary { padding: 16px 18px; font-size: 1.125rem; }
   .faq details p { padding: 0 18px 18px; font-size: 1.0625rem; }
