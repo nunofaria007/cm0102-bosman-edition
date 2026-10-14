@@ -137,7 +137,45 @@ def test_fade(ctx):
     return case + 1
 
 
+def test_screen_draw_names(ctx):
+    """Fixed sequences of background names, so that each rule of the name compare runs whatever the
+    random draws of the other tests do."""
+    draws = 0
+    with tempfile.TemporaryDirectory(dir="/tmp") as folder:
+        full = _write(folder, "full.rgn", _rgn(800, 600, _pixels(ctx, 800, 600))).encode()
+        sequences = [
+            ("empty twice", [b"", b""], 0),
+            ("same name twice", [full, full], 0),
+            ("other case", [full, full.upper()], 0),
+            ("no backgrounds, then empty", [full, b"", b""], 1),
+            ("no backgrounds, then a name", [b"", full, full], 1),
+        ]
+        for case, (label, names, no_backgrounds) in enumerate(sequences):
+            scene = ManagerScene(ctx)
+            ctx.sync_framebuffer(100 + case)
+            scene.new(0)
+            scene.reset(1)
+            _screen(ctx, scene)
+            scene.set_draw_globals(no_backgrounds, 0)
+            for step, background in enumerate(names):
+                name = f"names {label} draw {step}"
+                # The widgets change the screen between draws, so a second capture of an empty name
+                # differs from the first.
+                ctx.sync_framebuffer(200 + case * 10 + step)
+                scene.start_free_count()
+                scene.draw_screen(background)
+                ctx.port.send("frees")
+                ctx.expect_equal(f"{name}: images freed", ctx.original.frees / 2, int(ctx.port.reply()[0]))
+                ctx.expect_same_framebuffer(name)
+                scene.expect_same_flips(name)
+                scene.expect_same(name, "manager", 0)
+                scene.expect_same_image(name, "manager", 0, "background")
+                draws += 1
+    return draws
+
+
 TESTS = [
+    ("screen_draw_names", test_screen_draw_names),
     ("fade", test_fade),
     ("screen_draw", test_screen_draw),
 ]

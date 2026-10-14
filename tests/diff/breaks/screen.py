@@ -1,5 +1,5 @@
 """Deliberate breaks of the screen draw and the fade. Each one must fail a suite. See tools/breaks.py."""
-SUITES = ["fade", "screen_draw"]
+SUITES = ["fade", "screen_draw", "screen_draw_names"]
 
 # name, file, text to find (once in the file), text to put in its place
 BREAKS = [
@@ -10,7 +10,6 @@ BREAKS = [
     ("fade: clip", "src/si/gui_utils.c", "    if (steps == 0 || !gui_clip(x1, y1, x2, y2, &c)) return;", "    if (steps == 0) return;\n    gui_clip(x1, y1, x2, y2, &c);"),
     ("fade: flip box", "src/si/gui_utils.c", "display_flip(c.x1, c.y1, c.x2, c.y2);", "display_flip(c.x1, c.y1, c.x2, c.y2 + 1);"),
     ("draw: skip", "src/si/scrman.c", "    if (sm->skip_draw) return;\n", ""),
-    ("draw: no backgrounds", "src/si/scrman.c", "    if (g_no_backgrounds && background[0] != '\\0') background = \"\\\\\";\n", ""),
     ("draw: no backgrounds empty", "src/si/scrman.c", "if (g_no_backgrounds && background[0] != '\\0')", "if (g_no_backgrounds)"),
     ("draw: case", "src/si/scrman.c", "if (!strcasecmp(sm->background_name, name)) return;", "if (!strcmp(sm->background_name, name)) return;"),
     ("draw: same name", "src/si/scrman.c", "    if (!strcasecmp(sm->background_name, name)) return;\n", ""),
@@ -34,4 +33,5 @@ BREAKS = [
     ("load: reuse 555", "src/si/rgn_loader.c", "            convert_rgb555_to_rgb565(reuse->pixels, w * h);\n", ""),
     ("draw: both fail clears", "src/si/scrman.c", "        if (!img) return;", "        if (!img) {\n            rgn_free(sm->background);\n            sm->background = NULL;\n            return;\n        }"),
     ("draw: both fail forgets name", "src/si/scrman.c", "        if (!img) return;", "        if (!img) {\n            sm->background_name[0] = 1;\n            return;\n        }"),
+    ("draw: no backgrounds", "src/si/scrman.c", "    if (g_no_backgrounds && background[0] != '\\0') strcpy(background, \"\\\\\");\n", ""),
 ]
