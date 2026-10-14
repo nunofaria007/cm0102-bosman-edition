@@ -1,4 +1,5 @@
-/* The flat memory, the PE load, the heap, calls through addresses and the stops. */
+/* The flat memory, the PE load, calls through addresses, host functions at fake addresses, the x87
+ * state save and the stops. The heap is in heap.c. */
 #include "rt.h"
 #include "rt_host.h"
 
@@ -11,65 +12,9 @@ Cpu cpu;
 Fpu fpu;
 uint8_t *g_mem;
 
-static uint32_t heap_top = RT_HEAP_BASE;
-
-/* Block sizes for realloc: an open hash from address to size. */
-static uint32_t *size_keys, *size_vals;
-static uint32_t size_cap, size_count;
-
-static void size_put(uint32_t addr, uint32_t size)
-{
-    if (size_count * 2 >= size_cap) {
-        uint32_t old_cap = size_cap, *ok = size_keys, *ov = size_vals;
-        size_cap = size_cap ? size_cap * 2 : 1024;
-        size_keys = calloc(size_cap, 4);
-        size_vals = calloc(size_cap, 4);
-        size_count = 0;
-        for (uint32_t i = 0; i < old_cap; i++)
-            if (ok[i]) size_put(ok[i], ov[i]);
-        free(ok);
-        free(ov);
-    }
-    uint32_t i = (addr >> 4) * 2654435761u & (size_cap - 1);
-    while (size_keys[i] && size_keys[i] != addr) i = (i + 1) & (size_cap - 1);
-    if (!size_keys[i]) size_count++;
-    size_keys[i] = addr;
-    size_vals[i] = size;
-}
-
-uint32_t rt_block_size(uint32_t addr)
-{
-    if (!size_cap) return 0;
-    uint32_t i = (addr >> 4) * 2654435761u & (size_cap - 1);
-    while (size_keys[i]) {
-        if (size_keys[i] == addr) return size_vals[i];
-        i = (i + 1) & (size_cap - 1);
-    }
-    return 0;
-}
-
-void rt_set_block_size(uint32_t addr, uint32_t size) { size_put(addr, size); }
-
-uint32_t rt_alloc(uint32_t size)
-{
-    uint32_t addr = heap_top;
-    heap_top += ((size ? size : 1) + 15) & ~15u;
-    if (heap_top > RT_HEAP_BASE + RT_HEAP_SIZE) rt_fatal("heap full");
-    size_put(addr, size);
-    return addr;
-}
-
-uint32_t rt_alloc_str(const char *s)
-{
-    uint32_t n = (uint32_t)strlen(s) + 1;
-    uint32_t a = rt_alloc(n);
-    memcpy(g_mem + a, s, n);
-    return a;
-}
-
-uint32_t rt_heap_top(void) { return heap_top; }
-
 static uint32_t image_base, image_size;
+const uint8_t *rt_exe_data;
+uint32_t rt_exe_size;
 
 uint32_t rt_image_base(void) { return image_base; }
 uint32_t rt_image_size(void) { return image_size; }
@@ -103,7 +48,8 @@ void rt_init(const char *exe_path)
         uint32_t len = vsize && vsize < rsize ? vsize : rsize;
         memcpy(g_mem + image_base + va, data + rptr, len);
     }
-    free(data);
+    rt_exe_data = data;                      /* kept for the resources (cursors, icon) */
+    rt_exe_size = (uint32_t)n;
     for (uint32_t i = 0; i < rt_iat_size; i++) wr32(g_mem, rt_iat[i].iat, rt_iat[i].stub);
     fpu_init();
     fpu.cw = 0x27f;                        /* what Windows gives a new process */
@@ -150,8 +96,49 @@ void wrf80(uint8_t *m, uint32_t a, double v)
     memcpy(m + a + 8, &se, 2);
 }
 
+/* fnsave and frstor. The 108-byte image: control, status and tag words at 0, 4 and 8, then the eight
+ * registers ST(0)..ST(7) as 80-bit values from offset 28. fnsave then resets the x87. */
+void rt_fnsave(uint8_t *m, uint32_t a)
+{
+    memset(m + a, 0, 108);
+    wr32(m, a, fpu.cw);
+    wr32(m, a + 4, fstatus());
+    wr32(m, a + 8, 0);
+    for (int i = 0; i < 8; i++) wrf80(m, a + 28 + 10 * (uint32_t)i, ST(i));
+    fpu_init();
+}
+
+void rt_frstor(uint8_t *m, uint32_t a)
+{
+    uint32_t sw = rd32(m, a + 4);
+    fpu.cw = (uint16_t)rd32(m, a);
+    fpu.top = (sw >> 11) & 7;
+    fpu.sw = (uint16_t)(sw & ~0x3800u);
+    for (int i = 0; i < 8; i++) ST(i) = rdf80(m, a + 28 + 10 * (uint32_t)i);
+}
+
+/* Host functions at fake addresses: COM methods and the results of GetProcAddress. */
+#define MAX_HOST_FNS 1024
+static struct { RtFn fn; const char *name; } host_fns[MAX_HOST_FNS];
+static uint32_t host_fn_count;
+
+uint32_t rt_host_fn(const char *name, RtFn fn)
+{
+    for (uint32_t i = 0; i < host_fn_count; i++)
+        if (host_fns[i].fn == fn && host_fns[i].name == name) return RT_HOST_FN_BASE + 4 * i;
+    if (host_fn_count == MAX_HOST_FNS) rt_fatal("too many host functions");
+    host_fns[host_fn_count].fn = fn;
+    host_fns[host_fn_count].name = name;
+    return RT_HOST_FN_BASE + 4 * host_fn_count++;
+}
+
+static int is_host_fn(uint32_t target)
+{
+    return target >= RT_HOST_FN_BASE && target < RT_HOST_FN_BASE + 4 * host_fn_count && !(target & 3);
+}
+
 /* Calls through an address. */
-RtFn rt_lookup(uint32_t target)
+static const RtEntry *find_entry(uint32_t target)
 {
     uint32_t lo = 0, hi = rt_table_size;
     while (lo < hi) {
@@ -159,14 +146,62 @@ RtFn rt_lookup(uint32_t target)
         if (rt_table[mid].addr < target) lo = mid + 1;
         else hi = mid;
     }
-    return lo < rt_table_size && rt_table[lo].addr == target ? rt_table[lo].fn : NULL;
+    return lo < rt_table_size && rt_table[lo].addr == target ? &rt_table[lo] : NULL;
 }
+
+RtFn rt_lookup(uint32_t target)
+{
+    if (is_host_fn(target)) return host_fns[(target - RT_HOST_FN_BASE) / 4].fn;
+    const RtEntry *e = find_entry(target);
+    return e ? e->fn : NULL;
+}
+
+const char *rt_name_of(uint32_t target)
+{
+    if (is_host_fn(target)) return host_fns[(target - RT_HOST_FN_BASE) / 4].name;
+    const RtEntry *e = find_entry(target);
+    return e ? e->name : "?";
+}
+
+int rt_unwinding;
+uint32_t rt_call_target;
 
 void rt_call(uint32_t target)
 {
+    rt_call_target = target;
     RtFn fn = rt_lookup(target);
     if (!fn) rt_fatal("call to %#x, which is not a recompiled function (from %#x)", target, rd32(g_mem, cpu.esp));
     fn();
+}
+
+void rt_jump(uint32_t target)
+{
+    if (is_host_fn(target)) { host_fns[(target - RT_HOST_FN_BASE) / 4].fn(); return; }
+    const RtEntry *e = find_entry(target);
+    if (!e) rt_fatal("jump to %#x, which is not a recompiled entry", target);
+    e->fn();
+    /* A resume entry ran the rest of an older frame: unwind the host frames above it. */
+    if (e->flags & RT_RESUME) rt_unwinding = 1;
+}
+
+/* Calls a function of the original from the host with 32-bit arguments and returns eax. The callee may
+ * be cdecl or stdcall: esp and the other registers come back as they were. If the call unwinds past the
+ * host (rt_unwinding), cpu stays as the unwinding left it. */
+uint32_t rt_callback(uint32_t target, int nargs, const uint32_t *args)
+{
+    Cpu saved = cpu;
+    for (int i = nargs - 1; i >= 0; i--) {
+        cpu.esp -= 4;
+        wr32(g_mem, cpu.esp, args[i]);
+    }
+    cpu.esp -= 4;
+    wr32(g_mem, cpu.esp, RT_RETURN_ADDR);
+    rt_call(target);
+    if (rt_unwinding) return cpu.eax;
+    uint32_t eax = cpu.eax;
+    cpu = saved;
+    cpu.eax = eax;
+    return eax;
 }
 
 void rt_fatal(const char *fmt, ...)
@@ -177,11 +212,18 @@ void rt_fatal(const char *fmt, ...)
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     va_end(ap);
+    if (rt_on_fatal) rt_on_fatal();
     exit(70);
 }
+
+void (*rt_on_fatal)(void);
 
 void rt_unimpl(uint32_t at, const char *text) { rt_fatal("instruction at %#x is not translated: %s", at, text); }
 void rt_fell_off(uint32_t at) { rt_fatal("execution reached %#x, where the recompiler found no code", at); }
 void rt_bad_jump(uint32_t at, uint32_t target) { rt_fatal("jump table at %#x: target %#x is not in the table", at, target); }
 void rt_missing_import(const char *name) { rt_fatal("import %s has no replacement (called from %#x)", name, rd32(g_mem, cpu.esp)); }
+void rt_missing_method(const char *iface, uint32_t offset)
+{
+    rt_fatal("%s method at vtable offset %#x has no replacement (called from %#x)", iface, offset, rd32(g_mem, cpu.esp));
+}
 void rt_divide_error(uint32_t at) { rt_fatal("divide error at %#x", at); }

@@ -250,9 +250,26 @@ static inline void rt_rep_stos(uint8_t *m, uint32_t size, uint32_t *ecx, uint32_
     *ecx = 0;
 }
 
-/* Calls through an address: generated functions, replacements and import stubs. */
+/* Calls through an address: generated functions, replacements, import stubs and host functions. */
 void rt_call(uint32_t target);
+void rt_jump(uint32_t target);
 RtFn rt_lookup(uint32_t target);
+
+/* Unwinding of host frames. longjmp and a jump to an exception continuation run the rest of an older
+ * frame of the original as a new host call (a resume entry). When it returns, every host frame of a
+ * generated function whose entry esp lies below the new esp is gone and returns at once. */
+extern int rt_unwinding;
+static inline int rt_unwound(uint32_t esp0)
+{
+    if (esp0 < cpu.esp) return 1;
+    rt_unwinding = 0;
+    return 0;
+}
+#define RT_AFTER_CALL() do { if (__builtin_expect(rt_unwinding, 0) && rt_unwound(esp0)) return; } while (0)
+
+/* fnsave and frstor: the 108-byte x87 state. */
+void rt_fnsave(uint8_t *m, uint32_t a);
+void rt_frstor(uint8_t *m, uint32_t a);
 
 /* Stops the program. */
 void rt_unimpl(uint32_t at, const char *text) __attribute__((noreturn));
@@ -271,7 +288,8 @@ static inline uint32_t rt_arg(int i) { return rd32(g_mem, cpu.esp + 4 + 4 * (uin
 static inline void rt_ret_cdecl(uint32_t v) { cpu.eax = v; cpu.esp += 4; }
 static inline void rt_ret_stdcall(uint32_t v, int nargs) { cpu.eax = v; cpu.esp += 4 + 4 * (uint32_t)nargs; }
 
-typedef struct { uint32_t addr; RtFn fn; const char *name; } RtEntry;
+#define RT_RESUME 1u      /* entered by a jump into the middle of a function; see rt_unwinding */
+typedef struct { uint32_t addr; RtFn fn; const char *name; uint32_t flags; } RtEntry;
 extern const RtEntry rt_table[];
 extern const uint32_t rt_table_size;
 

@@ -5,7 +5,8 @@ Usage:
 
 Build the program first:
     python tools/recomp/recomp.py --exe <cm0102.exe> --out build/recomp/load \\
-        --functions build/recomp/functions.txt --entries 0x528540 --compile tests/recomp/load_driver.c
+        --functions tools/recomp/functions.txt --entries 0x528540 --runtime tests/recomp/load_rt.c \\
+        --compile tests/recomp/load_driver.c
 
 Both runs start from the same memory: the PE image, the import address table pointing at the same stub
 addresses, a bump heap at 0x70000000 and the stack at 0x20000000. After the load the test compares the

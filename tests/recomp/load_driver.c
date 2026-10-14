@@ -13,6 +13,7 @@
 #include <time.h>
 
 void f_00528540(void);
+extern const char *rt_data_dir;      /* load_rt.c */
 
 static void dump(const char *dir, const char *name, uint32_t start, uint32_t end)
 {
@@ -40,6 +41,7 @@ int main(int argc, char **argv)
     size_t n = strlen(data);
     while (n > 1 && data[n - 1] == '/') data[--n] = 0;
     rt_data_dir = data;
+    rt_heap_bump = 1;
     rt_init(argv[1]);
 
     /* The state before the load, as in tests/recomp/reference.py run_load(). */

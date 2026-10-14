@@ -71,7 +71,7 @@ class Image:
                 if entry == 0:
                     break
                 if entry & 0x80000000:
-                    fn = "ord%d" % (entry & 0xFFFF)
+                    fn = "%s_ord%d" % (dll.split(".")[0].upper(), entry & 0xFFFF)   # e.g. WSOCK32_ord57
                 else:
                     fn = self.read(self.base + entry + 2, 128).split(b"\0")[0].decode()
                 result[self.base + iat + 4 * i] = (dll, fn, IMPORT_STUBS + 4 * k)

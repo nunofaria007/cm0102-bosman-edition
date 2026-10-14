@@ -9,13 +9,18 @@ Usage:
               writes (its normalized_result). A jump to one of them is a tail call. The indirect call
               table holds every translated function.
 --all         translate every function of --functions.
---compile     compile the generated C with the runtime (src/recomp_rt) and this driver into <out>/program.
+--runtime     a C file of replacements (RT_REPLACE, RT_IMPORT) that goes with the core runtime
+              (src/recomp_rt/*.c). Give it once per file.
+--shards      write the functions into this many files gen/fn_000.c ... so that a build system knows
+              their names before the run.
+--compile     compile the generated C with the runtime and this driver into <out>/program.
 
 The generated C is a translation of the original. It goes into the build folder and is not committed.
 """
 import argparse
 import collections
 import concurrent.futures
+import io
 import json
 import os
 import re
@@ -34,13 +39,21 @@ RUNTIME = os.path.join(ROOT, "src", "recomp_rt")
 GROUP = 64          # functions per C file
 
 
-def runtime_symbols():
+# Calls after which the code can be entered again at the return address: _setjmp3 returns a second
+# time through longjmp (0x94791c), which jumps to the saved return address.
+RESUME_AFTER_CALLS = {0x947998}
+
+
+def runtime_sources(extra):
+    core = [os.path.join(RUNTIME, n) for n in sorted(os.listdir(RUNTIME)) if n.endswith(".c")]
+    return core + [os.path.abspath(p) for p in extra]
+
+
+def runtime_symbols(sources):
     """The functions and imports that the runtime replaces, from its RT_REPLACE and RT_IMPORT lines."""
     replaced, imports = {}, set()
-    for name in os.listdir(RUNTIME):
-        if not name.endswith(".c"):
-            continue
-        text = open(os.path.join(RUNTIME, name)).read()
+    for path in sources:
+        text = open(path).read()
         for m in re.finditer(r"^RT_REPLACE\(([0-9a-f]{8}),\s*(\w+)\)", text, re.M):
             replaced[int(m.group(1), 16)] = m.group(2)
         for m in re.finditer(r"^RT_IMPORT\((\w+)\)", text, re.M):
@@ -56,6 +69,20 @@ def read_functions(path):
     return [int(x, 16) for x in text.split()]
 
 
+class ChangedFile(io.StringIO):
+    """A file written only when its text changes, so that a build does not compile it again."""
+    def __init__(self, path):
+        super().__init__()
+        self.path = path
+
+    def __exit__(self, *exc):
+        text = self.getvalue()
+        if not os.path.exists(self.path) or open(self.path).read() != text:
+            with open(self.path, "w") as out:
+                out.write(text)
+        return super().__exit__(*exc)
+
+
 def fname(addr):
     return "f_%08x" % addr
 
@@ -69,6 +96,9 @@ def main(argv):
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--no-follow", action="store_true")
     ap.add_argument("--compile")
+    ap.add_argument("--runtime", action="append", default=[])
+    ap.add_argument("--shards", type=int, default=0)
+    ap.add_argument("--stamp", help="a file to touch when the run ends (for a build system)")
     ap.add_argument("--opt", default="-O1")
     ap.add_argument("--jobs", type=int, default=os.cpu_count())
     args = ap.parse_args(argv)
@@ -79,10 +109,12 @@ def main(argv):
     entries = [int(x, 16) for x in args.entries.split(",") if x]
     if args.all:
         entries += known
-    replaced, imported = runtime_symbols()
+    sources = runtime_sources(args.runtime)
+    replaced, imported = runtime_symbols(sources)
     an = Analyzer(image, set(known) | set(entries))
 
     funcs = {}
+    resume = set()
     work = list(dict.fromkeys(entries))
     while work:
         e = work.pop()
@@ -93,6 +125,11 @@ def main(argv):
             continue
         f = an.function(e)
         funcs[e] = f
+        for a, insn in f.insns.items():
+            if insn.mnemonic == "call" and insn.operands[0].type == 2 \
+                    and insn.operands[0].imm & 0xFFFFFFFF in RESUME_AFTER_CALLS:
+                resume.add(a + insn.size)
+                work.append(a + insn.size)
         if not args.no_follow:
             work.extend(t for t in (f.calls | f.tails) if t not in funcs)
     t_analysis = time.time() - t_start
@@ -134,17 +171,22 @@ def main(argv):
     missing = sorted(a for a in referenced if a not in funcs and a not in replaced)
     files = []
     order = sorted(bodies)
-    for g in range(0, len(order), GROUP):
-        chunk = order[g:g + GROUP]
-        path = os.path.join(gen, "fn_%06x.c" % chunk[0])
-        with open(path, "w") as out:
+    if args.shards:
+        per = -(-len(order) // args.shards)
+        chunks = [order[i * per:(i + 1) * per] for i in range(args.shards)]
+        paths = [os.path.join(gen, "fn_%03d.c" % i) for i in range(args.shards)]
+    else:
+        chunks = [order[g:g + GROUP] for g in range(0, len(order), GROUP)]
+        paths = [os.path.join(gen, "fn_%06x.c" % c[0]) for c in chunks]
+    for chunk, path in zip(chunks, paths):
+        with ChangedFile(path) as out:
             out.write('#include "rt.h"\n#include "functions.h"\n\n')
             for e in chunk:
                 out.write(bodies[e])
                 out.write("\n")
         files.append(path)
 
-    with open(os.path.join(gen, "functions.h"), "w") as out:
+    with ChangedFile(os.path.join(gen, "functions.h")) as out:
         out.write("/* Generated by tools/recomp. */\n")
         for a in sorted(set(funcs) | set(referenced) | set(replaced)):
             out.write(f"void {fname(a)}(void);\n")
@@ -153,7 +195,7 @@ def main(argv):
             out.write(f"void imp_{n}(void);\n")
 
     # The table of addresses, the import address table and stubs for missing pieces.
-    with open(os.path.join(gen, "table.c"), "w") as out:
+    with ChangedFile(os.path.join(gen, "table.c")) as out:
         out.write('#include "rt.h"\n#include "rt_host.h"\n#include "functions.h"\n\n')
         for a in missing:
             out.write(f"void {fname(a)}(void) {{ rt_fatal(\"function %#x was not recompiled\", 0x{a:x}u); }}\n")
@@ -168,7 +210,8 @@ def main(argv):
         out.write("\nconst RtEntry rt_table[] = {\n")
         for a in sorted(rows):
             fn, n = rows[a]
-            out.write(f"    {{0x{a:x}u, {fn}, \"{n or fn}\"}},\n")
+            flags = "RT_RESUME" if a in resume else "0"
+            out.write(f"    {{0x{a:x}u, {fn}, \"{n or fn}\", {flags}}},\n")
         out.write("};\n")
         out.write(f"const uint32_t rt_table_size = {len(rows)};\n\n")
         out.write("const RtIat rt_iat[] = {\n")
@@ -189,6 +232,7 @@ def main(argv):
         "unhandled_at": [("%#x" % a, t, why) for a, t, why in unhandled_at[:200]],
         "decode_stops": stats["decode_stops"],
         "jump_tables": stats["jump_tables"],
+        "resume_entries": len(resume),
         "features": dict(features.most_common()),
         "missing_functions": ["%#x" % a for a in missing],
         "c_bytes": sum(os.path.getsize(p) for p in files),
@@ -200,19 +244,21 @@ def main(argv):
     report["mnemonics_unhandled"] = sorted(unhandled_mn)
 
     if args.compile:
-        report.update(compile_all(args, files))
+        report.update(compile_all(args, files, sources))
     json.dump(report, open(os.path.join(args.out, "report.json"), "w"), indent=1)
     short = {k: v for k, v in report.items() if k not in ("unhandled_at", "missing_functions")}
     print(json.dumps(short, indent=1))
+    if args.stamp:
+        with open(args.stamp, "w") as out:
+            out.write("%d functions\n" % stats["functions"])
     return 0
 
 
-def compile_all(args, files):
+def compile_all(args, files, runtime):
     obj = os.path.join(args.out, "obj")
     os.makedirs(obj, exist_ok=True)
     gen = os.path.join(args.out, "gen")
     flags = [args.opt, "-std=c11", "-fno-strict-aliasing", "-fwrapv", "-w", "-I", RUNTIME, "-I", gen]
-    runtime = [os.path.join(RUNTIME, n) for n in sorted(os.listdir(RUNTIME)) if n.endswith(".c")]
     sources = files + runtime + [os.path.abspath(args.compile)]
 
     def one(src):

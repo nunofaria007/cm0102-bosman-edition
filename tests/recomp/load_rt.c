@@ -1,6 +1,7 @@
-/* Replacements for functions of the original: the CRT heap and files, and the few game functions that
- * touch the screen, the disk or the CD. tests/recomp/reference.py replaces the same functions in the
- * Unicorn run with the same behaviour; keep the two lists the same.
+/* The replacements of the database load test: functions of the original (the CRT heap and files, and
+ * the few game functions that touch the screen, the disk or the CD) and three imports.
+ * tests/recomp/reference.py replaces the same functions in the Unicorn run with the same behaviour; keep
+ * the two lists the same. The whole game (src/recomp_rt/win) recompiles these functions instead.
  *
  * The heap is replaced, not recompiled: the CRT heap of MSVC 6 (the small-block heap over HeapAlloc and
  * VirtualAlloc) would need its Win32 calls emulated for no gain, and a bump heap that never reuses a
@@ -169,3 +170,7 @@ RT_REPLACE(00802f80, progress) { rt_count("progress"); rt_ret_stdcall(0, 4); }
 /* Free memory and free disk in MB: plenty. */
 RT_REPLACE(007a1710, free_memory_mb) { rt_count("free_memory_mb"); rt_ret_cdecl(1000); }
 RT_REPLACE(007a1820, free_disk_mb) { rt_count("free_disk_mb"); rt_ret_cdecl(1000); }
+
+RT_IMPORT(GlobalAlloc) { rt_count("GlobalAlloc"); rt_ret_stdcall(rt_alloc(rt_arg(1)), 2); }
+RT_IMPORT(GlobalFree) { rt_count("GlobalFree"); rt_ret_stdcall(0, 1); }
+RT_IMPORT(DeleteFileA) { rt_count("DeleteFileA"); rt_ret_stdcall(1, 1); }   /* deletes nothing */
