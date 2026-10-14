@@ -8,9 +8,10 @@
  * - a picture of exactly 800x600 (a background) is scaled to fill the screen when it is loaded.
  *
  * The settings file settings.txt in the user folder chooses the mode with the line
- * "display = classic" or "display = widescreen". The runtime writes the file when it is missing. */
+ * "display = classic" or "display = widescreen". options.c reads it and writes it when it is missing. */
 #include "win.h"
 #include "host.h"
+#include "options.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -20,47 +21,20 @@
 #define WIDE_W 1280u
 #define WIDE_H 800u
 
-static const char settings_text[] =
-    "# CM 01/02: Bosman Edition settings.\n"
-    "# display = widescreen draws the game at 1280x800. display = classic draws it at 800x600.\n"
-    "display = widescreen\n";
-
-/* Reads settings.txt in the user folder, or writes it with the defaults. Sets the screen size. */
+/* Reads settings.txt in the user folder through the options module (options.h), which writes the
+ * file when it is missing. Sets the screen size. */
 void win_read_settings(void)
 {
-    char path[1100], line[256];
+    char path[1100];
     snprintf(path, sizeof path, "%s/settings.txt", win_user_dir);
-    rt_screen_w = WIDE_W;
-    rt_screen_h = WIDE_H;
-    FILE *f = host_fopen(path, "r");
-    if (!f) {
-        f = host_fopen(path, "w");
-        if (f) {
-            fputs(settings_text, f);
-            fclose(f);
-        }
-        return;
+    options_load(path);
+    if (options_enum(OPT_DISPLAY) == DISPLAY_CLASSIC) {
+        rt_screen_w = CLASSIC_W;
+        rt_screen_h = CLASSIC_H;
+    } else {
+        rt_screen_w = WIDE_W;
+        rt_screen_h = WIDE_H;
     }
-    while (fgets(line, sizeof line, f)) {
-        char key[64], value[64];
-        char *p = line;
-        while (isspace((unsigned char)*p)) p++;
-        if (*p == '#' || !*p) continue;
-        if (sscanf(p, " %63[A-Za-z_] = %63s", key, value) != 2) continue;
-        for (char *q = key; *q; q++) *q = (char)tolower((unsigned char)*q);
-        for (char *q = value; *q; q++) *q = (char)tolower((unsigned char)*q);
-        if (strcmp(key, "display")) continue;
-        if (!strcmp(value, "classic")) {
-            rt_screen_w = CLASSIC_W;
-            rt_screen_h = CLASSIC_H;
-        } else if (!strcmp(value, "widescreen")) {
-            rt_screen_w = WIDE_W;
-            rt_screen_h = WIDE_H;
-        } else {
-            fprintf(stderr, "cm0102_recomp: %s: unknown display \"%s\", so widescreen mode is used.\n", path, value);
-        }
-    }
-    fclose(f);
 }
 
 /* A coordinate for 800x600 on the screen. A left or top edge maps to the first pixel of its part of

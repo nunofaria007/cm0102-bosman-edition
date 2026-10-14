@@ -99,6 +99,15 @@ if(APPLE)
     )
 endif()
 
+# Test of the settings file reader of the recompiled game: ctest, or build and run options_test.
+if(NOT WIN32)
+    enable_testing()
+    add_executable(options_test tests/options/test_options.c src/recomp_rt/win/options.c
+        src/recomp_rt/host/posix.c)
+    target_include_directories(options_test PRIVATE src/recomp_rt/win)
+    add_test(NAME options COMMAND options_test)
+endif()
+
 # The recompiled original (docs/specs/2026-10-14-recompile-spec.md). tools/recomp translates the
 # player's own cm0102.exe into C in the build folder; that C is a build product and stays out of git.
 # By default the first cm0102.exe in a folder above the repo (a git worktree sits deeper).
