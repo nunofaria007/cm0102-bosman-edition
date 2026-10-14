@@ -20,7 +20,7 @@ A recompiler translates every x86 instruction of `cm0102.exe` into C that works 
 ## Slices
 ### 1. Sizing run
 A recompiler prototype translates the database load and its callees, links them with a minimal runtime and compares every table with the Unicorn run of the original. It reports the speed of translation and the share of instructions it handles.
-- [ ] The recompiled load gives the same tables as the original.
+- [x] The recompiled load gives the same tables as the original.
 
 ### 2. Import inventory
 Every import of the original, grouped by library, with its calls, its arguments as the original uses them, and what an SDL replacement must do.
