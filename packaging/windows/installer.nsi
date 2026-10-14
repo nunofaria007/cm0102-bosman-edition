@@ -1,4 +1,4 @@
-; The Windows installer of CM 01/02: Re-Signed Edition (NSIS 3, made on the Mac with makensis).
+; The Windows installer of CM 01/02: Bosman Edition (NSIS 3, made on the Mac with makensis).
 ; packaging/windows/windows.cmake runs it with these defines:
 ;   VERSION   the project version, for example 0.1.0
 ;   EXE       the 64-bit cm0102_recomp.exe
@@ -34,11 +34,11 @@ ManifestDPIAware true
 !include "x64.nsh"
 !include "LogicLib.nsh"
 
-!define PRODUCT "CM 01/02: Re-Signed Edition"
-!define FILE_NAME "CM 01-02 Re-Signed Edition"
+!define PRODUCT "CM 01/02: Bosman Edition"
+!define FILE_NAME "CM 01-02 Bosman Edition"
 !define PROGRAM "${FILE_NAME}.exe"
-!define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\CM0102ReSignedEdition"
-!define APP_KEY "Software\CM0102ReSignedEdition"
+!define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\CM0102BosmanEdition"
+!define APP_KEY "Software\CM0102BosmanEdition"
 
 Name "${PRODUCT}"
 OutFile "${OUT_FILE}"

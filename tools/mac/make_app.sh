@@ -1,5 +1,5 @@
 #!/bin/bash
-# Makes "CM 01-02 Re-Signed Edition.app" and the .dmg (slice 5 of the release spec).
+# Makes "CM 01-02 Bosman Edition.app" and the .dmg (slice 5 of the release spec).
 #
 # Usage:
 #   tools/mac/make_app.sh --game <folder> [--exe <cm0102.exe>] [--icns <file.icns>]
@@ -49,9 +49,9 @@ if [ -n "$ICNS" ] && [ ! -f "$ICNS" ]; then echo "make_app.sh: icon $ICNS not fo
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 
-APP_NAME="CM 01-02 Re-Signed Edition"
+APP_NAME="CM 01-02 Bosman Edition"
 APP="$OUT/$APP_NAME.app"
-DMG="$OUT/CM-01-02-Re-Signed-Edition-$VERSION-mac.dmg"
+DMG="$OUT/CM-01-02-Bosman-Edition-$VERSION-mac.dmg"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 trash() {  # Move a path to the Trash with a time stamp.

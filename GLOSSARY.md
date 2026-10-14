@@ -20,9 +20,9 @@ _Avoid_: port (alone), remake, clone, wrapper
 
 ### Distribution
 
-**Re-Signed Edition**:
-The product name, written in full as "CM 01/02: Re-Signed Edition". It is an unofficial port of Championship Manager 01/02.
-_Avoid_: Championship Manager (as the product name), CM Modern Edition
+**Bosman Edition**:
+The product name, written in full as "CM 01/02: Bosman Edition", after the free transfers that older CM players know. It is an unofficial port of Championship Manager 01/02.
+_Avoid_: Championship Manager (as the product name), Re-Signed Edition (the old name), CM Modern Edition
 
 **Free release**:
 The CD image that Eidos made free to download in 2008. It holds version 3.9.60 of the original and its data.
@@ -41,7 +41,7 @@ A community collection that adds a loader, patches or updated data to the game. 
 _Avoid_: mod pack, starter kit
 
 **Release**:
-One numbered version of the Re-Signed Edition, published with a tag and the downloads for Mac and Windows.
+One numbered version of the Bosman Edition, published with a tag and the downloads for Mac and Windows.
 _Avoid_: build, drop
 
 **Download**:

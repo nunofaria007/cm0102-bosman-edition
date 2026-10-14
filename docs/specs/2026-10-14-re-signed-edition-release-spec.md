@@ -1,4 +1,4 @@
-# Re-Signed Edition 0.1.0 release
+# Bosman Edition 0.1.0 release
 Status: In build
 
 ## Problem
@@ -25,9 +25,9 @@ A player opens the site, clicks the button for Mac or Windows, installs, double-
 Settled in the grilling interview of 2026-10-14 (Q1 to Q45).
 
 **Product**
-- Name: "CM 01/02: Re-Signed Edition". The description says "an unofficial port of Championship Manager 01/02". The full name of the original appears only in descriptive text.
+- Name: "CM 01/02: Bosman Edition" (renamed from "Re-Signed Edition" by Max on 2026-10-14, after the Bosman free transfers; this file keeps its old name). The description says "an unofficial port of Championship Manager 01/02". The full name of the original appears only in descriptive text.
 - Logo: the classic CM 01/02 logo with the Apple and Windows marks from Simple Icons underneath. The logo files stay out of git. They come from the clean files at build time, or sit in the release assets.
-- Repo: `maxevans60/cm0102-re-signed-edition` (renamed from `cm0102-mac`). Site: `maxevans60.github.io/cm0102-re-signed-edition`.
+- Repo: `maxevans60/cm0102-bosman-edition` (renamed from `cm0102-mac`, then from `cm0102-re-signed-edition`). Site: `maxevans60.github.io/cm0102-bosman-edition`.
 
 **Clean files**
 - Free release: `CM0102.iso`, 303,628,288 bytes, SHA-256 `853134bbfc9e774424e62f9694ad7fe9dd7361c8bab93033f82fc906b31a5c53`. It holds version 3.9.60. The data sits in InstallShield cabinets.

@@ -118,7 +118,7 @@ def check_app(app, version, want_archs, manifest):
     # 2. Version.
     for key in ("CFBundleShortVersionString", "CFBundleVersion"):
         check(info.get(key) == version, "%s is %s" % (key, version), "%s is %r, expected %s" % (key, info.get(key), version))
-    title = ("CM 01/02: Re-Signed Edition " + version).encode()
+    title = ("CM 01/02: Bosman Edition " + version).encode()
     with open(exe, "rb") as f:
         data = f.read()
     check(title in data, "window title with the version is in the program",

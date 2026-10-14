@@ -18,7 +18,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-GH_REPO="maxevans60/cm0102-re-signed-edition"
+GH_REPO="maxevans60/cm0102-bosman-edition"
 GAME=""; SDL_MAC=""; SDL_MINGW=""; SITE=""; PUBLISH=0
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -51,7 +51,7 @@ CHECK_ARGS=(--manifest "$MANIFEST")
 echo "== Mac"
 "$REPO/tools/mac/make_app.sh" --game "$GAME" --sdl2-arm64 "$SDL_MAC/mac-arm64" --sdl2-x86_64 "$SDL_MAC/mac-x86_64" \
     --out "$REPO/build/mac"
-DMG="$REPO/build/mac/CM-01-02-Re-Signed-Edition-$VERSION-mac.dmg"
+DMG="$REPO/build/mac/CM-01-02-Bosman-Edition-$VERSION-mac.dmg"
 python3 -I "$REPO/tools/mac/check_package.py" "$DMG" ${CHECK_ARGS[@]+"${CHECK_ARGS[@]}"}
 cp "$DMG" "$OUT/"
 
@@ -60,7 +60,7 @@ cmake -B "$REPO/build-win" -DCMAKE_TOOLCHAIN_FILE="$REPO/packaging/windows/mingw
     -DSDL2_DIR="$SDL_MINGW/x86_64-w64-mingw32/lib/cmake/SDL2" -DCM0102_EXE="$GAME/cm0102.exe" \
     -DCM0102_GAME_DIR="$GAME" >/dev/null
 cmake --build "$REPO/build-win" -j --target windows_installer
-SETUP="$REPO/build-win/CM0102-Re-Signed-Edition-$VERSION-Setup.exe"
+SETUP="$REPO/build-win/CM0102-Bosman-Edition-$VERSION-Setup.exe"
 python3 -I "$REPO/tools/windows/check_installer.py" "$REPO/build-win/cm0102_recomp.exe" "$SETUP" --version "$VERSION"
 cp "$SETUP" "$OUT/"
 
@@ -82,8 +82,8 @@ fi
 
 PRE=()
 case "$VERSION" in 0.*) PRE=(--prerelease) ;; esac
-git -C "$REPO" tag -a "$TAG" -m "CM 01/02 Re-Signed Edition $VERSION"
+git -C "$REPO" tag -a "$TAG" -m "CM 01/02 Bosman Edition $VERSION"
 git -C "$REPO" push origin "$TAG"
-gh release create "$TAG" --repo "$GH_REPO" ${PRE[@]+"${PRE[@]}"} --title "CM 01/02 Re-Signed Edition $VERSION" \
+gh release create "$TAG" --repo "$GH_REPO" ${PRE[@]+"${PRE[@]}"} --title "CM 01/02 Bosman Edition $VERSION" \
     --notes-file "$OUT/notes.md" "$OUT/$(basename "$DMG")" "$OUT/$(basename "$SETUP")" "$OUT/site-assets.zip" "$OUT/SHA256SUMS"
 echo "Published $TAG."

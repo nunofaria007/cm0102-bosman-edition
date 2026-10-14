@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CM 01/02 Re-Signed</title>
+<title>CM 01/02 Bosman Edition</title>
 <meta name="description" content="An unofficial port of Championship Manager 01/02 for today's Mac and Windows. Free download, widescreen, official 3.9.68 data.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -213,7 +213,7 @@ a { color: inherit; }
 
 <header class="hero" id="top">
   <nav class="nav" aria-label="Main">
-    <a class="mark" href="#top">CM 01/02<span class="long"> Re-Signed Edition</span></a>
+    <a class="mark" href="#top">CM 01/02<span class="long"> Bosman Edition</span></a>
     <ul>
       <li><a href="#release">Release</a></li>
       <li><a href="#install">Install</a></li>
@@ -223,7 +223,7 @@ a { color: inherit; }
   </nav>
   <h1>
     <img src="assets/logo.png" width="1294" height="562" alt="Championship Manager Season 01/02">
-    <span class="edition">Re-Signed <em>Edition</em></span>
+    <span class="edition">Bosman <em>Edition</em></span>
   </h1>
   <div class="flank left">
     <p>Championship Manager 01/02, rebuilt to run on Mac and Windows.</p>
@@ -240,8 +240,8 @@ a { color: inherit; }
   <div class="inner">
     <h2 class="bar" id="release-title">What's in <em>this release</em></h2>
     <div class="downloads" data-in>
-      <a class="dl" data-link="mac" href="https://github.com/maxevans60/cm0102-re-signed-edition/releases"><svg aria-hidden="true"><use href="#apple"/></svg><span>Download for Mac<small data-note="mac">Coming soon</small></span></a>
-      <a class="dl" data-link="win" href="https://github.com/maxevans60/cm0102-re-signed-edition/releases"><svg aria-hidden="true"><use href="#win"/></svg><span>Download for Windows<small data-note="win">Coming soon</small></span></a>
+      <a class="dl" data-link="mac" href="https://github.com/maxevans60/cm0102-bosman-edition/releases"><svg aria-hidden="true"><use href="#apple"/></svg><span>Download for Mac<small data-note="mac">Coming soon</small></span></a>
+      <a class="dl" data-link="win" href="https://github.com/maxevans60/cm0102-bosman-edition/releases"><svg aria-hidden="true"><use href="#win"/></svg><span>Download for Windows<small data-note="win">Coming soon</small></span></a>
     </div>
     <div class="release">
       <div class="panel" data-in>
@@ -312,11 +312,11 @@ a { color: inherit; }
 <footer class="foot">
   <div class="inner">
     <img src="assets/logo-sm.png" width="647" height="281" alt="Championship Manager Season 01/02" loading="lazy">
-    <p>CM 01/02 Re-Signed Edition is an unofficial fan project. Not affiliated with or endorsed by Sports Interactive, SEGA, Eidos or Square Enix. The download includes the game files from the 2008 free release. Logo from the 2001 manual.</p>
+    <p>CM 01/02 Bosman Edition is an unofficial fan project. Not affiliated with or endorsed by Sports Interactive, SEGA, Eidos or Square Enix. The download includes the game files from the 2008 free release. Logo from the 2001 manual.</p>
     <ul>
-      <li><a href="https://github.com/maxevans60/cm0102-re-signed-edition">Source on GitHub</a></li>
-      <li><a href="https://github.com/maxevans60/cm0102-re-signed-edition/releases">All releases</a></li>
-      <li><a href="https://github.com/maxevans60/cm0102-re-signed-edition/issues">Report a problem</a></li>
+      <li><a href="https://github.com/maxevans60/cm0102-bosman-edition">Source on GitHub</a></li>
+      <li><a href="https://github.com/maxevans60/cm0102-bosman-edition/releases">All releases</a></li>
+      <li><a href="https://github.com/maxevans60/cm0102-bosman-edition/issues">Report a problem</a></li>
     </ul>
   </div>
 </footer>
@@ -339,7 +339,7 @@ document.documentElement.classList.add('js');
   // Point the download buttons at the newest release, pre-releases included.
   var ua = navigator.platform || navigator.userAgent;
   var isMac = /Mac/.test(ua), isWin = /Win/.test(ua);
-  fetch('https://api.github.com/repos/maxevans60/cm0102-re-signed-edition/releases?per_page=5')
+  fetch('https://api.github.com/repos/maxevans60/cm0102-bosman-edition/releases?per_page=5')
     .then(function (r) { return r.ok ? r.json() : []; })
     .then(function (list) {
       var rel = (list || []).filter(function (x) { return !x.draft; })[0];

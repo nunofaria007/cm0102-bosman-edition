@@ -207,7 +207,7 @@ if(APPLE AND TARGET cm0102_recomp)
     endif()
     add_custom_target(mac_check
         COMMAND "${RECOMP_PYTHON}" -I "${CMAKE_SOURCE_DIR}/tools/mac/check_package.py"
-            "${CM0102_APP_OUT}/CM-01-02-Re-Signed-Edition-${PROJECT_VERSION}-mac.dmg"
+            "${CM0102_APP_OUT}/CM-01-02-Bosman-Edition-${PROJECT_VERSION}-mac.dmg"
             --version "${PROJECT_VERSION}" ${CM0102_CHECK_ARCHS}
         COMMENT "Checking the Mac download"
         VERBATIM USES_TERMINAL)

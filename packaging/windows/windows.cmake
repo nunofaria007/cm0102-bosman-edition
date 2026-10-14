@@ -6,7 +6,7 @@
 enable_language(RC)
 
 # The exe properties carry the one version number of the project.
-set(CM0102_PRODUCT "CM 01/02: Re-Signed Edition")
+set(CM0102_PRODUCT "CM 01/02: Bosman Edition")
 # The icon is the original's ball, taken from the player's own cm0102.exe at build time (not in git).
 set(CM0102_ICO "${CMAKE_BINARY_DIR}/icons/cm0102.ico")
 add_custom_command(OUTPUT "${CM0102_ICO}"
@@ -24,7 +24,7 @@ target_link_libraries(cm0102_recomp PRIVATE SDL2::SDL2main SDL2::SDL2-static)
 
 set(CM0102_GAME_DIR "" CACHE PATH "The folder of the clean files that the Windows installer holds")
 find_program(MAKENSIS makensis REQUIRED)
-set(CM0102_SETUP "CM0102-Re-Signed-Edition-${PROJECT_VERSION}-Setup.exe")
+set(CM0102_SETUP "CM0102-Bosman-Edition-${PROJECT_VERSION}-Setup.exe")
 # makensis on macOS stops with std::bad_alloc when the locale is not set.
 add_custom_target(windows_installer
     COMMAND "${CMAKE_COMMAND}" -E env LC_ALL=en_US.UTF-8 "${MAKENSIS}" -V2 -INPUTCHARSET UTF8

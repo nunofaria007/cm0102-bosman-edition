@@ -4,10 +4,10 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleExecutable</key><string>cm0102_recomp</string>
-    <key>CFBundleIdentifier</key><string>io.github.maxevans60.cm0102-re-signed-edition</string>
+    <key>CFBundleIdentifier</key><string>io.github.maxevans60.cm0102-bosman-edition</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-    <key>CFBundleName</key><string>CM 01/02 Re-Signed</string>
-    <key>CFBundleDisplayName</key><string>CM 01/02: Re-Signed Edition</string>
+    <key>CFBundleName</key><string>CM 01/02 Bosman</string>
+    <key>CFBundleDisplayName</key><string>CM 01/02: Bosman Edition</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>@VERSION@</string>
     <key>CFBundleVersion</key><string>@VERSION@</string>
