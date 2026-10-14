@@ -95,3 +95,20 @@ Search for the same faults:
 
 Not checked on screen: the possession bar. A scripted run did not reach a match (injuries, offers and squad numbers stop Continue at random). The fix follows from the code. Max checks it in play.
 
+
+## 9. Sweep for click areas that do not match what is drawn (2026-10-14)
+
+Method: every function that reads the mouse position (`0xb67a20` x, `0xb67a14` y), every function that touches the widget rect fields (Display +0xba96e..+0xba97a) outside the display code, and every call of the text measure functions `0x5e5ad0` (width) and `0x5e5cd0` (line height).
+
+Mouse readers, all clean (they compare the mouse with area and widget rects, which the area draw sets in screen pixels):
+- `0x560490` hit test, `0x560c30` input poll (its 300 is a time in ms), `0x561050` and `0x561f10` scroll bar and thumb drag, `0x561210` widget drag (limits fixed in section 2), `0x5617c0` text entry, `0x5621f0` synthetic click, `0x5e2eb0` flip.
+- `0x5e8290` message box: drawn and tested with the same classic y numbers and the same left edge, so clicks land on the buttons.
+- Popup menus and drop-down lists: popup areas take their place from the owner widget (`0x403760`), and their items are widgets. Checked on screen: the manager popup, the Tactics and Edit drop-downs.
+
+Fault found: text widths. Screen code places widgets at "x + width of a text" or sizes them to a text, for example the underline of "Non-Playing Staff" (`0x461656`), "Friendly" on Next Match (`0x45d941`), the match screens (`0x71c9e2`, `0x71d445`, `0x72481c`), the title bar box (`0x808f68`) and the menu helpers (`0x5ed153`, `0x5ed25f`, `0x5edfa6`). The width came in screen pixels and the coordinates were scaled again, so the widget came out too wide or too far right of its text. Fix: `RT_WRAP` of `0x5e5ad0` returns the width in classic pixels (rounded up) to these calls. The calls in `widescreen.py` `TRUE_WIDTH` (text draw, text entry, widget init, message box, and `0x4aeaf0`, which the clickable names work owns) still get screen pixels; the build checks each address. Line heights (`0x5e5cd0`) stay as they are: rows and the widgets on them get the same vertical scale.
+
+Other fix: the tactics drop search `0x89f710` (`0x8a20f8`, `0x8a21e2`, `0x8a260f`, `0x8a26f6`) ignores a drop more than 800 screen pixels from every position. Now the limit is the screen width.
+
+Direct users of widget rects outside the display code: only `0x89f710` (tactics input), which works in screen pixels from the pitch widget. Checked on screen: a player dragged on the pitch lands on the position under the mouse, and the With Ball view draws its zones on the scaled pitch.
+
+Not checked on screen: the match screens (a scripted run does not reach a match; see section 8).

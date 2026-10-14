@@ -6,7 +6,7 @@ Before a call the locals go back into `cpu` and after it they come back. Memory 
 """
 from capstone import x86_const as X
 
-from widescreen import INSNS, PATCHES
+from widescreen import INSNS, PATCHES, TRUE_WIDTH
 
 PATCHED = set()     # the addresses of PATCHES that a translation used
 
@@ -170,6 +170,10 @@ class FunctionWriter:
                 self.handled += 1
                 if a in PATCHES:
                     self.patch(body, mark, a)
+                if a in TRUE_WIDTH:
+                    if text != "call 0x5e5ad0":
+                        raise SystemExit(f"widescreen.py: the instruction at {a:#x} is not call 0x5e5ad0")
+                    PATCHED.add(a)
             except Unhandled as exc:
                 del body[mark:]
                 self.unhandled.append((a, text, str(exc)))

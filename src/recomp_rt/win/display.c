@@ -62,6 +62,7 @@ void o_0055fba0(void);
 void o_0055f990(void);
 void o_005e40d0(void);
 void o_00800890(void);
+void o_005e5ad0(void);
 
 /* Area create, thiscall: (x1, y1, x2, y2, columns, column weights, rows, row weights, flags, colour,
  * owner). */
@@ -90,6 +91,26 @@ RT_WRAP(00800890, widget_set_rect)
     }
     scale_rect_args(1);
     o_00800890();
+}
+
+/* Text width 0x5e5ad0, cdecl: (font, text); returns the width in pixels. Screen code lays out widgets
+ * in classic coordinates and often places a widget at "x + width of a text", or sizes it to a text.
+ * The runtime scales those coordinates, so in widescreen mode such a call gets the width in classic
+ * pixels (rounded up): the widget then lands on the text, and its click area covers what is drawn.
+ * The calls of tools/recomp/widescreen.py TRUE_WIDTH compare with rects on the screen or draw, and
+ * get screen pixels. */
+extern const uint32_t rt_true_width_returns[];
+extern const uint32_t rt_true_width_count;
+
+RT_WRAP(005e5ad0, text_width)
+{
+    uint32_t ret = rd32(g_mem, cpu.esp);
+    o_005e5ad0();
+    if (rt_unwinding || rt_screen_w == CLASSIC_W) return;
+    for (uint32_t i = 0; i < rt_true_width_count; i++)
+        if (rt_true_width_returns[i] == ret) return;
+    int32_t w = (int32_t)cpu.eax;
+    if (w > 0) cpu.eax = (uint32_t)(((int64_t)w * CLASSIC_W + rt_screen_w - 1) / rt_screen_w);
 }
 
 /* The pixel at (x, y) of a 565 picture, mixed from its four neighbours by the weights fx, fy (0..256). */
