@@ -2,6 +2,7 @@
 #define LANGLIB_H
 
 #include "cm_types.h"
+#include <stddef.h>
 
 /*
  * Text of the original, from Langlib.cpp. The original looks a format up in
@@ -28,8 +29,9 @@ const char *langlib_version(void);
  * characters as plain text. The original drops an empty tag, skips one
  * argument for each "{" or "[", and replaces a tag with content in a later
  * pass. The original has no limit on the result. The port writes at most
- * 2047 characters after the leading spaces.
+ * `size` - 1 characters, the leading spaces included.
  */
-char *text_format(char *dst, const char *format, ...);
+char *text_format(char *dst, size_t size, const char *format, ...)
+    __attribute__((format(printf, 3, 4)));
 
 #endif

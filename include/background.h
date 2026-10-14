@@ -40,7 +40,7 @@ extern pics_section_t g_pics[PICS_SECTIONS];
  * earlier call read. A name stays only when its file opens: "name", then
  * "stadium\name", then "old\name", then the same three with "_name" when the
  * name does not start with "_". The kept name is the form that opened.
- * Line ends stay part of the last name of a line, as in the original.
+ * The file opens in text mode, as in the original, so CR LF reads as LF.
  * The original ends the program when it runs out of memory. The port stops
  * reading.
  */

@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 #define FORMAT_MAX 0x828 /* the buffer of the stripped format, 0xb6619c */
-#define RESULT_MAX 2048
 
 char g_text_buffer[0x834];
 char g_title_buffer[0x70];
@@ -52,19 +51,20 @@ static void strip_notes(char *out, const char *s)
     out[j < FORMAT_MAX ? j : FORMAT_MAX - 1] = '\0';
 }
 
-char *text_format(char *dst, const char *format, ...)
+char *text_format(char *dst, size_t size, const char *format, ...)
 {
     char stripped[FORMAT_MAX];
-    s32 n = 0;
+    size_t n = 0;
     va_list args;
 
-    while (format[n] == ' ') {
+    if (size == 0) return dst;
+    while (format[n] == ' ' && n + 1 < size) {
         dst[n] = ' ';
         n++;
     }
     strip_notes(stripped, format + n);
     va_start(args, format);
-    vsnprintf(dst + n, RESULT_MAX, stripped, args);
+    vsnprintf(dst + n, size - n, stripped, args);
     va_end(args);
     return dst + n;
 }

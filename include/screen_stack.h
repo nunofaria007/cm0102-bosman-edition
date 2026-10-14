@@ -159,6 +159,14 @@ extern bool (*g_screen_pump)(void);
 #define SCREEN_CONTINUE_ANY  -13
 
 /*
+ * The pop of the main loop (result -9, at 0x7fce46 of the original): frees
+ * screens from the last one back to the first flagged one. Returns false,
+ * and frees nothing more, when the screen to free is the first: the main loop
+ * then acts on -5.
+ */
+bool screen_stack_pop(screen_stack_t *st);
+
+/*
  * FUN_007fc7e0 for one local player. Each pass builds and draws the current
  * screen when it needs it, pumps the events, polls the input, calls the input
  * function with the clicked widget or -1, and acts on the result. The loop

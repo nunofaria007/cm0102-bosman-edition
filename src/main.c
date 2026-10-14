@@ -8,6 +8,7 @@
 #include "setup.h"
 #include "utils.h"
 #include "guio.h"
+#include <sys/stat.h>
 #include <time.h>
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -37,7 +38,8 @@ static void handle_event(SDL_Event *e)
             (e->key.keysym.mod & KMOD_ALT)) {
             display_toggle_fullscreen();
         }
-        if (e->key.keysym.sym == SDLK_ESCAPE) {
+        /* The original has no quit key. Escape ends the demo only. */
+        if (g_demo && e->key.keysym.sym == SDLK_ESCAPE) {
             g_running = false;
         }
         if (g_demo && e->key.keysym.sym == SDLK_UP) demo_scroll(-1);
@@ -83,6 +85,33 @@ static bool pump(void)
     return g_running;
 }
 
+/*
+ * The data folder when --data is missing: "Data" in the current folder, else
+ * the first "Data" folder that holds the fonts, looking upwards from the
+ * folder of the app. The original takes its folder from the registry.
+ */
+static const char *find_data_dir(const char *argv0)
+{
+    static char path[1024];
+    char dir[1024];
+    struct stat st;
+
+    if (stat("Data/arial_14.fnt", &st) == 0) return "./Data";
+    snprintf(dir, sizeof(dir), "%s", argv0);
+    for (int level = 0; level < 8; level++) {
+        char *slash = strrchr(dir, '/');
+
+        if (!slash) break;
+        *slash = '\0';
+        snprintf(path, sizeof(path), "%s/Data/arial_14.fnt", dir);
+        if (stat(path, &st) == 0) {
+            snprintf(path, sizeof(path), "%s/Data", dir);
+            return path;
+        }
+    }
+    return "./Data";
+}
+
 /* Runs the screens of the original, starting with "Setup Game". */
 static void run_game(const char *pictures_dir)
 {
@@ -99,7 +128,7 @@ static void run_game(const char *pictures_dir)
 /* Usage: cm0102 [--data <folder>] [--pictures <folder>] [--demo] [picture.rgn] */
 int main(int argc, char *argv[])
 {
-    const char *data_dir = "./Data";
+    const char *data_dir = NULL;
     const char *pictures_dir = NULL;
     const char *picture = NULL;
     static char default_pictures[1024];
@@ -119,6 +148,8 @@ int main(int argc, char *argv[])
             picture = argv[i];
         }
     }
+
+    if (!data_dir) data_dir = find_data_dir(argv[0]);
 
     if (!display_init("Championship Manager 01/02", false)) {
         fprintf(stderr, "Display init failed\n");

@@ -48,4 +48,5 @@ BREAKS = [
     ("start: slot 0 area", "src/cm3/setup.c", "                           1, NULL, 2, 0, -1);", "                           1, NULL, 1, 0, -1);"),
     ("start: forward", "src/cm3/setup.c", "    if (id == -3) return 0;", ""),
     ("start: side bar input", "src/cm3/setup.c", "    result = menubar_input(clicked);\n    if (result == 0) result = menubar_input_more(clicked);\n    return result;\n}\n", "    return 0;\n}\n"),
+    ("main loop pop: flagged count", "src/si/screen_stack.c", "        if (flagged) {\n            rec->flagged--;", "        if (flagged) {\n            (void)0;"),
 ]

@@ -77,7 +77,12 @@ static void run_text(const char *args)
     /* The tests use at most four arguments, each a text or an int. */
 #define ARG(i) (strings[i] ? (intptr_t)strings[i] : values[i])
     memset(result, 0, sizeof(result));
-    char *end = text_format(result, format, ARG(0), ARG(1), ARG(2), ARG(3));
+    /* The format comes from the test, so the compiler cannot check it. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+    char *end = text_format(result, sizeof(result), format, ARG(0), ARG(1),
+                            ARG(2), ARG(3));
+#pragma clang diagnostic pop
 #undef ARG
     printf("%ld ", (long)(end - result));
     print_hex(result);

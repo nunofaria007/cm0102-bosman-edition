@@ -104,7 +104,7 @@ s32 gui_back_next_bar(s32 back, s32 next)
     s16 area = scrman_area_create(screen_manager(), 100, 555, 790, 590, 2,
                                   weights, 1, NULL, 1, 0, -1);
 
-    text_format(text, "Back");
+    text_format(text, sizeof(text), "Back");
     if (back) {
         screen_cell_button(st, area, 0, 0, 0x30, GUI_COLOUR_GREY, 0xc, 3,
                            GUI_COLOUR_LIGHT_GREY, text, -2, 0);
@@ -112,7 +112,7 @@ s32 gui_back_next_bar(s32 back, s32 next)
         screen_cell_label(st, area, 0, 0, 0x30, GUI_COLOUR_GREY, 0x2c, 3,
                           GUI_COLOUR_LIGHT_GREY, text);
     }
-    text_format(text, "Next");
+    text_format(text, sizeof(text), "Next");
     if (next) {
         screen_cell_button(st, area, 1, 0, 0x30, GUI_COLOUR_GREY, 0xc, 3,
                            GUI_COLOUR_LIGHT_GREY, text, -3, 0);

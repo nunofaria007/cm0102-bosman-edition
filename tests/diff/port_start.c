@@ -66,22 +66,6 @@ static void dump(void)
 }
 
 /* The loop of a pop of the main loop: frees the last screen. */
-static void pop_last(void)
-{
-    screen_record_t *rec = &g_screen_stack.record;
-    screen_node_t *node = rec->last;
-
-    if (!node || !node->prev) return;
-    rec->current = rec->last = node->prev;
-    rec->last->next = NULL;
-    for (int i = 0; i < SCREEN_SLOTS; i++) {
-        if (node->slots[i].owned) free((void *)node->slots[i].value);
-    }
-    if (node->flag) rec->flagged--;
-    free(node);
-    rec->count--;
-}
-
 static void dump_pics(void)
 {
     for (int i = 0; i < PICS_SECTIONS; i++) {
@@ -151,7 +135,7 @@ bool start_command(const char *cmd, const char *args)
         g_dialog_code = (s32)next_long(&args);
         g_dialog_button = (s32)next_long(&args);
     } else if (!strcmp(cmd, "st_pop")) {
-        pop_last();
+        screen_stack_pop(&g_screen_stack);
     } else if (!strcmp(cmd, "st_back")) {
         /* The result -2 of the main loop: the screen before becomes current. */
         if (st->record.current && st->record.current->prev) {

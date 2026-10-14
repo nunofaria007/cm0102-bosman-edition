@@ -42,7 +42,7 @@ void menubar_build(u8 mode, s32 arg2)
     cells = scrman_area_create(sm, 5, 10, 85, 590, 1, NULL, 13, NULL, 1, 0,
                                -1);
 
-    text_format(g_text_buffer, "Version\n<%s - version>", langlib_version());
+    text_format(g_text_buffer, sizeof(g_text_buffer), "Version\n<%s - version>", langlib_version());
     screen_cell_label(st, cells, 0, row, 0x1061, 0, 0xc, 1, GUI_COLOUR_YELLOW,
                       g_text_buffer);
 
@@ -59,12 +59,12 @@ void menubar_build(u8 mode, s32 arg2)
                        GUI_COLOUR_LIGHT_GREY, ">>>", ID_FORWARD, 0);
 
     row++;
-    text_format(g_text_buffer, "Add\nManager");
+    text_format(g_text_buffer, sizeof(g_text_buffer), "Add\nManager");
     screen_cell_label(st, cells, 0, row, 0x1021, 0, 0x2c, 1,
                       GUI_COLOUR_LIGHT_GREY, g_text_buffer);
 
     row++;
-    text_format(g_text_buffer, "Restart\nGame");
+    text_format(g_text_buffer, sizeof(g_text_buffer), "Restart\nGame");
     if (st->record.player == 0 && flagged == 0) {
         screen_cell_button(st, cells, 0, row, 0x1021, 0, 0xc, 1,
                            GUI_COLOUR_YELLOW, g_text_buffer, ID_RESTART, 0);
@@ -74,7 +74,7 @@ void menubar_build(u8 mode, s32 arg2)
     }
 
     row++;
-    text_format(g_text_buffer, "Exit\nGame");
+    text_format(g_text_buffer, sizeof(g_text_buffer), "Exit\nGame");
     if (flagged == 0) {
         screen_cell_button(st, cells, 0, row, 0x1021, 0, 0xc, 1,
                            GUI_COLOUR_YELLOW, g_text_buffer, ID_EXIT, 0);
@@ -89,8 +89,13 @@ static void confirm(const char *question, s32 code)
 {
     char heading[0x100];
 
-    text_format(g_text_buffer, question);
-    confirm_push(setup_title(), text_format(heading, "Please Confirm"),
+    /* The original passes a fixed text as the format, so its '<' notes work. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-security"
+
+    text_format(g_text_buffer, sizeof(g_text_buffer), question);
+#pragma clang diagnostic pop
+    confirm_push(setup_title(), text_format(heading, sizeof(heading), "Please Confirm"),
                  g_text_buffer, 1, GUI_COLOUR_LIGHT_GREY, GUI_COLOUR_RED,
                  code);
 }

@@ -29,7 +29,11 @@ Port the screen stack of scrman.cpp for one local player, its main loop on SDL, 
 - The menu items "Start New Game", "Quick Start Game", "Restore Saved Game", "Delete Saved Game", "Network Play", "Game Settings", "Hall Of Fame", "Game Credits" and "Web Sites" rebuild the start screen. The side bar button "Exit Game" opens the "Please Confirm" screen of the original, and its "Yes" returns `SCREEN_QUIT`, where the original calls `exit(0)`. (Research of 2026-10-14 found the confirm screen. The interview assumed that Exit Game quits at once.)
 - The side bar shows "Version\n3.9.68", as the original does.
 - The command-line loads of the original (`-load`, `quick_start.cfg`, `auto_setup.cfg`) are left out.
-- The app with no arguments opens the start screen. `--demo` keeps the made-up screen.
+- The app with no arguments opens the start screen. `--demo` keeps the made-up screen. Without `--data`, the app takes `Data` in the current folder, or else the first `Data` folder with the fonts above the folder of the app. The original takes its folder from the registry.
+- The original has no quit key. Escape ends the demo only. Closing the window ends the main loop.
+- A quick tap gives the press and the release of the button in one pump pass. The pump of the port stops after a press, so the poll sees the button held once. The original would miss such a tap.
+- The review of 2026-10-14 found four differences in the main loop that no ported screen reaches, and the port now follows the original in each: the result starts at 0 in each pass; a continue with flagged screens but none that fits sets the result to 0; -10 with no flagged chain frees nothing and calls the input function with -1; the redraw after a click also sets 0x12f551 and clears the darken flag.
+- The text function takes the size of its buffer. The original has no limit.
 - Commits are local. Nothing is pushed.
 - The speed rules of 2026-10-13 apply: the break tool after each slice, one review at the end of the spec, and tests for what a real screen can reach.
 
@@ -103,4 +107,4 @@ Delivers: the mouse globals from SDL, the poll and the mode 0 hit test, the main
 Merge danger: two-way door. Blast radius: the app start.
 - [x] The hit test returns the same widget as the original for random mouse states.
 - [ ] The app opens on the start screen, a menu item rebuilds it, and "Exit Game" quits. Manual check.
-- [ ] The full differential test passes.
+- [x] The full differential test passes.

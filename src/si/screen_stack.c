@@ -179,15 +179,16 @@ void screen_stack_set_slot(screen_stack_t *st, s32 slot, uintptr_t value,
 
     /* The original ends the program (scrman.cpp 1754) or shows an error box. */
     if (!node || slot < 0 || slot >= SCREEN_SLOTS) return;
+    /* The copy comes first, so a slot can take a copy of its own text. */
+    char *text = value && copy ? malloc(strlen((const char *)value) + 1) : NULL;
+
+    if (value && copy && !text) return;
+    if (text) strcpy(text, (const char *)value);
     if (node->slots[slot].owned) {
         free((void *)node->slots[slot].value);
         node->slots[slot].owned = 0;
     }
-    if (value && copy) {
-        char *text = malloc(strlen((const char *)value) + 1);
-
-        if (!text) return;
-        strcpy(text, (const char *)value);
+    if (text) {
         node->slots[slot].value = (uintptr_t)text;
         node->slots[slot].owned = 1;
     } else {
@@ -256,12 +257,10 @@ static void drop_last(screen_record_t *rec)
     free_node(rec, node);
 }
 
-/*
- * -9: frees screens from the last one back to the first flagged one. Returns
- * false when it reaches the first screen: the result then becomes -5.
- */
-static bool pop(screen_record_t *rec)
+bool screen_stack_pop(screen_stack_t *st)
 {
+    screen_record_t *rec = &st->record;
+
     for (;;) {
         screen_node_t *node = rec->last;
         bool flagged = node->flag != 0;
@@ -278,7 +277,11 @@ static bool pop(screen_record_t *rec)
     }
 }
 
-/* -10: frees the chain of flagged screens that ends the stack. */
+/*
+ * -10: frees the chain of flagged screens that ends the stack. With no such
+ * chain it frees nothing. Returns false when the chain starts at the first
+ * screen: the result then becomes -5.
+ */
 static bool pop_chain(screen_record_t *rec)
 {
     screen_node_t *node = rec->last;
@@ -286,7 +289,8 @@ static bool pop_chain(screen_record_t *rec)
     while (node && !(node->flag && (!node->prev || !node->prev->flag))) {
         node = node->prev;
     }
-    if (!node || node == rec->first) {
+    if (!node) return true;
+    if (node == rec->first) {
         rec->flagged = 0;
         return false;
     }
@@ -297,17 +301,23 @@ static bool pop_chain(screen_record_t *rec)
     return true;
 }
 
-/* -5, -6, -8 and -13. Returns true when a pending flagged screen takes over. */
-static bool next_flagged(screen_record_t *rec, s32 result)
+/*
+ * -5, -6, -8 and -13. Returns true when a pending flagged screen takes over.
+ * With flagged screens but none that fits, the original also sets the result
+ * to 0, so -6 then acts as -5 and the loop returns 0.
+ */
+static bool next_flagged(screen_record_t *rec, s32 *result)
 {
     if (rec->flagged <= 0) return false;
     for (screen_node_t *node = rec->last; node; node = node->prev) {
-        if (node->flag && (result == SCREEN_CONTINUE_ANY || !node->exit)) {
+        if (node->flag && (*result == SCREEN_CONTINUE_ANY || !node->exit)) {
             rec->current = node;
             rec->rebuild = 1;
+            *result = 0;
             return true;
         }
     }
+    *result = 0;
     return false;
 }
 
@@ -322,6 +332,7 @@ s32 screen_stack_run(screen_stack_t *st)
     if (rec->rebuild) rec->started = (s32)time(NULL);
 
     for (;;) {
+        result = 0;
         if (rec->rebuild && rec->current) {
             g_left_held = g_right_held = 0;
             rec->rebuild = 0;
@@ -382,7 +393,7 @@ s32 screen_stack_run(screen_stack_t *st)
         case SCREEN_POP:
         case SCREEN_POP_CHAIN:
             leave_current(rec);
-            if (!(result == SCREEN_POP ? pop(rec) : pop_chain(rec))) {
+            if (!(result == SCREEN_POP ? screen_stack_pop(st) : pop_chain(rec))) {
                 result = SCREEN_CONTINUE;
                 goto act;
             }
@@ -398,10 +409,7 @@ s32 screen_stack_run(screen_stack_t *st)
         case SCREEN_CONTINUE_AWAY:
         case SCREEN_CONTINUE_8:
         case SCREEN_CONTINUE_ANY:
-            if (next_flagged(rec, result)) {
-                result = 0;
-                break;
-            }
+            if (next_flagged(rec, &result)) break;
             if (result == SCREEN_CONTINUE_AWAY) {
                 rec->done = 1;
                 rec->away = 1;
@@ -411,8 +419,13 @@ s32 screen_stack_run(screen_stack_t *st)
             rec->rebuild = 1;
             break;
         default:
-            /* The original redraws the whole screen after a click here. */
+            /*
+             * The original redraws the whole screen after a click here
+             * (FUN_00802d00). It also sets a field of unknown use.
+             */
             if (clicked != -1 && !rec->rebuild) {
+                sm->unknown_12f551 = 1;
+                sm->darken_screen = 0;
                 scrman_draw(sm, screen_stack_title(st), -1, -1, -1, -1);
             }
             break;

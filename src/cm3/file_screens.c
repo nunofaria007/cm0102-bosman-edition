@@ -63,7 +63,7 @@ void confirm_build(void)
                      text);
     }
     if (buttons == 0) {
-        text_format(g_text_buffer, "Ok");
+        text_format(g_text_buffer, sizeof(g_text_buffer), "Ok");
         scrman_widget_create(sm, 2, 100, 555, 790, 590, 0, 0, 0x30,
                              GUI_COLOUR_GREY, GUI_COLOUR_GREY, 0xc, 4,
                              GUI_COLOUR_LIGHT_GREY, g_text_buffer, 0, 3, 0,
@@ -77,10 +77,10 @@ void confirm_build(void)
         area = scrman_area_create(sm, 0, 0, 3, 1, 2, weights, 1, NULL, 1, 0,
                                   -1);
     }
-    text_format(g_text_buffer, "No");
+    text_format(g_text_buffer, sizeof(g_text_buffer), "No");
     screen_cell_button(st, area, 0, 0, 0x30, GUI_COLOUR_GREY, 0xc, 3,
                        GUI_COLOUR_LIGHT_GREY, g_text_buffer, 1, 0);
-    text_format(g_text_buffer, "Yes");
+    text_format(g_text_buffer, sizeof(g_text_buffer), "Yes");
     screen_cell_button(st, area, 1, 0, 0x30, GUI_COLOUR_GREY, 0xc, 3,
                        GUI_COLOUR_LIGHT_GREY, g_text_buffer, 2, 0);
 }
