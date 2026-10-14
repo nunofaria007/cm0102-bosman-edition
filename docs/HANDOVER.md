@@ -32,6 +32,8 @@ Max settled the plan on 2026-10-14 (interview Q50 to Q58). Spec: `docs/specs/202
 
 ## Rules that still apply
 
+- The site's "Coming next" panels read the open milestones and their issues labelled `enhancement` live from GitHub. A feature issue's title is the text players see, so write it for players. Closing the issue marks it Done on the site, and closing the milestone at release removes its panel. Bugs (label `bug`) never show.
+
 - Never commit the original's code or data, the logo or screenshots. Clean files only in downloads; the fan pack in `/Users/max/Downloads/Game` is never a build input.
 - Grilling before a new feature, then a spec. Track bugs and features as GitHub issues in a milestone.
 - Agents must not run `rm` with a wildcard or a variable path.
