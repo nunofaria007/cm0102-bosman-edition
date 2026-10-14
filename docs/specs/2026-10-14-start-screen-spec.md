@@ -25,9 +25,9 @@ Port the screen stack of scrman.cpp for one local player, its main loop on SDL, 
 - Input covers mode 0 of the original: the mouse position and the left button, the hit test and a press and release on a widget. The keyboard, popup areas, the scrollbar drag, the widget drag, text entry and the text timer are left out.
 - The window procedure of the original sets the mouse globals. The port sets the same values from SDL events.
 - The text function `FUN_0066f4e0` is ported for plain text, `%s` and `%d`. Its `{...}` and `[...]` tags are left out.
-- The background picker `FUN_0041bfb0` picks a random RGN file from the Pictures folder. The app takes the folder from `--pictures`, with `Pictures` next to the data folder as the default. In the differential test both programs get the same picture.
-- The menu items "Start New Game", "Quick Start Game", "Restore Saved Game", "Delete Saved Game", "Network Play", "Game Settings", "Hall Of Fame", "Game Credits" and "Web Sites" rebuild the start screen. The side bar button "Exit Game" quits.
-- The version text of the side bar shows the label only. The arguments that the original formats there are not traced.
+- The background picker `FUN_0041bfb0` picks a random picture from the "England" list of `Pictures/pics.cfg`, read as the original reads it. The original draws its random numbers from a pool in its data, seeded from the clock. The port uses its own random numbers. The app takes the folder from `--pictures`, with `Pictures` next to the data folder as the default. In the differential test both programs get the same title.
+- The menu items "Start New Game", "Quick Start Game", "Restore Saved Game", "Delete Saved Game", "Network Play", "Game Settings", "Hall Of Fame", "Game Credits" and "Web Sites" rebuild the start screen. The side bar button "Exit Game" opens the "Please Confirm" screen of the original, and its "Yes" quits. (Research of 2026-10-14 found the confirm screen. The interview assumed that Exit Game quits at once.)
+- The side bar shows "Version\n3.9.68", as the original does.
 - The command-line loads of the original (`-load`, `quick_start.cfg`, `auto_setup.cfg`) are left out.
 - The app with no arguments opens the start screen. `--demo` keeps the made-up screen.
 - Commits are local. Nothing is pushed.
