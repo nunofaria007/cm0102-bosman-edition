@@ -58,7 +58,7 @@ Settled in the grilling interview of 2026-10-14 (Q1 to Q45).
 
 **Site**
 - Content and order follow the OpenSGolf page (`crspytopgn.github.io/opensgolf`). The look follows the `design-taste-frontend` skill.
-- Top picture: the classic logo, cut from the 2001 manual cover, on a red hexagon net, with "Re-Signed Edition" in the style of "SEASON 01/02" (Max, 2026-10-14). Below it three sections in the style of the game's own screens: what's in the release (with the two downloads and one 4:3 screenshot), how to install, and questions. No donation link. No visit counter.
+- Top picture: the classic logo, cut from the 2001 manual cover, on a red hexagon net, with "Bosman Edition" in the style of "SEASON 01/02" (Max, 2026-10-14). Below it three sections in the style of the game's own screens: what's in the release (with the two downloads and one 4:3 screenshot), how to install, and questions. No donation link. No visit counter.
 - Footer: "An unofficial fan project. Not affiliated with or endorsed by Sports Interactive, SEGA, Eidos or Square Enix. The download includes the game files from the 2008 free release."
 - The site lives in `site/` and publishes with a GitHub Pages workflow. Downloads live in GitHub Releases only.
 
@@ -131,7 +131,7 @@ Merge danger: two-way door. Blast radius: the Mac build, which the smoke run gua
 - [x] The installer installs and the game starts under CrossOver
 - [x] Saves go to `%APPDATA%\cm0102`
 - Build: download the SDL2 2.x mingw development release (`SDL2-devel-2.x-mingw.tar.gz`) from github.com/libsdl-org/SDL, then `cmake -B build-win -DCMAKE_TOOLCHAIN_FILE=packaging/windows/mingw-w64-x86_64.cmake -DSDL2_DIR=<SDL2>/x86_64-w64-mingw32/lib/cmake/SDL2 -DCM0102_EXE=<exe> -DCM0102_GAME_DIR=<clean files>` and `cmake --build build-win -j --target windows_installer`.
-- The runtime reaches the system through `src/recomp_rt/host.h`: `host/posix.c` on the Mac, `host/win32.c` on Windows. The installer puts the program in `C:\Program Files\CM 01-02 Re-Signed Edition` and the clean files in its folder `game`, which the program finds beside itself. The uninstaller asks before it deletes the saves. A silent uninstall (`/S`) keeps them.
+- The runtime reaches the system through `src/recomp_rt/host.h`: `host/posix.c` on the Mac, `host/win32.c` on Windows. The installer puts the program in `C:\Program Files\CM 01-02 Bosman Edition` and the clean files in its folder `game`, which the program finds beside itself. The uninstaller always keeps the saves and says where they are.
 
 ### 7. Release 0.1.0
 Blocked by: 2, 4, 5, 6
