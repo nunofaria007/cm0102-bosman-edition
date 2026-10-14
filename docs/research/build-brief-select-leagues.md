@@ -25,3 +25,4 @@ Build the slice of `docs/specs/2026-10-14-select-leagues-spec.md` that your task
 
 ## Report
 At most 300 words: what works, the break results, what you left out, open doubts, the commits and the files you touched.
+- Do not run `rm` with a wildcard or on a path in a variable. A safety check stops it and asks Max, even in bypass mode. To start again with an empty work folder, make a new folder (`mktemp -d` in your scratch area) and use that.

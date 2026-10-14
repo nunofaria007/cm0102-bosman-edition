@@ -27,3 +27,4 @@ Use the REA MCP tools on the original. Load them with ToolSearch (`select:mcp__r
 - The port is for single player. Note network code, but do not analyse it in depth.
 - The goal of the port is a game that plays the same. Put first what a real screen or a real saved game needs. Name what looks unreachable or unused, so that the port can leave it out.
 - Final reply: at most 300 words, with the findings that matter most for a plan, and the path of your file.
+- Do not run `rm` with a wildcard or on a path in a variable. A safety check stops it and asks Max, even in bypass mode. To start again with an empty work folder, make a new folder (`mktemp -d` in your scratch area) and use that.
