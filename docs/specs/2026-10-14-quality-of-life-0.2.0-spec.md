@@ -27,9 +27,9 @@ Settled in the interview of 2026-10-14 (Q50 to Q58).
 
 - **Scope:** 0.2.0 holds issues #11 to #21 and #23 (position, condition and match rating together on the tactics screen, added by Max after the interview). The new screens (#22: player comparison, squad depth, best XI) are release 0.3.0.
 - **Options:** every option is a line in the settings file. No new in-game options screen in 0.2.0. The site lists each option with its default.
-- **Defaults:** on: Space to continue, shortcuts, sharp picture, sound, clickable names, attribute colours, faster days. Off: assistant selection. The save folder defaults to the current folder.
+- **Defaults:** on: Space to continue, shortcuts, sharp picture, sound, clickable names, attribute colours, faster days. Assistant selection is available by default and used per match on request. The save folder defaults to the current folder.
 - **Faithful logic:** no feature may change match results or the game's decisions. Faster days must leave a save that is byte for byte the same as normal days, given the same start and the same input.
-- **Assistant selection:** uses the same code that picks teams for computer-run clubs, run for the player's club before each match, and keeps the player's tactic. If that code cannot keep the tactic, stop and ask Max.
+- **Assistant selection:** always available, used on request (Max, Q62): the A key on the tactics screen before a match asks the assistant to pick the eleven and subs, keeping the tactic. It uses the original's own holiday code for computer-picked teams. The option `assistant_selection = on` (default) enables the key; there is no automatic mode in 0.2.0. Picking the team changes later results, as any selection does; Max does not count that as an exception to the faithful-logic rule.
 - **Attribute colours:** modern FM colours on the 1 to 20 scale: low red, mid amber, high green, top band bright green. The exact band edges are set in the build slice and shown to Max on a screenshot before release.
 - **Sound:** the original's own sound files from the clean files, played through SDL audio. It follows the game's Sound On/Off setting. No new volume control.
 - **Clickable names:** look the same as now, with an underline only while the mouse is over the name. A click calls the game's own function that opens the profile, so Back works as normal.
