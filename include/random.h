@@ -41,10 +41,13 @@ s32 random_number(s32 n);
  */
 void random_seed(s32 seed);
 
+/* Copies the table from the loaded image (exe_image_load). False if none. */
+bool random_use_image(void);
+
 /*
- * Reads the table from cm0102.exe at `exe_path`. The file must have the
- * SHA256 of the 3.9.68 exe. On failure, writes a message for the player to
- * `error` and returns false.
+ * Loads the image of cm0102.exe at `exe_path` (exe_image.h), then copies the
+ * table from it. The file must have the SHA256 of the 3.9.68 exe. On
+ * failure, writes a message for the player to `error` and returns false.
  */
 bool random_load_table(const char *exe_path, char *error, size_t error_size);
 

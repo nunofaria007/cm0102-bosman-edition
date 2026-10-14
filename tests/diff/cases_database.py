@@ -284,7 +284,7 @@ def test_read(ctx):
     """The loader up to the id pass: index.dat, the sizes, the reserve rows, the manager rows, the
     readers and the staff conversion with the preferences table."""
     original_load(ctx)
-    ctx.port.send("db_fresh")
+    ctx.port.send("db_fresh", ctx.original.exe_path)
     ctx.port.send("db_read", ctx.data_dir)
     ctx.expect_equal("port read", [b"1"], ctx.port.reply(), source="wanted")
     return expect_tables(ctx, original_load(ctx), "read", linked=False)
@@ -417,7 +417,7 @@ def test_synthetic(ctx):
         original = Original(ctx.original.exe_path, ctx.data_dir)
         load = OriginalLoad(original, folder)
         load.check(ctx)
-        ctx.port.send("db_fresh")
+        ctx.port.send("db_fresh", ctx.original.exe_path)
         ctx.port.send("db_read", folder)
         ctx.expect_equal("port read", [b"1"], ctx.port.reply(), source="wanted")
         ctx.port.send("db_resolve")

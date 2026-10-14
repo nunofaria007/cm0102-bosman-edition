@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "guio.h"
 #include "random.h"
+#include "exe_image.h"
 #include <sys/stat.h>
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -214,7 +215,9 @@ int main(int argc, char *argv[])
         }
         g_data_dir = data_dir;
         if (!exe_path) exe_path = find_exe(data_dir);
-        if (!random_load_table(exe_path, error, sizeof(error))) {
+        /* One load of the exe: the random table and the key id names read from it. */
+        if (!exe_image_load(exe_path, error, sizeof(error)) || !random_use_image()) {
+            if (!*error) snprintf(error, sizeof(error), "%s has no random table.", exe_path);
             fprintf(stderr, "%s\n", error);
             display_shutdown();
             return 1;

@@ -27,6 +27,7 @@ add_executable(cm0102
     src/si/progress_box.c
     src/si/utils.c
     src/si/date.c
+    src/si/exe_image.c
     src/si/random.c
     src/cm3/background.c
     src/cm3/menubar.c
@@ -74,6 +75,7 @@ add_executable(port_driver
     src/si/progress_box.c
     src/si/utils.c
     src/si/date.c
+    src/si/exe_image.c
     src/si/random.c
     src/cm3/background.c
     src/cm3/menubar.c
