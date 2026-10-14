@@ -126,6 +126,7 @@ class Original:
         uc.hook_add(UC_HOOK_CODE, self._on_text_entry, begin=FUN_TEXT, end=FUN_TEXT)
         self.error_lines = []
         self.data_dir = data_dir
+        self.no_data_files = False     # the path lookup then names a file that does not exist
         self.title = self.alloc_c_string("")
         self._replace(FUN_SCREEN_TITLE, 0, lambda: self.title)
         self._replace(FUN_DATA_PATH, 2, self._data_path)
@@ -287,6 +288,8 @@ class Original:
         self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
 
     def _data_path(self, folder, name):
+        if self.no_data_files:
+            return self.alloc_c_string(os.path.join(self.data_dir, "no such file"))
         wanted = self.read_c_string(name).lower()
         found = [entry for entry in os.listdir(self.data_dir) if entry.lower() == wanted]
         return self.alloc_c_string(os.path.join(self.data_dir, found[0]) if found else wanted)

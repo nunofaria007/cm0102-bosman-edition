@@ -525,6 +525,13 @@ bool scene_command(const char *cmd, const char *args)
         show_flips();
         return true;
     }
+    if (!strcmp(cmd, "data_dir")) {
+        char path[1024];
+
+        if (sscanf(args, "%1023s", path) != 1) return false;
+        g_data_dir = strdup(path);
+        return true;
+    }
     if (!strcmp(cmd, "draw_globals")) {
         g_no_backgrounds = index;
         g_darken_screens = second;

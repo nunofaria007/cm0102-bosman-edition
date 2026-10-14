@@ -307,6 +307,11 @@ class ManagerScene(Scene):
         """The areas in use, as the original counts them."""
         return struct.unpack("<h", self.ctx.original.read(self.manager + 0x12E99E, 2))[0]
 
+    def hide_data_files(self, hidden, empty_folder):
+        """With `hidden`, DEFAULT_PIC.RGN does not load in either program."""
+        self.ctx.original.no_data_files = hidden
+        self.ctx.port.send("data_dir", empty_folder if hidden else self.ctx.data_dir)
+
     def set_draw_globals(self, no_backgrounds, darken_screens):
         self.ctx.original.write_u32(G_NO_BACKGROUNDS, no_backgrounds)
         self.ctx.original.write_u32(G_DARKEN_SCREENS, darken_screens)

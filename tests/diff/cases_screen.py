@@ -41,7 +41,7 @@ def _screen(ctx, scene):
             arguments[8] = 1
         # The line buffer of the original's text function holds 251 characters (text spec).
         if arguments[10] is not None:
-            # A popup area wider than the screen hides itself, so its entries stay short, as in a menu.
+            # A popup area wider than the screen hides itself, so the texts in a popup area stay short.
             arguments[10] = arguments[10][:20 if area != -1 and areas[area] else 251]
         scene.widget_create(f"screen widget {index}", *arguments)
     for index, popup in enumerate(areas):
@@ -64,7 +64,10 @@ def test_screen_draw(ctx):
         small = _write(folder, "small.rgn", _rgn(300, 200, _pixels(ctx, 300, 200)))
         # Same width as the full pictures, so only the height tells the original not to reuse.
         short = _write(folder, "short.rgn", _rgn(800, 500, _pixels(ctx, 800, 500)))
-        names = [name.encode() for name in full + [small, short, os.path.join(folder, "missing.rgn")]]
+        # The original reads RGB555 pictures too, and converts them to RGB565 as it loads them.
+        old = _write(folder, "old.rgn", _rgn(800, 600, _pixels(ctx, 800, 600), g_mask=0x3E0))
+        empty = tempfile.mkdtemp(dir=folder)
+        names = [name.encode() for name in full + [small, short, old, os.path.join(folder, "missing.rgn")]]
         names += [b"", full[0].upper().encode(), b"\\"]
         for case in range(30):
             scene = ManagerScene(ctx)
@@ -93,12 +96,15 @@ def test_screen_draw(ctx):
                     if ctx.rng.random() < 0.3:
                         box[ctx.rng.randrange(4)] = -1
                 background = ctx.rng.choice(names)
+                # Without DEFAULT_PIC.RGN, a name that does not load keeps the old background.
+                scene.hide_data_files(ctx.rng.random() < 0.15, empty)
                 size, stored = _background(ctx.original, scene)
                 # With an empty name and a background of another size, the original loses the old
                 # background. The port frees it.
                 extra_free = int(background == b"" and stored != "" and size not in (None, (800, 600)))
                 scene.start_free_count()
                 scene.draw_screen(background, box)
+                # A fade also frees the shade table of each colour in the original, so the count differs there.
                 if not case in (3, 17) or step:
                     ctx.port.send("frees")
                     ctx.expect_equal(f"{name}: images freed", ctx.original.frees / 2 + extra_free,
@@ -109,6 +115,7 @@ def test_screen_draw(ctx):
                 scene.expect_same_image(name, "manager", 0, "background")
             for index in range(areas):
                 scene.expect_same(f"screen {case}", "area", index)
+            scene.hide_data_files(False, empty)
     return draws
 
 

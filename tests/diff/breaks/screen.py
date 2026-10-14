@@ -31,4 +31,7 @@ BREAKS = [
     ("draw: flip test", "src/si/scrman.c", "if (x1 == -1 || x2 == -1 || y1 == -1 || y2 == -1) {", "if (x1 == -1 || x2 == -1 || y1 == -1) {"),
     ("draw: laid out", "src/si/scrman.c", "    sm->laid_out = 1;\n}", "}"),
     ("load: reuse size", "src/si/rgn_loader.c", "if (reuse && reuse->width == w && reuse->height == h) {", "if (reuse && reuse->width == w) {"),
+    ("load: reuse 555", "src/si/rgn_loader.c", "            convert_rgb555_to_rgb565(reuse->pixels, w * h);\n", ""),
+    ("draw: both fail clears", "src/si/scrman.c", "        if (!img) return;", "        if (!img) {\n            rgn_free(sm->background);\n            sm->background = NULL;\n            return;\n        }"),
+    ("draw: both fail forgets name", "src/si/scrman.c", "        if (!img) return;", "        if (!img) {\n            sm->background_name[0] = 1;\n            return;\n        }"),
 ]
