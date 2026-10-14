@@ -22,6 +22,7 @@ Max settled the plan on 2026-10-14 (interview Q50 to Q58). Spec: `docs/specs/202
 
 - `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Downloads/Game/clean-3968 /Users/max/Downloads/Game/smoke-ref --mode classic` and `--mode widescreen`. References live outside git.
 - `tests/recomp/test_load.py` (see its docstring) and the hand port's `tests/diff/run.py`.
+- Sound (0.2.0, `src/recomp_rt/win/dsound.c`): `RECOMP_SOUND_LOG=1` prints each sound that loads, plays, stops and ends. With `SDL_VIDEODRIVER=dummy` the runtime also uses the dummy audio driver, so test runs make no noise.
 
 ## Known limits of 0.1.0
 

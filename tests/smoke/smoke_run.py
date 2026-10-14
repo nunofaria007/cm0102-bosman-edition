@@ -11,8 +11,9 @@ days (default 14) after the first news screen (RECOMP_SAVE_AFTER_DAYS) and stops
     normal   every option at its default, faster_days = off
     again    the same as normal: the runs are repeatable
     faster   faster_days = on: faster days changes no game decision
+    silent   sound = off: sound changes no game decision
 Each save must be byte for byte the same as the save of "normal". A failed check names the parts of
-the save file that differ. The check takes about six minutes. A later option that must not change the
+the save file that differ. The check takes about eight minutes. A later option that must not change the
 game adds a run to SAME_SAVE_RUNS.
 
 The run uses a new empty save folder (RECOMP_USER_DIR is a temporary folder), so the game first shows its
@@ -31,6 +32,9 @@ Screens and checks:
     4 news       the first news screen of the new game, Saturday 14.7.01 AM: exact match
     5 holiday    30 s after "Go on Holiday": the date box differs from screen 4, so days passed
 
+The runs use the SDL dummy audio driver: the sounds take their real time, without noise. A click ends
+the intro and its sounds early, so the settings screen shows by 8 s.
+
 The run sets Background Changes to Off on the settings screen, so screens 2 to 4 repeat. The days
 pass on holiday, because Continue Game stops at random events (an offer for a player) that need an
 answer. The news of the days is random, so screen 5 is only checked for a new date. In 30 s the
@@ -47,6 +51,7 @@ import time
 # Positions for classic mode, 800x600. Times in ms from the window opening. The database load after
 # Select League(s) takes about 20 s, so the steps after it wait with a margin.
 STEPS = [
+    "1000 click 400 300",                   # the intro: a click ends the logos and their sounds
     "8000 dump {d}/1-settings.bmp",
     "8200 click 522 272",                   # settings: Background Changes Off
     "8500 click 662 524",                   # settings: Ok
@@ -133,6 +138,7 @@ SAME_SAVE_RUNS = [
     ("normal", {"faster_days": "off"}),
     ("again", {"faster_days": "off"}),
     ("faster", {"faster_days": "on"}),
+    ("silent", {"faster_days": "off", "sound": "off"}),
 ]
 SAVE_NAME = "samesave.sav"
 
@@ -170,7 +176,8 @@ def same_save(program, game, mode, days):
                 f.write(f"display = {mode}\n")
                 for key, value in options.items():
                     f.write(f"{key} = {value}\n")
-            env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", RECOMP_NO_BOX="1", RECOMP_USER_DIR=user,
+            env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", RECOMP_NO_BOX="1",
+                       RECOMP_USER_DIR=user,
                        RECOMP_FIXED_CLOCK="1", RECOMP_SAVE_AFTER_DAYS=str(days),
                        RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots)))
             start = time.time()
@@ -223,7 +230,7 @@ def main(argv):
         os.makedirs(user)
         with open(os.path.join(user, "settings.txt"), "w") as f:
             f.write(f"display = {mode}\n")
-        env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", RECOMP_NO_BOX="1",
+        env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", RECOMP_NO_BOX="1",
                    RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots)))
         env["RECOMP_USER_DIR"] = user
         r = subprocess.run([program, "--game", game], env=env, capture_output=True, text=True, timeout=300)
