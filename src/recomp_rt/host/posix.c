@@ -96,3 +96,8 @@ uint64_t host_unix_time_us(void)
     gettimeofday(&tv, NULL);
     return (uint64_t)tv.tv_sec * 1000000u + (uint64_t)tv.tv_usec;
 }
+
+FILE *host_fopen(const char *utf8_path, const char *mode)
+{
+    return fopen(utf8_path, mode);
+}

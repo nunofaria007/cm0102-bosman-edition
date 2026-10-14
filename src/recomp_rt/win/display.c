@@ -10,6 +10,7 @@
  * The settings file settings.txt in the user folder chooses the mode with the line
  * "display = classic" or "display = widescreen". The runtime writes the file when it is missing. */
 #include "win.h"
+#include "host.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -31,9 +32,9 @@ void win_read_settings(void)
     snprintf(path, sizeof path, "%s/settings.txt", win_user_dir);
     rt_screen_w = WIDE_W;
     rt_screen_h = WIDE_H;
-    FILE *f = fopen(path, "r");
+    FILE *f = host_fopen(path, "r");
     if (!f) {
-        f = fopen(path, "w");
+        f = host_fopen(path, "w");
         if (f) {
             fputs(settings_text, f);
             fclose(f);

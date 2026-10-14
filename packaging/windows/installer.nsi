@@ -7,8 +7,8 @@
 ;   ICON      optional: the original's ball icon (tools/icon/make_icons.py), for the setup exe
 ;
 ; Layout: $INSTDIR holds the program and the uninstaller, $INSTDIR\game the clean files. The program
-; finds the game folder beside itself. Saves go to %APPDATA%\cm0102, which an update keeps. The
-; uninstaller asks before it deletes the saves.
+; finds the game folder beside itself. Saves go to %APPDATA%\cm0102. An update keeps them. The
+; uninstaller never deletes them and never asks.
 
 !ifndef VERSION
   !error "Give VERSION with -DVERSION=..."
@@ -43,7 +43,6 @@ ManifestDPIAware true
 Name "${PRODUCT}"
 OutFile "${OUT_FILE}"
 InstallDir "$PROGRAMFILES64\${FILE_NAME}"
-InstallDirRegKey HKLM "${APP_KEY}" "InstallDir"
 RequestExecutionLevel admin
 BrandingText "${PRODUCT} ${VERSION}"
 
@@ -61,14 +60,20 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "An unofficial fan project"
   !define MUI_UNICON "${ICON}"
 !endif
 !define MUI_ABORTWARNING
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${PROGRAM}"
-!define MUI_FINISHPAGE_RUN_TEXT "Start ${PRODUCT}"
+; The game starts through explorer.exe, so that it runs as the logged-in user and not as the
+; elevated installer.
+!define MUI_FINISHPAGE_RUN ""
+!define MUI_FINISHPAGE_RUN_FUNCTION StartGame
+!define MUI_FINISHPAGE_RUN_TEXT "Start the game"
 
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE CheckFolder
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
+!define MUI_FINISHPAGE_TEXT "${PRODUCT} is removed.$\r$\n$\r$\nYour saved games and settings stay in:$\r$\n$APPDATA\cm0102$\r$\n$\r$\nThe uninstaller does not delete them. Delete that folder yourself to remove them."
+!insertmacro MUI_UNPAGE_FINISH
 !insertmacro MUI_LANGUAGE "English"
 
 Function .onInit
@@ -77,6 +82,27 @@ Function .onInit
     Abort
   ${EndIf}
   SetRegView 64
+  ; An upgrade goes to the folder of the earlier install, also when the player chose it. A folder
+  ; given with /D= on the command line wins.
+  ${If} $INSTDIR == "$PROGRAMFILES64\${FILE_NAME}"
+    ReadRegStr $0 HKLM "${UNINSTALL_KEY}" "InstallLocation"
+    ${If} $0 != ""
+      StrCpy $INSTDIR $0
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
+
+Function StartGame
+  Exec '"$WINDIR\explorer.exe" "$INSTDIR\${PROGRAM}"'
+FunctionEnd
+
+; A folder with a "game" folder and no program of ours holds somebody else's files.
+Function CheckFolder
+  ${If} ${FileExists} "$INSTDIR\game"
+  ${AndIfNot} ${FileExists} "$INSTDIR\${PROGRAM}"
+    MessageBox MB_OK|MB_ICONSTOP "This folder already holds a folder called $\"game$\". Choose another folder." /SD IDOK
+    Abort
+  ${EndIf}
 FunctionEnd
 
 Function un.onInit
@@ -84,11 +110,15 @@ Function un.onInit
 FunctionEnd
 
 Section "Install"
+  ; A silent install skips the folder page, so check here too.
+  Call CheckFolder
+
+  ; Only a folder of ours has a program in it. An update replaces the clean files as a whole.
+  ${If} ${FileExists} "$INSTDIR\${PROGRAM}"
+    RMDir /r "$INSTDIR\game"
+  ${EndIf}
   SetOutPath "$INSTDIR"
   File "/oname=${PROGRAM}" "${EXE}"
-
-  ; An update replaces the clean files as a whole.
-  RMDir /r "$INSTDIR\game"
   SetOutPath "$INSTDIR\game"
   File /r "${GAME_DIR}/*"
   SetOutPath "$INSTDIR"
@@ -124,13 +154,6 @@ Section "Uninstall"
   DeleteRegKey HKLM "${UNINSTALL_KEY}"
   DeleteRegKey HKLM "${APP_KEY}"
 
-  ; The saves stay unless the player says so. A silent uninstall keeps them.
+  ; The saves in $APPDATA\cm0102 stay. The last page says where they are.
   SetShellVarContext current
-  ${IfNot} ${Silent}
-  ${AndIf} ${FileExists} "$APPDATA\cm0102\*"
-    MessageBox MB_YESNO|MB_DEFBUTTON2|MB_ICONQUESTION \
-      "Also delete your saved games and settings in $APPDATA\cm0102?" IDNO keep_saves
-    RMDir /r "$APPDATA\cm0102"
-    keep_saves:
-  ${EndIf}
 SectionEnd

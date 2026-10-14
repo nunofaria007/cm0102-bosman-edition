@@ -8,6 +8,7 @@
 #define RECOMP_HOST_H
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -30,6 +31,9 @@ long host_write(int fd, const void *buf, uint32_t n);
 int64_t host_seek(int fd, int64_t off, int whence);
 int host_truncate(int fd, int64_t size);     /* 0 on success */
 int host_close(int fd);
+
+/* fopen for a UTF-8 host path. */
+FILE *host_fopen(const char *utf8_path, const char *mode);
 
 typedef struct { int is_dir; uint64_t size; int64_t mtime; } HostStat;
 int host_stat(const char *path, HostStat *st);   /* 0 on success */

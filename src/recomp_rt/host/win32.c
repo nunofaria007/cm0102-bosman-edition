@@ -73,6 +73,14 @@ static int from_wide(const wchar_t *s, char *out, size_t room)
 
 #define WPATH 4096
 
+FILE *host_fopen(const char *utf8_path, const char *mode)
+{
+    wchar_t w[WPATH], m[16];
+    if (!to_wide(utf8_path, w, WPATH)) return NULL;
+    if (MultiByteToWideChar(CP_UTF8, 0, mode, -1, m, 16) == 0) { errno = EINVAL; return NULL; }
+    return _wfopen(w, m);
+}
+
 int host_open(const char *path, int flags, int mode)
 {
     wchar_t w[WPATH];

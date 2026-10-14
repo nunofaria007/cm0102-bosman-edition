@@ -99,7 +99,7 @@ def parse_manifest(path):
         rest = [p.strip().strip('"') for p in parts if p.strip() not in (digest, size)]
         if digest is None or size is None or not rest:
             continue  # a header line
-        entries[rest[0].replace("\\", "/").lstrip("./").lstrip("/")] = (int(size), digest.lower())
+        entries[rest[0].replace("\\", "/").removeprefix("./").lstrip("/")] = (int(size), digest.lower())
     return entries
 
 

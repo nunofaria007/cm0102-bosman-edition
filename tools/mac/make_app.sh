@@ -118,7 +118,7 @@ for a in "${ARCHS[@]}"; do
     install_name_tool -add_rpath "@executable_path/../Frameworks" "$d/cm0102_recomp"
     # SDL2 builds that start in @loader_path need the same for the frameworks themselves.
     for f in "$d"/Frameworks/*.dylib; do install_name_tool -add_rpath "@loader_path" "$f" 2>/dev/null || true; done
-    eval "THIN_$a=\"$d\""
+    if [ "$a" = arm64 ]; then THIN_arm64="$d"; else THIN_x86_64="$d"; fi
 done
 
 # 3. The bundle.
@@ -127,12 +127,24 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks" "$APP/Contents/Resourc
 if [ ${#ARCHS[@]} -eq 2 ]; then
     lipo -create "$THIN_arm64/cm0102_recomp" "$THIN_x86_64/cm0102_recomp" -output "$APP/Contents/MacOS/cm0102_recomp"
     for f in "$THIN_arm64"/Frameworks/*.dylib; do
+        [ -e "$f" ] || continue
         n="$(basename "$f")"
+        if [ ! -f "$THIN_x86_64/Frameworks/$n" ]; then
+            echo "make_app.sh: $n is only in the arm64 build." >&2; exit 1
+        fi
         lipo -create "$f" "$THIN_x86_64/Frameworks/$n" -output "$APP/Contents/Frameworks/$n"
+    done
+    for f in "$THIN_x86_64"/Frameworks/*.dylib; do
+        [ -e "$f" ] || continue
+        n="$(basename "$f")"
+        [ -f "$THIN_arm64/Frameworks/$n" ] || echo "make_app.sh: warning: $n is only in the x86_64 build, so it is left out." >&2
     done
 else
     cp "$THIN_arm64/cm0102_recomp" "$APP/Contents/MacOS/cm0102_recomp"
-    cp "$THIN_arm64"/Frameworks/*.dylib "$APP/Contents/Frameworks/"
+    for f in "$THIN_arm64"/Frameworks/*.dylib; do
+        [ -e "$f" ] || continue
+        cp "$f" "$APP/Contents/Frameworks/"
+    done
 fi
 
 sed -e "s/@VERSION@/$VERSION/g" "$REPO/tools/mac/Info.plist.in" > "$APP/Contents/Info.plist"
