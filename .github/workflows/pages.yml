@@ -1,0 +1,44 @@
+# Publishes site/ to GitHub Pages. The site's pictures (logo and screenshots of the original) are not in
+# git: the workflow takes them from site-assets.zip on the newest release (tools/release/make_release.sh).
+name: Site
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/pages.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the site pictures from the newest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh api "repos/${{ github.repository }}/releases?per_page=10" --jq '[.[] | select(.draft | not)][0].tag_name')"
+          if [ -z "$tag" ] || [ "$tag" = "null" ]; then echo "No release yet, so no pictures." >&2; exit 1; fi
+          gh release download "$tag" --repo "${{ github.repository }}" --pattern site-assets.zip --dir "$RUNNER_TEMP"
+          mkdir -p site/assets
+          unzip -o -q "$RUNNER_TEMP/site-assets.zip" -d site/assets
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
