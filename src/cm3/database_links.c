@@ -1,4 +1,6 @@
 #include "database.h"
+#include "date.h"
+#include "random.h"
 #include "key_index.h"
 #include <string.h>
 
@@ -212,7 +214,7 @@ static bool clear_in(staff_t **list, s32 count, const staff_t *s)
  * the end of the job gets it. With `unlink` the link of the staff row to
  * the club becomes NULL.
  */
-bool database_leave_club(club_t *c, staff_t *s, const db_date_t *date, bool unlink, bool as_player)
+bool database_leave_club(club_t *c, staff_t *s, const cm_date_t *date, bool unlink, bool as_player)
 {
     bool national;
     s8 job;
@@ -339,18 +341,6 @@ static bool club_check_542740(const club_t *c)
 /* The staff pass */
 
 /*
- * FUN_0090cfc0, the random generator, belongs to the dates and random
- * numbers slice. With the shipped data the staff pass never draws a number
- * (the differential test checks it). Until the slices merge, this stands in
- * for it.
- */
-static s32 random_below(s32 n)
-{
-    (void)n;
-    return 0;
-}
-
-/*
  * The common name that a staff row with no name gets (0x52d533): the first
  * empty common name, cached in g_db_empty_common_name. With no empty common
  * name, a random row, which is not cached.
@@ -364,7 +354,7 @@ static db_name_t *empty_common_name(void)
             if (g_common_names[row].name[0] == '\0') break;
         }
         if (row < g_common_name_count) g_db_empty_common_name = row;
-        else row = random_below(g_common_name_count);
+        else row = random_number(g_common_name_count);
     }
     return &g_common_names[row];
 }
@@ -409,8 +399,17 @@ static void check_job(staff_t *s, s8 *job)
     }
 }
 
+/* FUN_00549f70 with weekday -1, for a valid day (1..31) and month (0..11). */
+static cm_date_t make_date(s16 day, s8 month, u16 year)
+{
+    cm_date_t d;
+
+    date_init(&d, day, month, year, -1);
+    return d;
+}
+
 /* True when date a is before date b: the year first, then the day. */
-static bool date_before(db_date_t a, db_date_t b)
+static bool date_before(cm_date_t a, cm_date_t b)
 {
     return a.year < b.year || (a.year == b.year && a.day < b.day);
 }
@@ -435,8 +434,8 @@ void database_staff_pass(void)
         }
         if (s->b23 && !s->b22) s->b23 = 0;
         if (!s->club && !s->national_club && s->non_player &&  /* 0x52d2d1 */
-            date_before(s->contract_end, database_date(1, 0, 1998))) {
-            s->contract_end = database_date(1, 8, 1997);
+            date_before(s->contract_end, make_date(1, 0, 1998))) {
+            s->contract_end = make_date(1, 8, 1997);
         }
         if (s->club_job == 7) s->club_job = 6;                 /* 0x52d33f */
         if (s->national_job == 7) s->national_job = 6;
@@ -449,7 +448,7 @@ void database_staff_pass(void)
         if (!s->nation) {                                      /* 0x52d37e */
             if (s->club) s->nation = s->club->nation;
             else if (s->national_club) s->nation = s->national_club->nation;
-            else s->nation = &g_nations[random_below(g_nation_count)];
+            else s->nation = &g_nations[random_number(g_nation_count)];
         }
         check_job(s, &s->club_job);                            /* 0x52d3fb */
         if (!s->first_name) s->first_name = empty_common_name();   /* 0x52d52e */

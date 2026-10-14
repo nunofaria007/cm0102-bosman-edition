@@ -434,33 +434,6 @@ void database_continent_bytes(const continent_t *c, u8 out[DB_CONTINENT_SIZE])
     record_to_bytes(&layouts[DB_CONTINENT], c, out);
 }
 
-/* Dates */
-
-/* FUN_0054a110: the date that a new record gets, 10 Feb 1972. */
-static db_date_t default_date(void)
-{
-    db_date_t d = {40, 1972, 1, 0};
-    return d;
-}
-
-/*
- * FUN_00549f70 with weekday -1, for a valid day and month: the day of the
- * year from the tables at 0x9b8448 and 0x9b8460 (from March one more in a
- * leap year), and the Gregorian leap flag.
- */
-db_date_t database_date(s32 day, s32 month, s32 year)
-{
-    static const s16 days[12] = {-1, 30, 58, 89, 119, 150, 180, 211, 242, 272, 303, 333};
-    db_date_t d;
-    bool leap = (year & 3) == 0 && (year % 100 != 0 || year % 400 == 0);
-
-    d.year = (u16)year;
-    d.leap = leap;
-    d.zero = 0;
-    d.day = (s16)(days[month] + (leap && month >= 2) + day);
-    return d;
-}
-
 /* Files */
 
 /* FUN_0054d580. Opens a file of the data folder, of any case. */
@@ -822,7 +795,7 @@ static void reserve_comps(void)
 static void blank_staff(staff_t *s, s32 row)
 {
     s->id = row;
-    s->born = default_date();
+    date_default(&s->born);
     s->age = 1971;
     s->nation = DB_FROM_ID(-1);
     s->nation2 = DB_FROM_ID(-1);
@@ -830,12 +803,12 @@ static void blank_staff(staff_t *s, s32 row)
     s->b23 = 0;
     s->national_club = DB_FROM_ID(-1);
     s->national_job = 0;
-    s->d29 = default_date();
-    s->d31 = default_date();
+    date_default(&s->d29);
+    date_default(&s->d31);
     s->club = DB_FROM_ID(-1);
     s->club_job = 0;
-    s->contract_end = default_date();
-    s->d46 = default_date();
+    date_default(&s->contract_end);
+    date_default(&s->d46);
     s->i4e = 0;
     s->i52 = 0;
     memset(s->unknown_56, 0, sizeof(s->unknown_56));
