@@ -102,6 +102,17 @@ extern s32 g_nation_count;          /* DAT_00ae2350 */
  */
 bool database_load_nations(const char *data_dir);
 
+/*
+ * FUN_00524d50, the load of "Start New Game", as far as the port has the
+ * tables: database_load_nations with the 47 calls of the progress box that
+ * the loader FUN_00528540 makes (see progress_box.h), then the key ids
+ * (key_index_match, the part of FUN_00601a40 that the port has). Returns
+ * false when the load fails. The loader's other work is not here: the copy
+ * of the .lng files, the other 20 tables, the staff pass and the delete of
+ * duff.out.
+ */
+bool database_load(const char *data_dir);
+
 /* The part of FUN_00528080 for these tables. */
 void database_free(void);
 

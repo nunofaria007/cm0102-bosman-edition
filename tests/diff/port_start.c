@@ -18,6 +18,7 @@ static int fn_id(void (*fn)(void))
 {
     if (fn == setup_build) return 1;
     if (fn == confirm_build) return 2;
+    if (fn == select_leagues_build) return 3;
     return fn ? 9 : 0;
 }
 
@@ -25,6 +26,7 @@ static int input_id(s32 (*fn)(s32))
 {
     if (fn == setup_input) return 1;
     if (fn == confirm_input) return 2;
+    if (fn == select_leagues_input) return 3;
     return fn ? 9 : 0;
 }
 

@@ -1,9 +1,15 @@
 #include "database.h"
+#include "key_index.h"
+#include "langlib.h"
+#include "progress_box.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 extern char *os_find_file_ci(const char *dir, const char *name);
+
+/* The load makes 47 calls of the progress box, steps 0 to 46. */
+#define DB_PROGRESS_TOTAL 46
 
 /*
  * The nation and continent part of the loader of Database.cpp and the
@@ -214,14 +220,13 @@ void database_free(void)
     g_nation_count = 0;
 }
 
-bool database_load_nations(const char *data_dir)
+/* Steps 5 and 7 of the loader for the two tables, after index.dat. */
+static bool load_tables(const char *data_dir)
 {
     const db_index_entry_t *continents, *nations;
     u8 *raw_continents = NULL, *raw_nations = NULL;
     bool ok = false;
 
-    database_free();
-    if (!read_index(data_dir)) return false;
     continents = find_entry(DB_TABLE_CONTINENT);
     nations = find_entry(DB_TABLE_NATION);
     /* FUN_0054d5e0 takes format 1 or 2, FUN_0054d740 only 2. */
@@ -246,4 +251,38 @@ bool database_load_nations(const char *data_dir)
     free(raw_nations);
     if (!ok) database_free();
     return ok;
+}
+
+bool database_load_nations(const char *data_dir)
+{
+    database_free();
+    if (!read_index(data_dir)) return false;
+    return load_tables(data_dir);
+}
+
+/*
+ * FUN_00524d50 calls FUN_00528540(dir, 1, 0). The progress steps are those
+ * of the loader. The port reads its two tables with the read loop, as the
+ * original does, and has no work for the sizing loop.
+ */
+bool database_load(const char *data_dir)
+{
+    screen_stack_t *st = &g_screen_stack;
+    char text[0x100];
+
+    database_free();                                           /* FUN_00528080 */
+    text_format(text, sizeof(text), "Loading database");
+    screen_stack_progress(st, text, 0, DB_PROGRESS_TOTAL, -1); /* 0x5285d4 */
+    if (!read_index(data_dir)) return false;
+    screen_stack_progress(st, text, 1, DB_PROGRESS_TOTAL, -1); /* 0x5289a9 */
+    for (s32 i = 0; i < DB_INDEX_ENTRIES; i++) {               /* 0x529930 */
+        screen_stack_progress(st, text, 2 + i, DB_PROGRESS_TOTAL, -1);
+    }
+    for (s32 i = 0; i < DB_INDEX_ENTRIES; i++) {               /* 0x52b3ab */
+        screen_stack_progress(st, text, 2 + DB_INDEX_ENTRIES + i, DB_PROGRESS_TOTAL, -1);
+    }
+    if (!load_tables(data_dir)) return false;
+    screen_stack_progress(st, text, DB_PROGRESS_TOTAL, DB_PROGRESS_TOTAL, -1); /* 0x52c671 */
+    key_index_match();                                         /* FUN_00601a40 */
+    return true;
 }

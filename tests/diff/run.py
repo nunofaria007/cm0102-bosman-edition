@@ -26,13 +26,14 @@ import cases_stack
 import cases_start
 import cases_scrman
 import cases_scroll
+import cases_select
 import cases_text
 import cases_widget
 from original import FB_SIZE, HEIGHT, WIDTH, Original
 
 SUITES = [cases_primitives, cases_images, cases_panel, cases_font, cases_text, cases_area, cases_widget,
           cases_area_draw, cases_scrman, cases_screen, cases_stack, cases_input,
-          cases_helpers, cases_start, cases_leagues, cases_progress, cases_scroll]
+          cases_helpers, cases_start, cases_leagues, cases_progress, cases_scroll, cases_select]
 
 
 class Mismatch(Exception):

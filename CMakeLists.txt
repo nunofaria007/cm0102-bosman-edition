@@ -48,6 +48,7 @@ add_executable(port_driver
     tests/diff/port_leagues.c
     tests/diff/port_progress.c
     tests/diff/port_scroll.c
+    tests/diff/port_select.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
