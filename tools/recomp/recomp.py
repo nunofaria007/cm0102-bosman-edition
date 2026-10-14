@@ -34,7 +34,7 @@ sys.setrecursionlimit(50000)
 from analysis import Analyzer  # noqa: E402
 from pe import Image  # noqa: E402
 from translate import PATCHED, FunctionWriter  # noqa: E402
-from widescreen import PATCHES  # noqa: E402
+from widescreen import INSNS, PATCHES  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 RUNTIME = os.path.join(ROOT, "src", "recomp_rt")
@@ -270,7 +270,7 @@ def main(argv):
     files.append(os.path.join(gen, "table.c"))
     t_translate = time.time() - t0
     if args.all:
-        lost = sorted(set(PATCHES) - PATCHED)
+        lost = sorted((set(PATCHES) | set(INSNS)) - PATCHED)
         if lost:
             raise SystemExit("widescreen.py: no translated instruction at " + ", ".join("%#x" % a for a in lost))
         lost = sorted(set(wrapped) - set(funcs))

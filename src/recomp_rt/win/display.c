@@ -87,6 +87,7 @@ static void scale_rect_args(int first)
 void o_0055fba0(void);
 void o_0055f990(void);
 void o_005e40d0(void);
+void o_00800890(void);
 
 /* Area create, thiscall: (x1, y1, x2, y2, columns, column weights, rows, row weights, flags, colour,
  * owner). */
@@ -101,6 +102,20 @@ RT_WRAP(0055f990, widget_create)
 {
     scale_rect_args(1);
     o_0055f990();
+}
+
+/* Widget rect setter 0x800890, thiscall on the screen stack: (widget, x1, y1, x2, y2), each a 16-bit
+ * value. The match screens move widgets with it, for example the possession bar of Match Overview
+ * (0x71d9e0: x from 277 to 713 by the share of the ball). The values are classic coordinates, as for
+ * the widget create, so they get the same scale. */
+RT_WRAP(00800890, widget_set_rect)
+{
+    for (int i = 1; i <= 4; i++) {
+        uint32_t a = cpu.esp + 4 + 4 * (uint32_t)i;
+        wr32(g_mem, a, (uint32_t)(int32_t)(int16_t)rd32(g_mem, a));
+    }
+    scale_rect_args(1);
+    o_00800890();
 }
 
 /* The pixel at (x, y) of a 565 picture, mixed from its four neighbours by the weights fx, fy (0..256). */

@@ -40,3 +40,10 @@ PATCHES = {
     # Widget init 0x5ee150: x2 and y2 are clamped to 799 and 599.
     0x5EE1F5: (799, W1), 0x5EE20A: (599, H1),
 }
+
+# Instructions whose whole translation is replaced: address: (the instruction in the original, C code).
+# The circle plot 0x5e7aa0 finds the pixel of row y as y * 25 * 32 (lea, lea, shl 5): a row of 800 pixels.
+# The replacement makes it y * rt_screen_w. The next instruction (add or sub) sets the flags again.
+ROW = "eax = (uint32_t)((int32_t)eax / 25 * (int32_t)rt_screen_w);"
+INSNS = {a: ("shl eax, 5", ROW) for a in (
+    0x5E7B7D, 0x5E7BE5, 0x5E7C42, 0x5E7CB8, 0x5E7D73, 0x5E7DE2, 0x5E7E44, 0x5E7EBB)}

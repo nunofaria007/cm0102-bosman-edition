@@ -77,3 +77,21 @@ The recompiler gained `RT_WRAP(addr, name)`: the translation of the function bec
 - Text keeps its size. Areas are larger, so lists show the same number of rows, with more space.
 - Not checked on screen: a match in progress (`match.mbr`), the tactics pitch, graphs, and the drag of a widget. Max plays a new game in widescreen mode as the spec's manual check.
 - Unknown: whether other functions draw straight onto the screen with classic coordinates. The scan finds constants 799 and 599, not other coordinates such as 555. A screen that draws that way shows its part in the top-left 800x600.
+
+## 8. Fixes after the first play (2026-10-14)
+
+Max found two faults in widescreen mode. Both are fixed.
+
+| Fault | Cause | Fix |
+|---|---|---|
+| Tactics screen: dotted circles and dashes all over the screen | The circle draw `0x5e7840` plots points with `0x5e7aa0`. It finds the row of a pixel as y * 25 * 32 (`lea`, `lea`, `shl 5`), a row of 800 pixels, at `0x5e7b7d`, `0x5e7be5`, `0x5e7c42`, `0x5e7cb8`, `0x5e7d73`, `0x5e7de2`, `0x5e7e44`, `0x5e7ebb`. | `widescreen.py` `INSNS`: the recompiler writes y * `rt_screen_w` in place of each `shl`. In classic mode the result is the same as before. |
+| Match Overview: the possession bar sits at its classic place | The match screens move widgets with the rect setter `0x800890` (thiscall: widget, x1, y1, x2, y2). The bar is set at x 277 to 277 + 436 * share / 100 and a y from the screen's slots (`0x71db48`, `0x71db9b`). Other callers: `0x720320` and `0x724520`. | `RT_WRAP` of `0x800890` scales the four values as the widget create does. |
+
+Search for the same faults:
+- Rows of 800 or 1600: the only screen code with y * 800 is `0x5e7aa0`. The other `lea`/`lea`/`shl` sequences are money (`0x4d4fb0`, `0x59cfa0`), struct strides (`0x55f290`, `0x562370`, `0x5ef5e0`, `0x717470`) and other values.
+- Pixel code: of the 11 functions that lock the back buffer, only `0x5e7840` holds a size constant (section 2). The others read the pitch from the Lock result.
+- Direct draws outside the display code: `0x7fdc00` (network session code) and the display's own functions. No graph or bar outside these draws straight onto the screen.
+- Widget moves: `0x800890` is the only setter that changes a rect.
+
+Not checked on screen: the possession bar. A scripted run did not reach a match (injuries, offers and squad numbers stop Continue at random). The fix follows from the code. Max checks it in play.
+
