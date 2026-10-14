@@ -1,4 +1,4 @@
-"""The window procedure of the original against input_poll of the port: keys, the wheel and the mouse."""
+"""The window procedure of the original against input_poll of the port: keys, characters, the wheel and the mouse."""
 import struct
 
 from cases_scroll import (G_CLICK_FRAMES, G_LEFT_CLICKED, G_LEFT_HELD, G_MOUSE_X, G_MOUSE_Y, G_RIGHT_CLICKED,
@@ -11,7 +11,18 @@ STUB = 0x64000000                # a stub for that import: stdcall, 4 arguments,
 
 WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP = 0x200, 0x201, 0x202
 WM_RBUTTONDOWN, WM_RBUTTONUP, WM_MOUSEWHEEL, WM_KEYDOWN = 0x204, 0x205, 0x20A, 0x100
-KEYS = list(range(0x21, 0x29))   # VK_PRIOR to VK_DOWN
+WM_CHAR = 0x102
+G_KEY_CODE, G_KEY_CHAR = 0xB67A04, 0xB67A24
+SCROLL_KEYS = list(range(0x21, 0x29))   # VK_PRIOR to VK_DOWN
+# Virtual key codes that the port makes from SDL keys: Backspace, Tab, Enter, Shift, Ctrl, Caps Lock, Escape,
+# Space, Insert, Delete, the digits, the letters, the keypad, F1 to F12 but F10, and the US punctuation keys.
+OTHER_KEYS = ([0x08, 0x09, 0x0D, 0x10, 0x11, 0x14, 0x1B, 0x20, 0x2D, 0x2E] + list(range(0x30, 0x3A)) +
+              list(range(0x41, 0x5B)) + list(range(0x60, 0x6C)) + [0x6D, 0x6E, 0x6F] +
+              [vk for vk in range(0x70, 0x7C) if vk != 0x79] + list(range(0xBA, 0xC1)) + list(range(0xDB, 0xDF)))
+# TranslateMessage of Windows gives a WM_CHAR after the WM_KEYDOWN of these keys.
+CHAR_KEYS = {0x08: 0x08, 0x09: 0x09, 0x0D: 0x0D, 0x1B: 0x1B}
+# The characters that SDL gives as text: printable ASCII and the Latin-1 letters.
+CHARS = list(range(0x20, 0x7F)) + list(range(0xA0, 0x100))
 
 
 def _stub_windows(original):
@@ -24,38 +35,63 @@ def _stub_windows(original):
     original.window_stubs = True
 
 
-def _send(ctx, name, message, w_param, l_param, port_words):
+def _send(ctx, name, message, w_param, l_param, port_words, char=None):
+    """One message to the window procedure, and one SDL event to the port. `char` adds the WM_CHAR that
+    Windows makes from the key."""
     original = ctx.original
     original.call(FUN_WINDOW_PROC, 0, message, w_param & 0xFFFFFFFF, l_param & 0xFFFFFFFF)
+    if char is not None:
+        original.call(FUN_WINDOW_PROC, 0, WM_CHAR, char, 0)
     wanted = [_u32(ctx, address) for address in (G_MOUSE_X, G_MOUSE_Y, G_LEFT_HELD, G_RIGHT_HELD,
-                                                  G_LEFT_CLICKED, G_RIGHT_CLICKED, G_CLICK_FRAMES)]
+                                                  G_LEFT_CLICKED, G_RIGHT_CLICKED, G_CLICK_FRAMES, G_KEY_CODE)]
+    wanted.append(original.read(G_KEY_CHAR, 1)[0])
     ctx.port.send("sdl", *port_words)
-    ctx.expect_equal(f"{name}: mouse x, y, held, clicked, frames", wanted, [int(w) for w in ctx.port.reply()])
+    ctx.expect_equal(f"{name}: mouse x, y, held, clicked, frames, key code, character", wanted,
+                     [int(w) for w in ctx.port.reply()])
 
 
 def test_window(ctx):
     steps = 0
-    for case in range(30):
+    _new_screen(ctx, 0)
+    _stub_windows(ctx.original)
+    # Every key and every character once, then random steps.
+    for vk in OTHER_KEYS:
+        _send(ctx, f"window: key {vk:#x}", WM_KEYDOWN, vk, 0, [0, vk], CHAR_KEYS.get(vk))
+        steps += 1
+    for char in CHARS:
+        _send(ctx, f"window: character {char:#x}", WM_CHAR, char, 0, [4, char])
+        steps += 1
+    for case in range(40):
         scene, areas, widgets = _new_screen(ctx, case)
         _stub_windows(ctx.original)
         # The poll clears the one-shot click flags. This test has no poll, so each case starts clear.
         ctx.original.write_u32(G_LEFT_CLICKED, 0)
         ctx.original.write_u32(G_RIGHT_CLICKED, 0)
         ctx.port.send("clicks", 0, 0)
+        code, char = ctx.rng.choice([0, 0x41, 0x0D]), ctx.rng.choice([0, 0x61])
+        ctx.original.write_u32(G_KEY_CODE, code)
+        ctx.original.write(G_KEY_CHAR, bytes([char]))
+        ctx.port.send("entry_keys", code, char)
         for step in range(ctx.rng.randint(5, 25)):
             name = f"window {case} step {step}"
             steps += 1
             roll = ctx.rng.random()
             x, y = ctx.rng.randint(0, 799), ctx.rng.randint(0, 599)
-            if roll < 0.25:
-                vk = ctx.rng.choice(KEYS)
+            if roll < 0.15:
+                vk = ctx.rng.choice(SCROLL_KEYS)
                 _send(ctx, f"{name}: key {vk:#x}", WM_KEYDOWN, vk, 0, [0, vk])
+            elif roll < 0.3:
+                vk = ctx.rng.choice(OTHER_KEYS)
+                _send(ctx, f"{name}: key {vk:#x}", WM_KEYDOWN, vk, 0, [0, vk], CHAR_KEYS.get(vk))
             elif roll < 0.4:
+                char = ctx.rng.choice(CHARS)
+                _send(ctx, f"{name}: character {char:#x}", WM_CHAR, char, 0, [4, char])
+            elif roll < 0.5:
                 notches = ctx.rng.choice([1, -1, 2, -2, 3])
                 _send(ctx, f"{name}: wheel {notches}", WM_MOUSEWHEEL, (notches * 120) << 16, 0, [1, notches])
-            elif roll < 0.6:
+            elif roll < 0.65:
                 _send(ctx, f"{name}: move", WM_MOUSEMOVE, 0, (y << 16) | x, [2, x, y])
-            elif roll < 0.85:
+            elif roll < 0.88:
                 down, button = ctx.rng.choice([1, 0]), ctx.rng.choice([1, 1, 3])
                 message = {(1, 1): WM_LBUTTONDOWN, (0, 1): WM_LBUTTONUP,
                            (1, 3): WM_RBUTTONDOWN, (0, 3): WM_RBUTTONUP}[down, button]

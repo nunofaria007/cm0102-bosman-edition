@@ -8,12 +8,15 @@ struct area;
 
 #define WIDGET_TEXT_ENTRY     0x00000008 /* the caller's text buffer is kept */
 #define WIDGET_CURSOR_AT_END  0x00000010 /* with WIDGET_TEXT_ENTRY */
+#define WIDGET_KEEPS_FOCUS    0x00000020 /* text entry: Tab and Enter pass no focus */
 #define WIDGET_STAYS_RAISED   0x00000004 /* no sunken bevel when highlighted */
 #define WIDGET_NO_POPUP_ARROW 0x00000080
 #define WIDGET_PICTURE        0x00000400 /* the text is an RGN file name */
 #define WIDGET_TEXT_STOP      0x00000800 /* the text ends at the first byte 1 */
 #define WIDGET_TICK           0x00002000
 #define WIDGET_MARK_RIGHT     0x00004000
+#define WIDGET_TEXT_PATH      0x00008000 /* text entry takes : and \ */
+#define WIDGET_TEXT_QUESTION  0x00010000 /* text entry takes ? */
 #define WIDGET_MARK_UP        0x00020000
 #define WIDGET_MARK_DOWN      0x00040000
 
@@ -36,12 +39,12 @@ typedef struct widget {
     s32 fixed_y2;          /* 0x34 */
     u32 style;             /* 0x38, panel flags */
     u32 text_flags;        /* 0x3c, passed to gui_text */
-    s32 unknown_40;
+    s32 text_limit;        /* 0x40, text entry: most characters, < 0: a key empties */
     s32 cursor;            /* 0x44, place of the cursor mark, -1 = none */
     intptr_t unknown_48;
     cm_image_t *saved;     /* 0x4c, the screen under the widget */
     s32 tick;              /* 0x50, g_tick at the time of widget_init */
-    const char *text_source; /* 0x54, the caller's text, for WIDGET_TEXT_ENTRY */
+    char *text_source;     /* 0x54, the caller's text, for WIDGET_TEXT_ENTRY */
     cm_image_t *picture;   /* 0x5c */
     s16 index;             /* 0x70, of this widget */
     u16 colour;            /* 0x72 */
@@ -52,7 +55,7 @@ typedef struct widget {
     s16 popup_area;        /* 0x7c, index of the popup area it opens */
     s16 unknown_7e;        /* widget_init sets -1 */
     char text[256];        /* 0x80 */
-    s32 unknown_180;
+    s32 text_changed;      /* 0x180, text entry: a key changed the text */
     s32 lighten_once;      /* 0x184, the next draw makes colour 10% lighter */
     s32 highlighted;       /* 0x188 */
 } widget_t;
@@ -67,7 +70,9 @@ extern s32 g_tick;
  * makes the area wide enough for the text and one row higher.
  *
  * The original copies the text with no limit, and its 257th to 260th bytes
- * land in unknown_180, which it then clears. The port keeps 255 characters.
+ * land in text_changed, which it then clears. The port keeps 255 characters.
+ * For WIDGET_TEXT_ENTRY, `text` is the caller's buffer (text_source). Text
+ * entry writes the text back into it, so it must hold 256 bytes.
  * In a popup area with no columns the original divides by zero. The port
  * uses column 0. An area index outside the areas reads other memory in the
  * original. The port treats it as an area that is not a popup area.
@@ -76,7 +81,7 @@ void widget_init(widget_t *widget, struct area *areas, widget_t *widgets,
                  s16 index, u32 flags, s32 x1, s32 y1, s32 x2, s32 y2,
                  s32 column, s32 row, u32 style, u16 colour,
                  u16 highlight_colour, u32 text_flags, s16 font,
-                 u16 text_colour, const char *text, s32 unknown_40,
+                 u16 text_colour, const char *text, s32 text_limit,
                  s32 unknown_08, intptr_t unknown_48, s16 area);
 
 /*
@@ -91,6 +96,17 @@ void widget_release(widget_t *widget);
  * panel. The area of the widget records which widget it highlights.
  */
 void widget_set_highlight(widget_t *widget, bool on);
+
+/*
+ * FUN_005eed50. Sets the text of the widget. A picture widget lets its
+ * picture go. A text entry also copies the text into text_source. With
+ * `redraw`, when the screen manager of the screen stack has drawn its
+ * screen, puts the screen under the widget back, draws the widget and
+ * flips it. The original shows an error box for a NULL text. The port lets
+ * the button go and returns, as the original does after the box. The port
+ * keeps 255 characters.
+ */
+void widget_set_text(widget_t *widget, const char *text, bool redraw);
 
 /* FUN_005ee590. `redraw` drops the saved screen and captures it again. */
 void widget_draw(widget_t *widget, bool redraw);

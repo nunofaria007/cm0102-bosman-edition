@@ -77,10 +77,10 @@ static const field_t widget_fields[] = {
     SCALAR(widget_t, font, true), SCALAR(widget_t, text_colour, false),
     ARRAY(widget_t, text, false),
     SCALAR(widget_t, lighten_once, true), SCALAR(widget_t, highlighted, true),
-    SCALAR(widget_t, unknown_08, true), SCALAR(widget_t, unknown_40, true),
+    SCALAR(widget_t, unknown_08, true), SCALAR(widget_t, text_limit, true),
     SCALAR(widget_t, unknown_48, false),
     SCALAR(widget_t, tick, true), SCALAR(widget_t, index, true),
-    SCALAR(widget_t, unknown_7e, true), SCALAR(widget_t, unknown_180, true),
+    SCALAR(widget_t, unknown_7e, true), SCALAR(widget_t, text_changed, true),
 };
 
 /* Same order as MANAGER_FIELDS in scene.py. */
@@ -94,7 +94,7 @@ static const field_t manager_fields[] = {
     SCALAR(scrman_t, unknown_12f501, true), SCALAR(scrman_t, unknown_12f503, true),
     SCALAR(scrman_t, unknown_12f505, true), ARRAY(scrman_t, unknown_12f509, true),
     SCALAR(scrman_t, unknown_12f52d, true), SCALAR(scrman_t, unknown_12f52f, true),
-    SCALAR(scrman_t, unknown_12f531, true), SCALAR(scrman_t, unknown_12f533, true),
+    SCALAR(scrman_t, unknown_12f531, true), SCALAR(scrman_t, passed_focus, true),
     SCALAR(scrman_t, fade_in, true),
     SCALAR(scrman_t, unknown_12f539, true), SCALAR(scrman_t, unknown_12f53b, true),
     SCALAR(scrman_t, skip_draw, true), SCALAR(scrman_t, unknown_12f541, false),
@@ -476,15 +476,43 @@ static bool manager_screen(const char *args)
 
 extern void input_poll(SDL_Event *e);
 
-/* The SDL key for a Windows virtual key code from VK_PRIOR to VK_DOWN. */
+/*
+ * The SDL key for a Windows virtual key code, from a table of its own, so
+ * that the test checks the table of input.c.
+ */
 static SDL_Keycode sdl_key(long vk)
 {
-    static const SDL_Keycode keys[] = {
-        SDLK_PAGEUP, SDLK_PAGEDOWN, SDLK_END, SDLK_HOME,
-        SDLK_LEFT, SDLK_UP, SDLK_RIGHT, SDLK_DOWN,
+    static const struct {
+        long vk;
+        SDL_Keycode key;
+    } keys[] = {
+        {0x08, SDLK_BACKSPACE}, {0x09, SDLK_TAB}, {0x0d, SDLK_RETURN},
+        {0x10, SDLK_LSHIFT}, {0x11, SDLK_LCTRL}, {0x14, SDLK_CAPSLOCK},
+        {0x1b, SDLK_ESCAPE}, {0x20, SDLK_SPACE}, {0x21, SDLK_PAGEUP},
+        {0x22, SDLK_PAGEDOWN}, {0x23, SDLK_END}, {0x24, SDLK_HOME},
+        {0x25, SDLK_LEFT}, {0x26, SDLK_UP}, {0x27, SDLK_RIGHT},
+        {0x28, SDLK_DOWN}, {0x2d, SDLK_INSERT}, {0x2e, SDLK_DELETE},
+        {0x60, SDLK_KP_0}, {0x61, SDLK_KP_1}, {0x62, SDLK_KP_2},
+        {0x63, SDLK_KP_3}, {0x64, SDLK_KP_4}, {0x65, SDLK_KP_5},
+        {0x66, SDLK_KP_6}, {0x67, SDLK_KP_7}, {0x68, SDLK_KP_8},
+        {0x69, SDLK_KP_9}, {0x6a, SDLK_KP_MULTIPLY}, {0x6b, SDLK_KP_PLUS},
+        {0x6d, SDLK_KP_MINUS}, {0x6e, SDLK_KP_PERIOD},
+        {0x6f, SDLK_KP_DIVIDE}, {0x70, SDLK_F1}, {0x71, SDLK_F2},
+        {0x72, SDLK_F3}, {0x73, SDLK_F4}, {0x74, SDLK_F5}, {0x75, SDLK_F6},
+        {0x76, SDLK_F7}, {0x77, SDLK_F8}, {0x78, SDLK_F9}, {0x7a, SDLK_F11},
+        {0x7b, SDLK_F12}, {0xba, SDLK_SEMICOLON}, {0xbb, SDLK_EQUALS},
+        {0xbc, SDLK_COMMA}, {0xbd, SDLK_MINUS}, {0xbe, SDLK_PERIOD},
+        {0xbf, SDLK_SLASH}, {0xc0, SDLK_BACKQUOTE}, {0xdb, SDLK_LEFTBRACKET},
+        {0xdc, SDLK_BACKSLASH}, {0xdd, SDLK_RIGHTBRACKET},
+        {0xde, SDLK_QUOTE},
     };
 
-    return vk >= 0x21 && vk <= 0x28 ? keys[vk - 0x21] : SDLK_a;
+    if (vk >= 0x30 && vk <= 0x39) return SDLK_0 + (SDL_Keycode)(vk - 0x30);
+    if (vk >= 0x41 && vk <= 0x5a) return SDLK_a + (SDL_Keycode)(vk - 0x41);
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        if (keys[i].vk == vk) return keys[i].key;
+    }
+    return SDLK_UNKNOWN;
 }
 
 /*
@@ -492,7 +520,8 @@ static SDL_Keycode sdl_key(long vk)
  * test gives the window procedure of the original as a Windows message.
  * kind: 0 key down (a = virtual key), 1 wheel (a = notches), 2 mouse move
  * (a, b = x, y), 3 button (a = 1 down or 0 up, b = 1 left or 3 right, c = x
- * packed with y as y * 65536 + x). Prints the mouse globals.
+ * packed with y as y * 65536 + x), 4 text (a = a Latin-1 character, sent as
+ * UTF-8). Prints the mouse globals, the key code and the character.
  */
 static bool sdl_event(const char *args)
 {
@@ -513,6 +542,14 @@ static bool sdl_event(const char *args)
         e.type = SDL_MOUSEMOTION;
         e.motion.x = (Sint32)v[1];
         e.motion.y = (Sint32)v[2];
+    } else if (v[0] == 4) {
+        e.type = SDL_TEXTINPUT;
+        if (v[1] < 0x80) {
+            e.text.text[0] = (char)v[1];
+        } else {
+            e.text.text[0] = (char)(0xc0 | (v[1] >> 6));
+            e.text.text[1] = (char)(0x80 | (v[1] & 0x3f));
+        }
     } else {
         e.type = v[1] ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
         e.button.button = (Uint8)v[2];
@@ -520,8 +557,9 @@ static bool sdl_event(const char *args)
         e.button.y = (Sint32)(v[3] >> 16);
     }
     input_poll(&e);
-    printf("%d %d %d %d %d %d %d\n", g_mouse_x, g_mouse_y, g_left_held,
-           g_right_held, g_left_clicked, g_right_clicked, g_click_frames);
+    printf("%d %d %d %d %d %d %d %d %d\n", g_mouse_x, g_mouse_y, g_left_held,
+           g_right_held, g_left_clicked, g_right_clicked, g_click_frames,
+           g_key_code, g_key_char);
     return true;
 }
 

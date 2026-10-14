@@ -8,10 +8,10 @@ STACK = "src/si/screen_stack.c"
 # name, file, text to find (once in the file), text to put in its place
 BREAKS = [
     # FUN_00561f10, the scrollbar click
-    ("click: no call", INPUT, "        if (area->has_scrollbar) scrollbar_click(sm, sm->area_order[k]);", ""),
-    ("click: shown only", INPUT, "        if (area->has_scrollbar) scrollbar_click(sm, sm->area_order[k]);",
-     "        if (area->has_scrollbar && area->shown) scrollbar_click(sm, sm->area_order[k]);"),
-    ("click: no second walk", INPUT, "        if (area->shown && area->owner_widget == -1) walk_rows(sm, area, false);", ""),
+    ("click: no call", INPUT, "                scrollbar_click(sm, sm->area_order[k]);\n", ""),
+    ("click: shown only", INPUT, "            if (pass == 1 && area->has_scrollbar) {",
+     "            if (pass == 1 && area->has_scrollbar && area->shown) {"),
+    ("click: no second walk", INPUT, "    for (s16 pass = 1; pass <= 2; pass++) {", "    for (s16 pass = 1; pass <= 1; pass++) {"),
     ("click: x2", INPUT, "bool across = bar->x1 <= x && x <= bar->x2;", "bool across = bar->x1 <= x && x < bar->x2;"),
     ("click: button", INPUT, "    if (g_left_held && across) {", "    if (across) {"),
     ("up: edge", INPUT, "        if (bar->y1 <= y && y <= bar->track_y1 - 1) {", "        if (bar->y1 <= y && y <= bar->track_y1) {"),
@@ -39,8 +39,8 @@ BREAKS = [
     ("drag: release", INPUT, "    if (!g_left_held) {\n        sm->mode = 0;", "    if (!g_left_held) {\n        sm->mode = 2;"),
     ("drag: top", INPUT, "    if (bar->thumb_y1 + dy < bar->track_y1) dy = bar->track_y1 - bar->thumb_y1;", ""),
     ("drag: bottom", INPUT, "    if (bar->track_y2 < bar->thumb_y2 + dy) dy = bar->track_y2 - bar->thumb_y2;", ""),
-    ("drag: position", INPUT, "(bar->track_y2 - bar->thumb_height - bar->track_y1 + 1);",
-     "(bar->track_y2 - bar->thumb_height - bar->track_y1);"),
+    ("drag: position", INPUT, "        s32 room = bar->track_y2 - bar->thumb_height - bar->track_y1 + 1;",
+     "        s32 room = bar->track_y2 - bar->thumb_height - bar->track_y1;"),
     ("drag: last y", INPUT, "    sm->unknown_12f509[1] = y;\n    return -1;", "    return -1;"),
     ("drag: no scroll", INPUT, "            area_scroll(area, bar->position - old_position);\n        }", "        }"),
     ("poll: no drag", INPUT, "    if (sm->mode == 2) return scrman_scrollbar_drag(sm);", ""),

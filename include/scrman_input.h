@@ -13,6 +13,7 @@ extern s32 g_left_held;        /* DAT_00b67a34 */
 extern s32 g_right_held;       /* DAT_00b67a38 */
 extern s32 g_left_clicked;     /* DAT_00b67a0c, set when the button goes down */
 extern s32 g_right_clicked;    /* DAT_00b67a1c */
+extern s32 g_key_code;         /* DAT_00b67a04, the Windows key code of the last key */
 extern u8 g_key_char;          /* DAT_00b67a24, the last character typed */
 extern s32 g_cursor_kind;      /* DAT_009c36e8, 2 = over a button */
 
@@ -30,10 +31,42 @@ extern s32 g_click_frames;
  * scrollbar (FUN_00561f10) moves the rows: the arrows by one row and the
  * track by one page, once for each call. The thumb starts mode 2. The
  * scrollbar of an area out of view takes clicks too, as in the original.
- * Text entry and the opening of a popup area are not ported: a widget with
- * a popup area acts as a plain button.
+ *
+ * The test runs in two passes. The buttons and the scrollbars count in the
+ * first pass only. Each text entry (WIDGET_TEXT_ENTRY) gets
+ * scrman_text_entry in both passes, in the same order. When one finishes,
+ * the hit test returns it at once. The text entries after it get one more
+ * call, so that the one with the passed focus starts. For a free widget
+ * these are the rest of the free widgets, then all free widgets again in
+ * the first pass. For a row they are the rows of this area and of the
+ * areas after it.
+ *
+ * The opening of a popup area is not ported: a widget with a popup area
+ * acts as a plain button.
  */
 s16 scrman_hit_test(scrman_t *sm);
+
+/*
+ * FUN_005617c0. One step of the text entry widget `index`. A click inside
+ * starts the editing, with the cursor at the end of the text. A click
+ * outside, Tab or Enter ends it and returns whether the text changed. Tab
+ * and Enter also pass the focus to the next text entry that the hit test
+ * calls, unless the widget has WIDGET_KEEPS_FOCUS. While the widget edits,
+ * Left, Right, Backspace and Delete (g_key_code) move the cursor and delete,
+ * and g_key_char goes in at the cursor. A widget with a negative text_limit
+ * empties its text at the first key. The text takes no more than text_limit
+ * characters and must fit the widget with 10 pixels to spare. It takes no
+ * character below a space and none of " * / < > | { } [ ] ~. It takes : and
+ * \ only with WIDGET_TEXT_PATH, and ? only with WIDGET_TEXT_QUESTION. A key
+ * that the widget uses clears g_key_code and g_key_char. A key that it
+ * cannot use stays. Returns false while the widget edits.
+ *
+ * The original shows an error box for a widget with no WIDGET_TEXT_ENTRY.
+ * The port lets the button go and returns false, as the original does
+ * after the box. With a text_limit above 255 the original can write past
+ * its buffer. The port keeps 255 characters.
+ */
+bool scrman_text_entry(scrman_t *sm, s16 index);
 
 /*
  * FUN_00561050, the thumb drag of mode 2. Moves the thumb by the change in

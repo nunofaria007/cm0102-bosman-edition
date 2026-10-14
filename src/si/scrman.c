@@ -66,7 +66,7 @@ void scrman_reset(scrman_t *sm, bool release)
     memset(sm->unknown_12f509, 0, sizeof(sm->unknown_12f509));
     sm->widget_overflow = 0;
     sm->area_overflow = 0;
-    sm->unknown_12f533 = -1;
+    sm->passed_focus = -1;
     sm->unknown_12f551 = 0;
     sm->unknown_12f555 = 0;
     sm->darken_screen = 0;
@@ -107,7 +107,7 @@ s16 scrman_area_create(scrman_t *sm, s32 x1, s32 y1, s32 x2, s32 y2,
 s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
                          s32 y2, s32 column, s32 row, u32 style, u16 colour,
                          u16 highlight_colour, u32 text_flags, s16 font,
-                         u16 text_colour, const char *text, s32 unknown_40,
+                         u16 text_colour, const char *text, s32 text_limit,
                          s32 unknown_08, intptr_t unknown_48, s16 area)
 {
     s16 index = sm->widget_slots;
@@ -120,7 +120,7 @@ s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
     memset(&sm->widgets[index], 0, sizeof(sm->widgets[index]));
     widget_init(&sm->widgets[index], sm->areas, sm->widgets, index, flags,
                 x1, y1, x2, y2, column, row, style, colour, highlight_colour,
-                text_flags, font, text_colour, text, unknown_40, unknown_08,
+                text_flags, font, text_colour, text, text_limit, unknown_08,
                 unknown_48, area);
     if (area != -1) {
         /* An index outside the areas reaches other memory in the original. */

@@ -34,7 +34,7 @@ typedef struct {
     s16 unknown_12f52d;
     s16 unknown_12f52f;
     s16 unknown_12f531;
-    s16 unknown_12f533;
+    s16 passed_focus;
     s32 fade_in;                            /* 0x12f535, the next draw only */
     s16 unknown_12f539;
     s16 unknown_12f53b;
@@ -85,7 +85,7 @@ s16 scrman_area_create(scrman_t *sm, s32 x1, s32 y1, s32 x2, s32 y2,
 s16 scrman_widget_create(scrman_t *sm, u32 flags, s32 x1, s32 y1, s32 x2,
                          s32 y2, s32 column, s32 row, u32 style, u16 colour,
                          u16 highlight_colour, u32 text_flags, s16 font,
-                         u16 text_colour, const char *text, s32 unknown_40,
+                         u16 text_colour, const char *text, s32 text_limit,
                          s32 unknown_08, intptr_t unknown_48, s16 area);
 
 /* DAT_00dd6bda. Not 0: every background name becomes "\\", which no file has. */
