@@ -10,9 +10,53 @@ A native macOS port of Championship Manager 01/02, rebuilt from the original Win
 The shipped Windows program, cm0102.exe. It is the reference for every behaviour.
 _Avoid_: binary, the exe, the game
 
-**Port**:
-The C and SDL2 program in this repo that reproduces the original.
-_Avoid_: remake, clone, wrapper
+**Recompiled game**:
+The original's code translated instruction by instruction into C, with a runtime that replaces the Windows calls. It is the program that every release ships.
+_Avoid_: recomp, emulator, the port
+
+**Hand port**:
+The clean C program in this repo that rewrites parts of the original by hand and is checked against it by the differential test.
+_Avoid_: port (alone), remake, clone, wrapper
+
+### Distribution
+
+**Re-Signed Edition**:
+The product name, written in full as "CM 01/02: Re-Signed Edition". It is an unofficial port of Championship Manager 01/02.
+_Avoid_: Championship Manager (as the product name), CM Modern Edition
+
+**Free release**:
+The CD image that Eidos made free to download in 2008. It holds version 3.9.60 of the original and its data.
+_Avoid_: freeware, ISO, base game
+
+**Official patch**:
+The 3.9.68 update from Sports Interactive, the last official update. It changes the original and its data.
+_Avoid_: latest patch, update
+
+**Clean files**:
+The free release with the official patch applied, and nothing else. They are the only input to a release.
+_Avoid_: vanilla, original files
+
+**Fan pack**:
+A community collection that adds a loader, patches or updated data to the game. It is never an input to a release.
+_Avoid_: mod pack, starter kit
+
+**Release**:
+One numbered version of the Re-Signed Edition, published with a tag and the downloads for Mac and Windows.
+_Avoid_: build, drop
+
+**Download**:
+The file that a player gets from a release: the recompiled game with the clean files, ready to start.
+_Avoid_: package, installer, bundle
+
+### Display
+
+**Widescreen mode**:
+The game drawn at 1280x800. It is the default.
+_Avoid_: HD mode, wide mode
+
+**Classic mode**:
+The game drawn at 800x600, as the original draws it.
+_Avoid_: 4:3 mode, original mode
 
 ### Screen
 
@@ -65,7 +109,7 @@ _Avoid_: input field, edit box, text field
 ### Verification
 
 **Differential test**:
-A test that runs one function of the original in an emulator, runs the same function of the port, and compares the results.
+A test that runs one function of the original in an emulator, runs the same function of the hand port, and compares the results.
 _Avoid_: emulation test, golden test
 
 ### Data
