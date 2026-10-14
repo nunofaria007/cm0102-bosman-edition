@@ -6,6 +6,7 @@
  */
 #include "port_leagues.h"
 #include "database.h"
+#include "exe_image.h"
 #include "key_index.h"
 #include "key_nation.h"
 #include "langlib.h"
@@ -13,6 +14,7 @@
 #include "setup.h"
 #include "utils.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void print_bytes(const u8 *bytes, size_t size)
@@ -81,6 +83,14 @@ bool leagues_command(const char *cmd, const char *args)
         memset(g_continents[row].name, 0, sizeof(g_continents[row].name));
         strncpy(g_continents[row].name, name, sizeof(g_continents[row].name) - 1);
     } else if (!strcmp(cmd, "lg_keys")) {
+        /* The args are the path of cm0102.exe, which holds the key id names. */
+        char path[1024] = "", error[512] = "";
+
+        sscanf(args, "%1023s", path);
+        if (!exe_image_loaded() && !exe_image_load(path, error, sizeof(error))) {
+            fprintf(stderr, "lg_keys: %s\n", error);
+            exit(1);
+        }
         key_index_match();
         for (s32 i = 0; i < KEY_NATION_COUNT; i++) printf("%d ", g_key_nations[i]);
         for (s32 i = 0; i < KEY_CONTINENT_COUNT; i++) printf("%d ", g_key_continents[i]);

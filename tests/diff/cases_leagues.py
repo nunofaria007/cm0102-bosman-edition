@@ -134,7 +134,7 @@ class Tables:
         uc.reg_write(UC_X86_REG_EBX, 0)
         uc.emu_start(CONTINENT_LOOP[0], CONTINENT_LOOP[1])
         wanted = [str(struct.unpack("<i", original.read(a, 4))[0]).encode() for a in KEY_NATIONS + KEY_CONTINENTS]
-        self.ctx.port.send("lg_keys")
+        self.ctx.port.send("lg_keys", original.exe_path)
         self.ctx.expect_equal(f"{case}: key ids", wanted, self.ctx.port.reply())
         return [int(w) for w in wanted]
 
