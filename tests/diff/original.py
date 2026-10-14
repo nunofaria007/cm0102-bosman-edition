@@ -69,9 +69,11 @@ CRT_FREAD = 0x945BFE
 CRT_SPLITPATH = 0x944CFF
 CRT_SPRINTF = 0x944C9F
 
-# The error box of the original: FUN_0090d130(name, extension, line) formats the
-# place, FUN_005e8290(title, message, 0) shows it.
+# The error box of the original: FUN_005e8290(title, message, 0) shows it. Before that the code
+# pushes the file name, extension and line for a sprintf and calls FUN_0090d130, which returns the
+# version text "3.9.68" (0xAD4394). The test reads the line from those pushes.
 FUN_ERROR_PLACE = 0x90D130
+VERSION_TEXT = 0xAD4394
 FUN_ERROR_BOX = 0x5E8290
 
 # IDirectDrawSurface vtable slots used by the drawing code: slot -> stdcall argument bytes.
@@ -126,13 +128,14 @@ class Original:
         uc.hook_add(UC_HOOK_CODE, self._on_text_entry, begin=FUN_TEXT, end=FUN_TEXT)
         self.error_lines = []
         self.data_dir = data_dir
+        self.pictures_dir = os.path.join(os.path.dirname(data_dir), "Pictures")
         self.no_data_files = False     # the path lookup then names a file that does not exist
         self.title = self.alloc_c_string("")
         self._replace(FUN_SCREEN_TITLE, 0, lambda: self.title)
         self._replace(FUN_DATA_PATH, 2, self._data_path)
         self.flips = []
         uc.hook_add(UC_HOOK_CODE, self._on_flip, begin=FUN_FLIP, end=FUN_FLIP)
-        self._replace(FUN_ERROR_PLACE, 3, lambda name, ext, line: self.error_lines.append(line) or 0)
+        self._replace(FUN_ERROR_PLACE, 3, lambda name, ext, line: self.error_lines.append(line) or VERSION_TEXT)
         self._replace(FUN_ERROR_BOX, 0, lambda: 0)
 
         self.write_u32(G_DISPLAY_OFF, 0)
@@ -288,8 +291,15 @@ class Original:
         self.uc.hook_add(UC_HOOK_CODE, on_call, begin=addr, end=addr)
 
     def _data_path(self, folder, name):
+        """The CM3_DATA or CM3_PICTURES folder. A backslash in the name separates folders."""
         if self.no_data_files:
             return self.alloc_c_string(os.path.join(self.data_dir, "no such file"))
+        if self.read_c_string(folder) == "CM3_PICTURES":
+            path = self.pictures_dir
+            for part in self.read_c_string(name).replace("/", "\\").split("\\"):
+                found = [e for e in os.listdir(path) if e.lower() == part.lower()] if os.path.isdir(path) else []
+                path = os.path.join(path, found[0] if found else part)
+            return self.alloc_c_string(path)
         wanted = self.read_c_string(name).lower()
         found = [entry for entry in os.listdir(self.data_dir) if entry.lower() == wanted]
         return self.alloc_c_string(os.path.join(self.data_dir, found[0]) if found else wanted)
@@ -332,7 +342,8 @@ class Original:
             handle = open(name, "rb")
         except OSError:
             return 0
-        stream = self.alloc(4)
+        # A FILE of MSVC is 0x20 bytes. Code of the original reads its flags at +0xc.
+        stream = self.alloc(0x20)
         self.files[stream] = handle
         return stream
 

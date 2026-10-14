@@ -24,6 +24,11 @@ add_executable(cm0102
     src/si/scrman_input.c
     src/si/langlib.c
     src/si/gui_menu.c
+    src/si/utils.c
+    src/cm3/background.c
+    src/cm3/menubar.c
+    src/cm3/file_screens.c
+    src/cm3/setup.c
     src/cm3/database.c
 )
 
@@ -36,6 +41,7 @@ add_executable(port_driver
     tests/diff/port_scene.c
     tests/diff/port_stack.c
     tests/diff/port_helpers.c
+    tests/diff/port_start.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c
@@ -50,6 +56,11 @@ add_executable(port_driver
     src/si/scrman_input.c
     src/si/langlib.c
     src/si/gui_menu.c
+    src/si/utils.c
+    src/cm3/background.c
+    src/cm3/menubar.c
+    src/cm3/file_screens.c
+    src/cm3/setup.c
 )
 target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})
 target_link_libraries(port_driver PRIVATE ${SDL2_LIBRARIES})

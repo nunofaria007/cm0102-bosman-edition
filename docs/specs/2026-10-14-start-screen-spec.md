@@ -26,7 +26,7 @@ Port the screen stack of scrman.cpp for one local player, its main loop on SDL, 
 - The window procedure of the original sets the mouse globals. The port sets the same values from SDL events.
 - The text function `FUN_0066f4e0` is ported for plain text, `%s` and `%d`. Its `{...}` and `[...]` tags are left out.
 - The background picker `FUN_0041bfb0` picks a random picture from the "England" list of `Pictures/pics.cfg`, read as the original reads it. The original draws its random numbers from a pool in its data, seeded from the clock. The port uses its own random numbers. The app takes the folder from `--pictures`, with `Pictures` next to the data folder as the default. In the differential test both programs get the same title.
-- The menu items "Start New Game", "Quick Start Game", "Restore Saved Game", "Delete Saved Game", "Network Play", "Game Settings", "Hall Of Fame", "Game Credits" and "Web Sites" rebuild the start screen. The side bar button "Exit Game" opens the "Please Confirm" screen of the original, and its "Yes" quits. (Research of 2026-10-14 found the confirm screen. The interview assumed that Exit Game quits at once.)
+- The menu items "Start New Game", "Quick Start Game", "Restore Saved Game", "Delete Saved Game", "Network Play", "Game Settings", "Hall Of Fame", "Game Credits" and "Web Sites" rebuild the start screen. The side bar button "Exit Game" opens the "Please Confirm" screen of the original, and its "Yes" returns `SCREEN_QUIT`, where the original calls `exit(0)`. (Research of 2026-10-14 found the confirm screen. The interview assumed that Exit Game quits at once.)
 - The side bar shows "Version\n3.9.68", as the original does.
 - The command-line loads of the original (`-load`, `quick_start.cfg`, `auto_setup.cfg`) are left out.
 - The app with no arguments opens the start screen. `--demo` keeps the made-up screen.
@@ -54,6 +54,21 @@ Found while building slice 2:
 - The menu builder returns 0 for 0 columns, where the original divides by zero.
 - `FUN_00804030` (a button with its own box) is ported with the other button helpers, though the start screen does not use it.
 
+Found while building slice 3:
+- "Yes" on the "Please Confirm" screen of "Exit Game" returns `SCREEN_QUIT` in the port. The original calls its shut-down code and `exit(0)` inside the side bar input function (0x762c4d), so its main loop never sees a result.
+- "Restart Game" also opens "Please Confirm" (code 0x3d). Its "Yes" makes the original start a new copy of itself with `WinExec` of its command line and end (`FUN_0068dbc0`). The port frees the screen stack, pushes the start screen and returns `SCREEN_REBUILD`.
+- The original opens `pics.cfg` in text mode, so the MSVC library turns CR LF into LF and ends the file at the byte 0x1a. The port reads it the same way. The research of 2026-10-14 assumed that the CR stays on the last name of a line: it does not, so "holywell03.RGN" stays in the list.
+- `FUN_00591840` takes 7 arguments: title, heading, text, buttons, text colour, colour and code (0x764396..0x7643ab). The research listed 8. The side bar passes light grey and red, and the build gives the heading the red panel and the light grey text.
+- A "{" ends a name and puts that name in the second list (`names2`), and the flag holds until a name is kept: "{x}" puts x in the second list (0x41b61b). The port reads names this way.
+- The port loads `pics.cfg` on the first background pick when the app has not loaded it. The original loads it once at start-up (0x5d7a98). `pics_free` empties the table, for the test.
+- The side bar has the mode 1 part only: no manager record. Not ported, with the address: "Add Manager" as a button (0x75de4a, needs `DAT_00dd711c`), "Chat" (0x75dea1, network), the arrows in font 0 for a font setting other than -1 (0x75dd36), modes 2 to 4 (0x75e04b..0x7611ff), and the hook `FUN_00823930` for id 0x423 (the port sets the id and no function).
+- The side bar input has the answers of codes 0xb and 0x3d, the ids -2, -3, 0x402 and 0x42f, and -11 for id 0x424. Not ported: the codes 1, 7, 8, 9, 0xa, 0x2a, 0x37, 0x3a, 0x3e, 0x43 and 0x44 (0x7623a6..0x762915, from screens the port lacks), the second dialogs when a flagged screen is open (0x762946, 0x762b20), the manager record parts (0x761654, 0x76222a), and the ids from 0x3e8 to 0x434 that need a game. `FUN_007643d0` returns 0 for every id that a ported screen has, so the port returns 0.
+- The confirm screen with no text lists an object from slot 6 (`FUN_005ed200`). Only `FUN_005919b0` pushes such an object, and nothing ported calls it, so it is left out. Its keys (`DAT_00b67a24`, jump table at 0x591f00) are left out with the keyboard.
+- The start screen input leaves out the actions of the nine menu items, the "Game Settings" screen of a first run (`FUN_00823890`, slot 0), the command-line loads and the dialog codes 4, 5 and 6. The test leaves the menu items out of its clicks.
+- "Network Play" keeps id 5 and the light grey text: the port has no `-nonetwork` option (`DAT_00a801c4` is 1 in the file).
+- The original keeps the menu items on its stack and never sets their data (widget +0x48). The port sets 0, and the test leaves that field out of the compare for the menu buttons.
+- The picture cache of the original (0xae291c) points into the emulated heap, which the test empties between cases. The test clears it in the original. The port keeps its cache, which holds the same picture.
+
 ## Out of scope
 - The screens behind the menu items.
 - Keyboard, popup areas, scrollbars, text entry, widget drag, the idle timeout.
@@ -80,7 +95,7 @@ Merge danger: two-way door. Blast radius: menus and headings of every later scre
 Blocked by: 1, 2
 Delivers: the build function of "Setup Game" with the background picker and the side bar on the start screen.
 Merge danger: two-way door. Blast radius: the start screen.
-- [ ] The build gives the same screen manager and the same screen as the original.
+- [x] The build gives the same screen manager and the same screen as the original.
 
 ### 4. Input and the main loop
 Blocked by: 3
