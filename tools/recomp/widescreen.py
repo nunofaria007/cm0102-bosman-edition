@@ -39,6 +39,9 @@ PATCHES = {
     0x5E8309: (800, W),
     # Widget init 0x5ee150: x2 and y2 are clamped to 799 and 599.
     0x5EE1F5: (799, W1), 0x5EE20A: (599, H1),
+    # Tactics input 0x89f710: the nearest position to a drop, by distance in screen pixels, starts at
+    # 800 and counts only if it ends below 800.
+    0x8A20F8: (800, W), 0x8A21E2: (800, W), 0x8A260F: (800, W), 0x8A26F6: (800, W),
 }
 
 # Instructions whose whole translation is replaced: address: (the instruction in the original, C code).
@@ -47,3 +50,17 @@ PATCHES = {
 ROW = "eax = (uint32_t)((int32_t)eax / 25 * (int32_t)rt_screen_w);"
 INSNS = {a: ("shl eax, 5", ROW) for a in (
     0x5E7B7D, 0x5E7BE5, 0x5E7C42, 0x5E7CB8, 0x5E7D73, 0x5E7DE2, 0x5E7E44, 0x5E7EBB)}
+
+# Calls of the text width function 0x5e5ad0 that must get the width in screen pixels. Every other call
+# (screen code that lays out widgets in classic coordinates) gets the width in classic pixels, so that
+# a widget placed after a text, or sized to it, keeps its place on the text once the runtime scales
+# the coordinates (src/recomp_rt/win/display.c, text_width). These calls compare the width with
+# a rect on the screen, or draw:
+TRUE_WIDTH = {
+    0x561E60,                                   # text entry 0x5617c0: does the text fit the widget
+    0x5E6F5F, 0x5E7205, 0x5E722A,               # text draw 0x5e6d80: wrap and align in the box
+    0x5E82DE,                                   # error box 0x5e8290: box width (not scaled)
+    0x5EE26F, 0x5EE281,                         # widget init 0x5ee150: popup width
+    # comp_text 0x4aeaf0 (news text and its name buttons): left as it is for the clickable names work.
+    0x4AEB54, 0x4AEDEF, 0x4AF16F, 0x4AF58B, 0x4AF66F,
+}

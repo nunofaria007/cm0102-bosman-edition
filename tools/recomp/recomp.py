@@ -34,7 +34,7 @@ sys.setrecursionlimit(50000)
 from analysis import Analyzer  # noqa: E402
 from pe import Image  # noqa: E402
 from translate import PATCHED, FunctionWriter  # noqa: E402
-from widescreen import INSNS, PATCHES  # noqa: E402
+from widescreen import INSNS, PATCHES, TRUE_WIDTH  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 RUNTIME = os.path.join(ROOT, "src", "recomp_rt")
@@ -267,10 +267,14 @@ def main(argv):
             out.write(f"    {{0x{iat:x}u, 0x{stub:x}u}},\n")
         out.write("};\n")
         out.write(f"const uint32_t rt_iat_size = {len(image.imports)};\n")
+        # The return addresses of the text width calls that get screen pixels (widescreen.py TRUE_WIDTH).
+        sites = sorted(a + 5 for a in TRUE_WIDTH)
+        out.write("\nconst uint32_t rt_true_width_returns[] = {" + ", ".join("0x%xu" % a for a in sites) + "};\n")
+        out.write(f"const uint32_t rt_true_width_count = {len(sites)};\n")
     files.append(os.path.join(gen, "table.c"))
     t_translate = time.time() - t0
     if args.all:
-        lost = sorted((set(PATCHES) | set(INSNS)) - PATCHED)
+        lost = sorted((set(PATCHES) | set(INSNS) | TRUE_WIDTH) - PATCHED)
         if lost:
             raise SystemExit("widescreen.py: no translated instruction at " + ", ".join("%#x" % a for a in lost))
         lost = sorted(set(wrapped) - set(funcs))
