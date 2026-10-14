@@ -41,6 +41,7 @@ Settled in the grilling interview of 2026-10-14 (Q1 to Q45).
 - Widescreen mode: 1280x800, the default. On a 16:9 screen the window shows thin bars at the sides.
 - Classic mode: 800x600. The switch is one line in a settings file in the save folder.
 - The wide background is made at run time from the official 800x600 background. No fan-made background files.
+- The window can be resized. It scales the picture to fit and keeps the aspect ratio, with bars at the sides or top. The screens do not lay out again for a new window shape (Max, 2026-10-14).
 
 **Downloads**
 - Mac: one `.dmg` with a universal app (arm64 and x86_64). SDL2 inside the bundle. The clean files inside the bundle. Ad hoc signature. Saves in `~/Library/Application Support/cm0102`.
