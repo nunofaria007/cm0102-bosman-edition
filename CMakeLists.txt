@@ -201,10 +201,14 @@ if(APPLE AND TARGET cm0102_recomp)
             --out "${CM0102_APP_OUT}" --version "${PROJECT_VERSION}"
         COMMENT "Making the Mac app and .dmg"
         VERBATIM USES_TERMINAL)
+    set(CM0102_CHECK_ARCHS "")
+    if(NOT CM0102_SDL2_PREFIX_X86_64)
+        set(CM0102_CHECK_ARCHS --archs arm64)
+    endif()
     add_custom_target(mac_check
         COMMAND "${RECOMP_PYTHON}" -I "${CMAKE_SOURCE_DIR}/tools/mac/check_package.py"
             "${CM0102_APP_OUT}/CM-01-02-Re-Signed-Edition-${PROJECT_VERSION}-mac.dmg"
-            --version "${PROJECT_VERSION}"
+            --version "${PROJECT_VERSION}" ${CM0102_CHECK_ARCHS}
         COMMENT "Checking the Mac download"
         VERBATIM USES_TERMINAL)
 endif()

@@ -30,7 +30,7 @@ void rt_init(const char *exe_path)
     if (!m) rt_fatal("cannot reserve 4 GB of address space");
     g_mem = m;
 
-    FILE *f = fopen(exe_path, "rb");
+    FILE *f = host_fopen(exe_path, "rb");
     if (!f) rt_fatal("cannot open %s", exe_path);
     fseek(f, 0, SEEK_END);
     long n = ftell(f);

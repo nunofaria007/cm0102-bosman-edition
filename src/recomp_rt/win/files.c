@@ -3,9 +3,10 @@
  * Paths: on macOS C:\ is the host root, so the original's folder /Users/max/Downloads/Game is
  * C:\Users\max\Downloads\Game. On Windows each drive is the host drive of that letter. The CD drive
  * (D:\ on macOS, a letter that Windows does not use there, host_cd_drive) is the folder that holds the
- * player's own cm0102.exe, which the CD check looks for (inventory 4.6). A relative path starts at the current folder, which
- * WinMain sets from the registry value Location. Each part of a path is matched without regard to case,
- * as Windows does; a part that does not exist keeps its spelling (a new file).
+ * player's own cm0102.exe, which the CD check looks for (inventory 4.6). A relative path starts at
+ * the current folder, which WinMain sets from the registry value Location. Each part of a path is
+ * matched without regard to case, as Windows does; a part that does not exist keeps its spelling
+ * (a new file).
  *
  * Writes: the game folder is never changed. A path has two host forms: H in the game folder and U in the
  * user folder (win_user_dir) under the same relative path. A read looks at U, then at H. A file opened

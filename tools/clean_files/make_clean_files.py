@@ -2,11 +2,15 @@
 """Make the clean files: the free release of CM 01/02 with the official 3.9.68 patch applied.
 
 Usage:
-    python3 tools/clean_files/make_clean_files.py ISO PATCH_EXE OUT_DIR [--manifest FILE]
+    python3 tools/clean_files/make_clean_files.py ISO PATCH_EXE OUT_DIR [--update-manifest]
     python3 tools/clean_files/make_clean_files.py --check OUT_DIR [--manifest FILE]
 
 ISO is the free release (CM0102.iso). PATCH_EXE is the official patch (cm0102_3968.exe).
 OUT_DIR must not exist. The tool stops if a hash of an input is wrong.
+The tool writes the manifest of the new files next to OUT_DIR (OUT_DIR.manifest.tsv), so that the
+file does not end up in a download. It then compares the files with the committed manifest and fails
+with the paths that differ. It never writes over the committed manifest, except with
+--update-manifest, which replaces the committed file on purpose.
 With --check, the tool compares OUT_DIR with the manifest and changes nothing.
 
 Manifest format (tools/clean_files/manifest.tsv): lines starting with # are comments; each other
@@ -56,7 +60,6 @@ CAB_GROUPS = {
     "Sounds": "Sounds",
     "Editor": "Editor",
 }
-CAB_FILE_COUNT = 779  # all groups, quick starts included
 
 # The file table of the patch's setup.exe (46 entries at 0x410070: name, folder). update.dat is
 # 46 little-endian 32-bit sizes in this order, then the files one after the other.
@@ -205,7 +208,8 @@ def main():
     global ARGS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", metavar="OUT_DIR")
-    ap.add_argument("--manifest", default=DEFAULT_MANIFEST)
+    ap.add_argument("--manifest", default=DEFAULT_MANIFEST, help="the committed manifest to compare with")
+    ap.add_argument("--update-manifest", action="store_true", help="replace the committed manifest")
     ap.add_argument("iso", nargs="?")
     ap.add_argument("patch", nargs="?")
     ap.add_argument("out", nargs="?")
@@ -235,10 +239,15 @@ def main():
             fail(f"the patched cm0102.exe reports {version}, not 3.9.68")
         os.replace(stage, out)
     rows = listing(out)
-    write_manifest(rows, ARGS.manifest)
+    own = out + ".manifest.tsv"
+    write_manifest(rows, own)
     print(f"{n} files from data1.cab, {len(PATCH_FILES)} from update.dat; {len(rows)} files in {out}")
-    print(f"cm0102.exe version {version}; manifest {ARGS.manifest}")
-    return 0
+    print(f"cm0102.exe version {version}; manifest of these files: {own}")
+    if ARGS.update_manifest:
+        write_manifest(rows, ARGS.manifest)
+        print(f"replaced the committed manifest {ARGS.manifest}")
+        return 0
+    return check(out, ARGS.manifest)
 
 
 if __name__ == "__main__":

@@ -39,8 +39,8 @@ VERSION="$(sed -n 's/^project([^)]*VERSION \([0-9][0-9.]*\).*/\1/p' "$REPO/CMake
 TAG="v$VERSION"
 NOTES="$(awk -v v="## $VERSION" 'index($0, v) == 1 { on = 1; next } /^## / && on { exit } on' "$REPO/CHANGELOG.md")"
 [ -n "$NOTES" ] || { echo "make_release.sh: CHANGELOG.md has no section for $VERSION." >&2; exit 2; }
-if [ -n "$(git -C "$REPO" status --porcelain --untracked-files=no)" ]; then
-    echo "make_release.sh: commit your changes first, so that the tag names the code that was built." >&2; exit 2
+if [ -n "$(git -C "$REPO" status --porcelain)" ]; then
+    echo "make_release.sh: commit or remove every change and every new file first, so that the tag names the code that was built." >&2; exit 2
 fi
 
 OUT="$REPO/build/release-$VERSION"
@@ -61,10 +61,14 @@ cmake -B "$REPO/build-win" -DCMAKE_TOOLCHAIN_FILE="$REPO/packaging/windows/mingw
     -DCM0102_GAME_DIR="$GAME" >/dev/null
 cmake --build "$REPO/build-win" -j --target windows_installer
 SETUP="$REPO/build-win/CM0102-Re-Signed-Edition-$VERSION-Setup.exe"
+python3 -I "$REPO/tools/windows/check_installer.py" "$REPO/build-win/cm0102_recomp.exe" "$SETUP" --version "$VERSION"
 cp "$SETUP" "$OUT/"
 
 echo "== Site pictures"
-( cd "$SITE" && zip -q -r -X "$OUT/site-assets.zip" . -x '.*' )
+# Write to a new file and move it over the old one, so that a removed picture does not stay.
+SITE_TMP="$(mktemp "$OUT/site-assets.XXXXXX")"
+( cd "$SITE" && zip -q -r -X - . -x '.*' ) > "$SITE_TMP"
+mv -f "$SITE_TMP" "$OUT/site-assets.zip"
 
 ( cd "$OUT" && shasum -a 256 "$(basename "$DMG")" "$(basename "$SETUP")" site-assets.zip > SHA256SUMS )
 printf '%s\n' "$NOTES" > "$OUT/notes.md"
