@@ -175,10 +175,13 @@ a { color: inherit; }
   .js [data-in], .js .hero h1 img, .js .hero h1 .edition, .js .hero .flank { opacity: 1 !important; transform: none !important; }
 }
 
-@media (max-width: 1000px) {
-  .release { grid-template-columns: 1fr; }
-  .shot { aspect-ratio: auto; }
-  .shot img { position: static; height: auto; }
+@media (max-width: 1100px) {
+  .release { gap: 20px; }
+  .release .panel { padding: 20px; }
+  .release .sub { margin-bottom: 12px; }
+  .release ul { gap: 8px; }
+  .release li { font-size: 1rem; line-height: 1.35; }
+  .release .later { margin-top: 14px; }
 }
 /* Phone */
 @media (max-width: 760px) {
@@ -192,6 +195,8 @@ a { color: inherit; }
   .screen { padding: 56px 16px; }
   .bar { padding: 14px 12px; margin-bottom: 28px; }
   .release, .steps, .downloads { grid-template-columns: 1fr; }
+  .shot { aspect-ratio: auto; }
+  .shot img { position: static; height: auto; }
   .panel { padding: 20px; }
   .faq summary { padding: 16px 18px; font-size: 1.125rem; }
   .faq details p { padding: 0 18px 18px; font-size: 1.0625rem; }
