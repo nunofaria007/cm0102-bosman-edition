@@ -4,6 +4,11 @@
 #include "gui_font.h"
 #include "gui_utils.h"
 #include "scrman.h"
+#include "screen_stack.h"
+#include "setup.h"
+#include "utils.h"
+#include "guio.h"
+#include <time.h>
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +23,7 @@ extern void rgn_free(cm_image_t *img);
 
 static bool g_running = true;
 static bool g_demo = false;
+static scrman_t g_screen_manager;
 
 static void handle_event(SDL_Event *e)
 {
@@ -55,20 +61,59 @@ static void handle_event(SDL_Event *e)
     }
 }
 
-/* Usage: cm0102 [--data <folder>] [--demo] [picture.rgn] */
+/*
+ * The message pump of the screen stack: SDL events set the mouse globals,
+ * and the tick of the original is the SDL tick. Returns false on quit.
+ */
+static bool pump(void)
+{
+    SDL_Event e;
+
+    while (SDL_PollEvent(&e)) {
+        handle_event(&e);
+        input_poll(&e);
+        /*
+         * A quick tap gives the press and the release in one pass. The poll
+         * must see the button held once, so the release waits for the next pass.
+         */
+        if (e.type == SDL_MOUSEBUTTONDOWN) break;
+    }
+    g_tick = (s32)SDL_GetTicks();
+    SDL_Delay(5);
+    return g_running;
+}
+
+/* Runs the screens of the original, starting with "Setup Game". */
+static void run_game(const char *pictures_dir)
+{
+    g_pictures_dir = pictures_dir;
+    scrman_init(&g_screen_manager, 0);
+    scrman_reset(&g_screen_manager, true);
+    screen_stack_init(&g_screen_stack, &g_screen_manager);
+    setup_push_start_screen();
+    g_screen_pump = pump;
+    SDL_StartTextInput();
+    screen_stack_run(&g_screen_stack);
+}
+
+/* Usage: cm0102 [--data <folder>] [--pictures <folder>] [--demo] [picture.rgn] */
 int main(int argc, char *argv[])
 {
     const char *data_dir = "./Data";
+    const char *pictures_dir = NULL;
     const char *picture = NULL;
+    static char default_pictures[1024];
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--demo")) {
             g_demo = true;
         } else if (!strcmp(argv[i], "--data") && i + 1 < argc) {
             data_dir = argv[++i];
+        } else if (!strcmp(argv[i], "--pictures") && i + 1 < argc) {
+            pictures_dir = argv[++i];
         } else if (argv[i][0] == '-') {
-            fprintf(stderr, "Usage: cm0102 [--data <folder>] [--demo] "
-                            "[picture.rgn]\n");
+            fprintf(stderr, "Usage: cm0102 [--data <folder>] "
+                            "[--pictures <folder>] [--demo] [picture.rgn]\n");
             return 2;
         } else {
             picture = argv[i];
@@ -93,6 +138,22 @@ int main(int argc, char *argv[])
         }
         g_data_dir = data_dir;
         demo_draw(picture);
+    } else if (!picture) {
+        /* The Pictures folder sits next to the data folder of the original. */
+        if (!pictures_dir) {
+            snprintf(default_pictures, sizeof(default_pictures), "%s/../Pictures",
+                     data_dir);
+            pictures_dir = default_pictures;
+        }
+        if (!gui_fonts_load(data_dir)) {
+            fprintf(stderr, "No fonts in %s. Use --data <folder>.\n", data_dir);
+            display_shutdown();
+            return 1;
+        }
+        g_data_dir = data_dir;
+        srand((unsigned)time(NULL));
+        run_game(pictures_dir);
+        g_running = false;
     } else if (picture) {
         cm_image_t *bg = rgn_load(picture);
         if (bg) {
