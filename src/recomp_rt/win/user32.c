@@ -55,10 +55,15 @@ static void post(uint32_t msg, uint32_t wparam, uint32_t lparam)
 
 static uint32_t mouse_lparam(void) { return ((uint32_t)mouse_y & 0xffff) << 16 | ((uint32_t)mouse_x & 0xffff); }
 
+/* The press that the left button is in: a new number at each WM_LBUTTONDOWN, and its time. */
+static uint32_t press_count;
+static uint64_t press_at;
+
 static void post_mouse(uint32_t msg, int x, int y)
 {
     mouse_x = x;
     mouse_y = y;
+    if (msg == WM_LBUTTONDOWN) { press_count++; press_at = SDL_GetTicks64(); }
     post(msg, (uint32_t)buttons, mouse_lparam());
 }
 
@@ -344,6 +349,47 @@ RT_IMPORT(GetMessageA)
     wr32(g_mem, m + 20, (uint32_t)mouse_x);
     wr32(g_mem, m + 24, (uint32_t)mouse_y);
     rt_ret_stdcall(q->msg != WM_QUIT, 4);
+}
+
+/* Repeat of a held button. The screen loop 0x7fc7e0 runs a pass: the pump 0x68d520, the input poll
+ * 0x55f620, the input function of the screen. While the left button flag 0xb67a34 is set, the hit
+ * test 0x560490 gives the widget under the pointer in every pass, so a held button acts once per pass.
+ * The +/- buttons (for example the Offer Contract input 0x4e2280, cases 4/5, 9/10, 0x17/0x18) change
+ * the value, redraw the screen and return 0, which keeps the flag. The original has no timer for this
+ * (its only clock read for input is the pump tick 0xb67a08, which no button code reads). Its pass took
+ * the time of two full screen draws on a PC of 2001. Here a pass takes about 1 ms, so one click gave
+ * a hundred steps.
+ *
+ * So the runtime paces a repeat: the same widget again from the poll in the same press. It is given to
+ * the game REPEAT_DELAY ms after the press, then every REPEAT_INTERVAL ms. If the button goes up before
+ * that, the poll gives -1 (nothing). The first result of each press, and a result for another widget
+ * (a click that ends a text entry and then hits the button under the pointer), go through at once. */
+#define REPEAT_DELAY 400u
+#define REPEAT_INTERVAL 100u
+static uint32_t last_press, last_widget = 0xffffu;
+static uint64_t next_repeat_at;
+
+void o_0055f620(void);
+
+/* The input poll, thiscall, no arguments: the widget index in AX, -1 for nothing. */
+RT_WRAP(0055f620, input_poll)
+{
+    o_0055f620();
+    uint32_t widget = cpu.eax & 0xffffu;
+    int held = (buttons & 1) && rd32(g_mem, 0xb67a34u) && !rd32(g_mem, 0xb67a3cu);
+    if (widget == 0xffffu || !held) return;
+    if (press_count != last_press || widget != last_widget) {
+        last_press = press_count;
+        last_widget = widget;
+        next_repeat_at = press_at + REPEAT_DELAY;
+        return;
+    }
+    while ((buttons & 1) && SDL_GetTicks64() < next_repeat_at) {
+        win_poll_events();
+        SDL_Delay(1);
+    }
+    if (!(buttons & 1)) { cpu.eax |= 0xffffu; return; }    /* released while it waited */
+    next_repeat_at = SDL_GetTicks64() + REPEAT_INTERVAL;
 }
 
 RT_IMPORT(TranslateMessage) { rt_ret_stdcall(1, 1); }
