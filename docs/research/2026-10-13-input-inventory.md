@@ -27,7 +27,7 @@ Date: 2026-10-13. Source: `/Users/max/Downloads/Game/cm0102.exe`, read with REA 
 | `b67a2c` | Window handle | not part of this task | | used for paint (`0x68d790`) |
 | `9c36e8` | Cursor kind chosen in this frame (0 default) | Reset to 0 at `0x55f630`. Set to 2 by `FUN_00560490`, `FUN_00560c30`, `FUN_005617c0` (xrefs `0x560578`, `0x560788`, `0x560eb9`, `0x5618cc`) | `FUN_0055f620` start | `FUN_0055f620` passes it to `FUN_005e8170` (`0x55f726`) |
 | `9cd804` | Cursor kind now shown (cache) | `FUN_005e8170` | | `FUN_005e8170`, `FUN_005e81e0` |
-| `ad9c58` | Pointer to the area object that the keyboard and wheel scroll | `0x4031dd`, `0x4031ed`, `0x403752` (area-object methods; not read) | unknown | `FUN_005621f0` only |
+| `ad9c58` | Pointer to the scrollbar struct (area-relative +0xb7a) that the keyboard and wheel click | `0x403752` in the scrollbar setup `FUN_00403600` (assembly read, 2026-10-14) | `0x4031ed` in the area release `FUN_004031a0`, when it points to that area | `FUN_005621f0` only |
 | `ae2a28` / `ae2a2c` | Last fire time of the 1000 ms and 100 ms text timers | `FUN_00569610` | | `FUN_00569610` |
 
 Window messages (window procedure at `0x68d630`; Ghidra merged it into `FUN_0068d520`. Evidence that it is a window procedure: four stack arguments, `RET 0x10`, default tail calls import `0x9671f4` with the four arguments, inference: `DefWindowProc`).
@@ -79,7 +79,7 @@ switch (mode) {
  default: b67a34 = 0; b67a3c = 0;            // End, Home: nothing
 }
 ```
-A[0] and A[1] are the area x and y (area-relative +0x00, +0x04: `FUN_00402d10` flips `[+0],[+4],[+8],[+0xc]`). The meaning of A[4], A[5], A[10] (area +0x10, +0x14, +0x28) is unknown. They are not the scrollbar struct (that sits at area-relative +0xb7a). See doubts.
+Resolved 2026-10-14: `A` is the scrollbar struct, not the area. A[0] is the scrollbar x1, A[1] its y1, A[4] the track top, A[5] the track bottom and A[10] the thumb bottom. So mode 0 clicks the down arrow, 1 the up arrow, 2 the track under the thumb and 3 the top of the track (the thumb, when the list is at the top).
 
 ## 2. The eight functions
 
@@ -545,7 +545,7 @@ Looks unused or without effect:
 1. One click or many: mode 0 returns the widget in every frame while the button is held, because it tests `b67a34` (level). The scrollbar relies on this (one step per frame). For normal buttons the screen loop (`FUN_007fc7e0`, `FUN_007fdc00`) must clear `b67a34` after it dispatches the result, or the screens must ignore repeats. I did not read the loops. The port must decide by reading `FUN_007fc7e0` or by a differential test.
 2. ECX of the highlight and popup calls in `FUN_00560490` and `FUN_00560c30` is inferred. The pseudocode drops it. The guards (`hover` of the widget just tested) and the area-object use in `FUN_00402d10` make the inference likely, but an assembly check of the calls is still open. Same for the ECX of the close call at the end of `FUN_00560c30` (assumed: the active popup area `D.+0x12f52d`).
 3. Meaning of area +0x214 and of its writer. Meaning of area +0x20e.
-4. `FUN_005621f0` uses `A[4]`, `A[5]`, `A[10]` (area +0x10, +0x14, +0x28) as y positions for the key presses. Their meaning is unknown, so the exact pixel the key presses click is unknown. `ad9c58` is set in `0x4031dd`, `0x4031ed`, `0x403752` (area methods, not read). The port needs to know which area is "current", and when.
+4. Resolved 2026-10-14: `ad9c58` points to a scrollbar struct, set by `FUN_00403600` and cleared by `FUN_004031a0`. See section 1.
 5. A wheel delta with absolute value under 120 gives `n = 0`. Then `FUN_005621f0(0,0)` sets `b67a34 = 1` and `b67a3c = 0`. The pump only decrements a non-zero counter, so the button stays "held" until a real button-up. High-resolution wheels may hit this. Inference from the code; not tested.
 6. Which writer sets `D.+0x12f4fe`, `+0x12f4ff`, `+0x12f501`, `+0x12f503`? Not among the eight functions. Probably screen build code or the setter functions near `0x567ac0`; I did not find it.
 7. Tab focus order in `FUN_005617c0`: after a widget finishes, the first text widget in the order list with `cur == -1` and a different index takes over, not the next one by position. This is what the code says. The real behaviour may depend on how screens order their widgets.

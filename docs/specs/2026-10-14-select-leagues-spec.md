@@ -29,6 +29,13 @@ Port the path from "Start New Game" to the first screen with real data: the "Loa
 - The buttons that lead past "Select League(s)" rebuild the screen until game creation is ported.
 - Two agents build slices 1 and 2 in parallel, each in its own worktree. One agent then builds slice 3. One review pair runs at the end.
 - Commits are local. Nothing is pushed.
+- The key and wheel scrollbar `DAT_00ad9c58` points to the scrollbar struct of an area (area +0xb7a). The scrollbar setup `FUN_00403600` sets it, so it is the scrollbar of the last area laid out with one. The area release `FUN_004031a0` clears it when it points to that area. The port keeps it as `g_key_scrollbar`.
+- The scroll `FUN_00403ee0` ends with a write for network players (`FUN_00800330`, net buffer `DAT_00ae28f8`). The port leaves it out. Without room in that buffer, the original shows an error box and lets the button go.
+- The second pass of the hit test only walks the rows again (area +0xb78), as text entry is not ported.
+- An SDL wheel event with y = 0 (part of a notch) does nothing. In the original, a wheel delta under 120 gives `FUN_005621f0(0, 0)`, which holds the button until the next real button-up.
+- The port does not keep the key code `DAT_00b67a04`, as text entry is not ported. Keys Left and Right do nothing, as in the original.
+- `FUN_00803320` uses the record of channel `+0x382a`. The port has one channel.
+- The differential test stubs the text timers `FUN_00569610` and the cursor `FUN_005e8170` to run the poll `FUN_0055f620` of the original. The window procedure and the pump have no differential test. The test models the countdown of the pump from the assembly.
 
 ## Testing
 One seam: the differential test.
@@ -58,7 +65,7 @@ Merge danger: two-way door. Blast radius: the data of every later screen.
 Blocked by: none
 Delivers: scrollbar click, thumb drag, scroll, scroll position, keys and wheel.
 Merge danger: two-way door. Blast radius: every list.
-- [ ] Random clicks, drags and keys on areas with scrollbars give the same state, screen and flips as the original.
+- [x] Random clicks, drags and keys on areas with scrollbars give the same state, screen and flips as the original.
 
 ### 3. "Select League(s)"
 Blocked by: 1, 2

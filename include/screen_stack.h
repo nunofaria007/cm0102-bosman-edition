@@ -134,6 +134,13 @@ s32 screen_stack_at_end(const screen_stack_t *st);
  */
 s32 screen_stack_cannot_go_back(const screen_stack_t *st, s32 any);
 
+/*
+ * FUN_00803320. The first row in view of an area of the screen manager
+ * (area_shown_row), or 0 for area -1. For a record of a network player, the
+ * row in unknown_24 when unknown_22 names the area, else 0.
+ */
+s32 screen_stack_shown_row(const screen_stack_t *st, s16 area);
+
 /* FUN_00803d50. Flagged screens of every record. */
 s32 screen_stack_flagged(const screen_stack_t *st);
 

@@ -42,6 +42,7 @@ add_executable(port_driver
     tests/diff/port_stack.c
     tests/diff/port_helpers.c
     tests/diff/port_start.c
+    tests/diff/port_scroll.c
     src/si/display.c
     src/si/rgn_loader.c
     src/si/gui_utils.c

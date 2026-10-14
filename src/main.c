@@ -5,6 +5,7 @@
 #include "gui_utils.h"
 #include "scrman.h"
 #include "screen_stack.h"
+#include "scrman_input.h"
 #include "setup.h"
 #include "utils.h"
 #include "guio.h"
@@ -71,6 +72,7 @@ static bool pump(void)
 {
     SDL_Event e;
 
+    scrman_count_click_frame();
     while (SDL_PollEvent(&e)) {
         handle_event(&e);
         input_poll(&e);

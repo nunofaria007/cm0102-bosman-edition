@@ -1,4 +1,5 @@
 #include "area.h"
+#include "display.h"
 #include "gui_utils.h"
 #include <stddef.h>
 #include <string.h>
@@ -85,7 +86,9 @@ void area_add_widget(area_t *area, s16 widget)
     area->widget_index[count + 1] = widget;
 }
 
-/* FUN_00403600. The original also stores the scrollbar address in DAT_00ad9c58. */
+area_scrollbar_t *g_key_scrollbar;
+
+/* FUN_00403600 */
 static void setup_scrollbar(area_t *area, s32 margin_x, s32 margin_y)
 {
     area_scrollbar_t *bar = &area->scrollbar;
@@ -124,6 +127,7 @@ static void setup_scrollbar(area_t *area, s32 margin_x, s32 margin_y)
     bar->thumb_y1 = (track - bar->thumb_height) * bar->position /
                     bar->max_position + bar->track_y1;
     bar->thumb_y2 = bar->thumb_y1 - 1 + bar->thumb_height;
+    g_key_scrollbar = bar;
 }
 
 static void split(s32 *start, s32 *end, const u8 *weight, s32 count,
@@ -178,8 +182,7 @@ void area_layout(area_t *area)
           height);
 }
 
-/* FUN_00403c80 */
-static void draw_scrollbar(area_t *area)
+void area_draw_scrollbar(area_t *area)
 {
     area_scrollbar_t *bar = &area->scrollbar;
     s32 up = bar->pressed == 1 ? 2 : 0;
@@ -273,7 +276,7 @@ void area_draw(area_t *area, bool redraw)
         place_widget(area, widget, shown_row);
         widget_draw(widget, redraw);
     }
-    if (area->has_scrollbar) draw_scrollbar(area);
+    if (area->has_scrollbar) area_draw_scrollbar(area);
 }
 
 void area_release(area_t *area)
@@ -282,6 +285,63 @@ void area_release(area_t *area)
     area->scrollbar.saved = NULL;
     rgn_free(area->saved);
     area->saved = NULL;
+    if (g_key_scrollbar == &area->scrollbar) g_key_scrollbar = NULL;
+}
+
+/* The row of the widget in list place i. Place -1 reads the field before the list. */
+static s32 list_row(const area_t *area, s16 i)
+{
+    return area->widgets[i == -1 ? area->unknown_210 : area->widget_index[i]].row;
+}
+
+void area_scroll(area_t *area, s32 rows)
+{
+    s16 first = area->first_visible;
+    s32 moved = 0;
+
+    if (area->row_count == 0 || area->widget_count <= 0) return;
+    if (area->saved) gui_blit(area->x1, area->y1, area->saved);
+
+    if (rows < 1) {
+        while (rows < moved && first - 1 >= 0) {
+            first--;
+            moved = list_row(area, first) - list_row(area, area->first_visible);
+        }
+        /* Back to the first widget of that row. */
+        while (first != 0 && list_row(area, first - 1) == list_row(area, first)) {
+            first--;
+        }
+    } else {
+        while (moved < rows && first + 1 < area->widget_count) {
+            first++;
+            moved = list_row(area, first) - list_row(area, area->first_visible);
+        }
+    }
+    area->first_visible = first;
+
+    for (s16 i = first; i != -1 && i < area->widget_count; i++) {
+        widget_t *widget = &area->widgets[area->widget_index[i]];
+        s32 shown_row = widget->row - list_row(area, area->first_visible);
+
+        if (shown_row > area->row_count - 1) break;
+        place_widget(area, widget, shown_row);
+        widget_draw(widget, false);
+    }
+    display_flip(area->x1, area->y1, area->x2 - 22, area->y2);
+}
+
+s32 area_shown_row(const area_t *area)
+{
+    if (!area->has_scrollbar) return 0;
+    return list_row(area, area->first_visible);
+}
+
+void area_set_scroll_to(area_t *area, s32 row)
+{
+    s32 last = area->last_row - area->row_count + 1;
+
+    if (row >= last) row = last;
+    area->scroll_to = row < 1 ? 0 : row;
 }
 
 void area_popup_position(const area_t *area, s32 *x, s32 *y)
