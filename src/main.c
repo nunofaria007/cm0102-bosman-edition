@@ -3,6 +3,7 @@
 #include "display.h"
 #include "gui_font.h"
 #include "gui_utils.h"
+#include "scrman.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,7 +91,8 @@ int main(int argc, char *argv[])
             display_shutdown();
             return 1;
         }
-        demo_draw(data_dir, picture);
+        g_data_dir = data_dir;
+        demo_draw(picture);
     } else if (picture) {
         cm_image_t *bg = rgn_load(picture);
         if (bg) {

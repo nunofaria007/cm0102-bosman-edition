@@ -119,6 +119,6 @@ Merge danger: two-way door. Blast radius: limited to what a screen shows.
 Blocked by: 3
 Delivers: the demo builds its screen with area create and widget create and draws it with the screen draw.
 Merge danger: two-way door. Blast radius: the demo only.
-- [ ] The app with `--demo` shows the same window as before the change.
+- [x] The app with `--demo` shows the same window as before the change.
 - [ ] The up and down keys still scroll the table.
-- [ ] The full differential test passes.
+- [x] The full differential test passes.
