@@ -58,7 +58,7 @@ Settled in the grilling interview of 2026-10-14 (Q1 to Q45).
 
 **Site**
 - Content and order follow the OpenSGolf page (`crspytopgn.github.io/opensgolf`). The look follows the `design-taste-frontend` skill.
-- Top picture: a widescreen screenshot of the game. Two downloads: Mac and Windows. A "How to install" section with the warning steps. No donation link. No visit counter.
+- Top picture: the classic logo, cut from the 2001 manual cover, on a red hexagon net, with "Re-Signed Edition" in the style of "SEASON 01/02" (Max, 2026-10-14). Below it three sections in the style of the game's own screens: what's in the release (with the two downloads and one 4:3 screenshot), how to install, and questions. No donation link. No visit counter.
 - Footer: "An unofficial fan project. Not affiliated with or endorsed by Sports Interactive, SEGA, Eidos or Square Enix. The download includes the game files from the 2008 free release."
 - The site lives in `site/` and publishes with a GitHub Pages workflow. Downloads live in GitHub Releases only.
 
@@ -90,38 +90,38 @@ Slices 1, 2, 3, 5 and 6 run in parallel. Review once for the whole spec, with tw
 Blocked by: none
 Delivers: the commits are on GitHub, the repo has its new name, milestone 0.1.0 and its issues exist.
 Merge danger: one-way door. The push and the rename are public. Blast radius: the original's content in public git history.
-- [ ] No file in git history holds the original's code or data
-- [ ] Repo renamed; the old URL redirects
-- [ ] Milestone 0.1.0 with issues for Mac app, Windows installer, widescreen, site, release
+- [x] No file in git history holds the original's code or data
+- [x] Repo renamed; the old URL redirects
+- [x] Milestone 0.1.0 with issues for Mac app, Windows installer, widescreen, site, release
 
 ### 2. Clean files
 Blocked by: none
 Delivers: a tool that makes the clean files from the free release and the official patch on the Mac, the manifest, and a recompiled game built from the clean exe that passes the smoke run.
 Merge danger: two-way door. Blast radius: the build input of every release.
-- [ ] The tool checks both input hashes and stops on a mismatch
-- [ ] The patched exe reports 3.9.68
-- [ ] `test_load.py` passes on the clean files
-- [ ] Smoke run in classic mode passes
+- [x] The tool checks both input hashes and stops on a mismatch
+- [x] The patched exe reports 3.9.68
+- [x] `test_load.py` passes on the clean files
+- [x] Smoke run in classic mode passes
 
 ### 3. Widescreen research
 Blocked by: none
 Delivers: an inventory in `docs/research/` of how the original sizes its screens and areas, and what 1280x800 needs.
 Merge danger: two-way door. Documents only.
-- [ ] Each fact has its address
+- [x] Each fact has its address
 
 ### 4. Widescreen mode
 Blocked by: 3
 Delivers: the game draws at 1280x800 by default, with the background made from the official one; the settings file switches to classic mode.
 Merge danger: two-way door. Blast radius: every screen of the game.
 - [ ] Smoke run in both modes passes
-- [ ] Max plays a new game in widescreen mode
+- [x] Max plays a new game in widescreen mode (2026-10-14, the clean-files Mac build)
 
 ### 5. Mac app
 Blocked by: none (it takes the clean files from slice 2 when they exist)
 Delivers: a universal `.dmg` that starts from Finder on a Mac without Homebrew; the one version number.
 Merge danger: two-way door.
-- [ ] Package check passes
-- [ ] Max starts the app from Finder
+- [x] Package check passes
+- [x] Max starts the app from Finder
 
 ### 6. Windows installer
 Blocked by: none (it takes the clean files from slice 2 when they exist)
@@ -144,5 +144,5 @@ Merge danger: one-way door. It publishes the original's data. Review rule applie
 Blocked by: 4 for the screenshot; links to 7
 Delivers: the site on GitHub Pages with download links to the latest release.
 Merge danger: one-way door. The site is public.
-- [ ] The taste skill's inspector shows no FAIL
+- [ ] The taste skill's inspector shows no FAIL, except the picture count: Max asked for one screenshot only
 - [ ] Download links point at the latest release
