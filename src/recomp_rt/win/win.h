@@ -65,6 +65,9 @@ int win_fixed_clock(void);
 /* The settings file of the user folder: the display mode sets rt_screen_w and rt_screen_h (display.c). */
 void win_read_settings(void);
 
+/* Sound (dsound.c): 0 mutes every sound while the window lacks focus, 1 makes them heard again. */
+void win_sound_focus(int focused);
+
 /* Window, input and screen (user32.c, ddraw.c). */
 void win_video_init(void);
 void win_present(void);                /* show the primary surface */

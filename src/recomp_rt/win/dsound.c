@@ -15,6 +15,10 @@
  * says "not playing", as in release 0.1.0. The game's own Sound On/Off setting needs nothing here:
  * with Sound Off the game makes no sound object (0x5d7c60).
  *
+ * As in DirectSound without DSBCAPS_GLOBALFOCUS (the game's flags are 0xe2), the sounds are muted
+ * while the window lacks focus. They go on in silence: the positions move, a loop keeps its place,
+ * and GetStatus tells the truth, so the commentary keeps its pace.
+ *
  * RECOMP_SOUND_LOG=1 (or RECOMP_TRACE) prints each load, play, stop and end of a sound on stderr. */
 #include "win.h"
 #include "options.h"
@@ -57,6 +61,7 @@ static Voice voices[VOICES];
 static SDL_AudioDeviceID device;
 static int device_tried;
 static int sound_log = -1;
+static volatile int muted;         /* the window lacks focus */
 
 static int logging(void)
 {
@@ -95,7 +100,7 @@ static void mix(void *user, Uint8 *stream, int len)
             if (vo->playing && !vo->looping && vo->pos >= vo->frames) { vo->playing = 0; vo->pos = 0; }
         }
         for (int i = 0; i < 2 * n; i++) {
-            float s = acc[i];
+            float s = muted ? 0.f : acc[i];
             out[i] = (int16_t)(s > 32767.f ? 32767 : s < -32768.f ? -32768 : s);
         }
         out += 2 * n;
@@ -134,6 +139,13 @@ static void open_device(void)
     }
     SOUND_LOG("sound: device open, driver %s\n", SDL_GetCurrentAudioDriver());
     SDL_PauseAudioDevice(device, 0);
+}
+
+void win_sound_focus(int focused)
+{
+    if (muted == !focused) return;
+    muted = !focused;
+    SOUND_LOG("sound: %s\n", focused ? "focus back, heard again" : "focus lost, muted");
 }
 
 static void lock(void) { if (device) SDL_LockAudioDevice(device); }
