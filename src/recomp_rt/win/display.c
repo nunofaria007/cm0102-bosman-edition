@@ -1,0 +1,216 @@
+/* Widescreen mode and classic mode (docs/research/2026-10-14-widescreen-inventory.md).
+ *
+ * The original draws at 800x600. In widescreen mode the screen is 1280x800:
+ * - tools/recomp/widescreen.py turns the size constants of the display code into rt_screen_w and
+ *   rt_screen_h;
+ * - the area and widget create functions get coordinates for 800x600 from about 600 places, so these
+ *   wrappers scale them to the screen before the original stores them;
+ * - a picture of exactly 800x600 (a background) is scaled to fill the screen when it is loaded.
+ *
+ * The settings file settings.txt in the user folder chooses the mode with the line
+ * "display = classic" or "display = widescreen". The runtime writes the file when it is missing. */
+#include "win.h"
+
+#include <ctype.h>
+#include <stdlib.h>
+
+#define CLASSIC_W 800u
+#define CLASSIC_H 600u
+#define WIDE_W 1280u
+#define WIDE_H 800u
+
+static const char settings_text[] =
+    "# CM 01/02: Re-Signed Edition settings.\n"
+    "# display = widescreen draws the game at 1280x800. display = classic draws it at 800x600.\n"
+    "display = widescreen\n";
+
+/* Reads settings.txt in the user folder, or writes it with the defaults. Sets the screen size. */
+void win_read_settings(void)
+{
+    char path[1100], line[256];
+    snprintf(path, sizeof path, "%s/settings.txt", win_user_dir);
+    rt_screen_w = WIDE_W;
+    rt_screen_h = WIDE_H;
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        f = fopen(path, "w");
+        if (f) {
+            fputs(settings_text, f);
+            fclose(f);
+        }
+        return;
+    }
+    while (fgets(line, sizeof line, f)) {
+        char key[64], value[64];
+        char *p = line;
+        while (isspace((unsigned char)*p)) p++;
+        if (*p == '#' || !*p) continue;
+        if (sscanf(p, " %63[A-Za-z_] = %63s", key, value) != 2) continue;
+        for (char *q = key; *q; q++) *q = (char)tolower((unsigned char)*q);
+        for (char *q = value; *q; q++) *q = (char)tolower((unsigned char)*q);
+        if (strcmp(key, "display")) continue;
+        if (!strcmp(value, "classic")) {
+            rt_screen_w = CLASSIC_W;
+            rt_screen_h = CLASSIC_H;
+        } else if (!strcmp(value, "widescreen")) {
+            rt_screen_w = WIDE_W;
+            rt_screen_h = WIDE_H;
+        } else {
+            fprintf(stderr, "cm0102_recomp: %s: unknown display \"%s\", so widescreen mode is used.\n", path, value);
+        }
+    }
+    fclose(f);
+}
+
+/* A coordinate for 800x600 on the screen. A left or top edge maps to the first pixel of its part of
+ * the screen and a right or bottom edge to the last, so that areas that touch still touch. Zero and
+ * negative values keep their meaning ("none" or "from the owner"). */
+static uint32_t scale(uint32_t v, uint32_t screen, uint32_t classic, int far_edge)
+{
+    int32_t x = (int32_t)v;
+    if (screen == classic || x <= 0) return v;
+    if (far_edge) return (uint32_t)((int64_t)(x + 1) * screen / classic - 1);
+    return (uint32_t)((int64_t)x * screen / classic);
+}
+
+/* Scales the rectangle x1, y1, x2, y2 in the four stack arguments from argument `first`. */
+static void scale_rect_args(int first)
+{
+    uint32_t a = cpu.esp + 4 + 4 * (uint32_t)first;
+    wr32(g_mem, a, scale(rd32(g_mem, a), rt_screen_w, CLASSIC_W, 0));
+    wr32(g_mem, a + 4, scale(rd32(g_mem, a + 4), rt_screen_h, CLASSIC_H, 0));
+    wr32(g_mem, a + 8, scale(rd32(g_mem, a + 8), rt_screen_w, CLASSIC_W, 1));
+    wr32(g_mem, a + 12, scale(rd32(g_mem, a + 12), rt_screen_h, CLASSIC_H, 1));
+}
+
+void o_0055fba0(void);
+void o_0055f990(void);
+void o_005e40d0(void);
+
+/* Area create, thiscall: (x1, y1, x2, y2, columns, column weights, rows, row weights, flags, colour,
+ * owner). */
+RT_WRAP(0055fba0, area_create)
+{
+    scale_rect_args(0);
+    o_0055fba0();
+}
+
+/* Widget create, thiscall: (flags, x1, y1, x2, y2, column, row, ...). */
+RT_WRAP(0055f990, widget_create)
+{
+    scale_rect_args(1);
+    o_0055f990();
+}
+
+/* The pixel at (x, y) of a 565 picture, mixed from its four neighbours by the weights fx, fy (0..256). */
+static uint16_t mix565(const uint8_t *px, uint32_t w, uint32_t h, uint32_t x, uint32_t y, uint32_t fx, uint32_t fy)
+{
+    uint32_t x1 = x + 1 < w ? x + 1 : x, y1 = y + 1 < h ? y + 1 : y;
+    uint32_t p[4] = {rd16(px, (y * w + x) * 2), rd16(px, (y * w + x1) * 2), rd16(px, (y1 * w + x) * 2),
+                     rd16(px, (y1 * w + x1) * 2)};
+    uint32_t k[4] = {(256 - fx) * (256 - fy), fx * (256 - fy), (256 - fx) * fy, fx * fy};
+    uint32_t r = 0, g = 0, b = 0;
+    for (int i = 0; i < 4; i++) {
+        r += (p[i] >> 11) * k[i];
+        g += ((p[i] >> 5) & 0x3f) * k[i];
+        b += (p[i] & 0x1f) * k[i];
+    }
+    return (uint16_t)(((r + 32768) >> 16) << 11 | ((g + 32768) >> 16) << 5 | ((b + 32768) >> 16));
+}
+
+/* Gives the picture at pic new pixels of w x h, made from its old ones. step_x and step_y are 256ths
+ * of an old pixel per new pixel, off_x and off_y the 256ths of the old picture left out at the left and
+ * the top. Returns 0 when there is no memory; then the picture keeps its old pixels. */
+static int resize_picture(uint32_t pic, uint32_t w, uint32_t h, uint32_t step_x, uint32_t step_y,
+                          uint32_t off_x, uint32_t off_y)
+{
+    uint32_t old_w = rd32(g_mem, pic), old_h = rd32(g_mem, pic + 4), size = w * h * 2;
+    uint32_t calloc_args[2] = {1, size};
+    uint32_t pixels = rt_callback(0x945501u, 2, calloc_args);      /* the original's calloc */
+    if (!pixels) return 0;
+    uint32_t old = rd32(g_mem, pic + 0xc);
+    const uint8_t *src = g_mem + old;
+    uint8_t *dst = g_mem + pixels;
+    for (uint32_t y = 0; y < h; y++) {
+        uint32_t sy = off_y + y * step_y;
+        for (uint32_t x = 0; x < w; x++) {
+            uint32_t sx = off_x + x * step_x;
+            wr16(dst, (y * w + x) * 2, mix565(src, old_w, old_h, sx >> 8, sy >> 8, sx & 255, sy & 255));
+        }
+    }
+    uint32_t free_args[1] = {old};
+    rt_callback(0x9452cau, 1, free_args);                           /* the original's free */
+    wr32(g_mem, pic, w);
+    wr32(g_mem, pic + 4, h);
+    wr32(g_mem, pic + 8, size);
+    wr32(g_mem, pic + 0xc, pixels);
+    return 1;
+}
+
+/* Picture load 0x5e40d0, cdecl: (path, picture to reuse). The picture struct holds the width +0, the
+ * height +4, the size of the pixels +8 and their address +0xc. In widescreen mode:
+ * - a picture of 800x600 (a background) is scaled by the same factor in both directions until it
+ *   covers the screen, and centred, so that the parts outside the screen are cut off;
+ * - a picture 600 high and narrower (the bar at the left, game.mbr and match.mbr) is scaled to the
+ *   screen height and by the factor of the screen width, as the area that holds it. */
+RT_WRAP(005e40d0, picture_load)
+{
+    o_005e40d0();
+    uint32_t pic = cpu.eax;
+    if (rt_unwinding || !pic || rt_screen_w == CLASSIC_W) return;
+    uint32_t w = rd32(g_mem, pic), h = rd32(g_mem, pic + 4);
+    if (h != CLASSIC_H || w > CLASSIC_W || !w) return;
+    if (w == CLASSIC_W) {
+        uint32_t step = CLASSIC_W * 256 / rt_screen_w;
+        if (CLASSIC_H * 256 / rt_screen_h < step) step = CLASSIC_H * 256 / rt_screen_h;
+        resize_picture(pic, rt_screen_w, rt_screen_h, step, step, (CLASSIC_W * 256 - rt_screen_w * step) / 2,
+                       (CLASSIC_H * 256 - rt_screen_h * step) / 2);
+    } else {
+        uint32_t new_w = w * rt_screen_w / CLASSIC_W;
+        resize_picture(pic, new_w, rt_screen_h, w * 256 / new_w, CLASSIC_H * 256 / rt_screen_h, 0, 0);
+    }
+    cpu.eax = pic;
+}
+
+/* Coordinates of the classic screen on this screen: x and y of a left or top edge, xe and ye of a right
+ * or bottom edge. */
+static uint32_t sx(uint32_t v) { return scale(v, rt_screen_w, CLASSIC_W, 0); }
+static uint32_t sy(uint32_t v) { return scale(v, rt_screen_h, CLASSIC_H, 0); }
+static uint32_t sxe(uint32_t v) { return scale(v, rt_screen_w, CLASSIC_W, 1); }
+static uint32_t sye(uint32_t v) { return scale(v, rt_screen_h, CLASSIC_H, 1); }
+
+/* Calls a cdecl function of the original with up to 9 arguments. */
+#define CALL(addr, ...) do { uint32_t a_[] = {__VA_ARGS__}; rt_callback(addr, (int)(sizeof a_ / 4), a_); } while (0)
+
+/* The progress box 0x5e76f0, cdecl: (text, step, total); returns 1, or 0 when it draws nothing. It draws
+ * straight onto the screen over the bottom bar, so the runtime draws it with the original's functions
+ * at the scaled places: the panel (100, 555)-(790, 590), the text (120, 565)-(250, 580) and the bar
+ * (270, 565)-(770, 580) filled from x 272 over 496 pixels, or the text alone over (120, 565)-(770, 580).
+ * Step 0 first darkens the screen once (0x55f2c0 on the screen manager of the record). */
+RT_REPLACE(005e76f0, progress_box)
+{
+    uint32_t text = rt_arg(0), step = rt_arg(1), total = rt_arg(2);
+    if (rd32(g_mem, 0xaebe0cu)) { rt_ret_cdecl(0); return; }        /* the display is off */
+    rt_callback(0x68d520u, 0, NULL);                                /* the message pump */
+    if (!text) { rt_ret_cdecl(0); return; }
+    if (!step) {
+        uint32_t record = (uint32_t)((int32_t)(int16_t)rd16(g_mem, 0xb77c7au) * 0x300);
+        Cpu saved = cpu;
+        cpu.ecx = rd32(g_mem, 0xb74c4cu + record);
+        rt_callback(0x55f2c0u, 0, NULL);
+        cpu = saved;
+    }
+    uint32_t grey = rd16(g_mem, 0xae317eu), light = rd16(g_mem, 0xae3184u), navy = rd16(g_mem, 0xaebe04u);
+    CALL(0x5e5df0u, sx(100), sy(555), sxe(790), sye(590), 0x30, grey, 0);
+    if ((int32_t)total > 0 && (int32_t)step <= (int32_t)total) {
+        CALL(0x5e6d80u, sx(120), sy(565), sxe(250), sye(580), 0xc, 1, light, text, 0xffffffffu);
+        CALL(0x5e5df0u, sx(270), sy(565), sxe(770), sye(580), 0x60, grey, 0);
+        uint32_t left = sx(272), width = sxe(768) - left;
+        int32_t fill = (int32_t)((int64_t)(int32_t)step * width / (int32_t)total);
+        CALL(0x5e3b50u, left, sy(567), left + (uint32_t)fill, sye(578), 4, navy);
+    } else {
+        CALL(0x5e6d80u, sx(120), sy(565), sxe(770), sye(580), 0xc, 1, light, text, 0xffffffffu);
+    }
+    CALL(0x5e2eb0u, sx(100), sy(555), sxe(790), sye(590));                       /* flip */
+    rt_ret_cdecl(1);
+}

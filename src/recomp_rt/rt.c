@@ -218,6 +218,8 @@ void rt_fatal(const char *fmt, ...)
 
 void (*rt_on_fatal)(void);
 
+uint32_t rt_screen_w = 800, rt_screen_h = 600;
+
 void rt_unimpl(uint32_t at, const char *text) { rt_fatal("instruction at %#x is not translated: %s", at, text); }
 void rt_fell_off(uint32_t at) { rt_fatal("execution reached %#x, where the recompiler found no code", at); }
 void rt_bad_jump(uint32_t at, uint32_t target) { rt_fatal("jump table at %#x: target %#x is not in the table", at, target); }

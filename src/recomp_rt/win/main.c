@@ -6,7 +6,8 @@
  * program that holds cm0102.exe and Data, else the current folder. The game folder is read only:
  * every write goes to ~/Library/Application Support/cm0102 (files.c).
  * Environment: RECOMP_TRACE=1 (print import calls), RECOMP_SCRIPT and RECOMP_DUMP
- * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr). */
+ * (user32.c), RECOMP_NO_BOX=1 (message boxes only on stderr), RECOMP_USER_DIR (another user folder,
+ * for test runs). */
 #include "win.h"
 
 #include <SDL.h>
@@ -79,12 +80,16 @@ int main(int argc, char **argv)
                         "Give the folder of the original game with --game <folder>.\n", game);
         return 2;
     }
-    const char *home = getenv("HOME");
-    if (!home || !*home) {
-        fprintf(stderr, "cm0102_recomp: HOME is not set, so the user folder is unknown.\n");
-        return 2;
+    const char *home = getenv("HOME"), *user = getenv("RECOMP_USER_DIR");
+    if (user && *user) {
+        snprintf(win_user_dir, sizeof win_user_dir, "%s", user);
+    } else {
+        if (!home || !*home) {
+            fprintf(stderr, "cm0102_recomp: HOME is not set, so the user folder is unknown.\n");
+            return 2;
+        }
+        snprintf(win_user_dir, sizeof win_user_dir, "%s/Library/Application Support/cm0102", home);
     }
-    snprintf(win_user_dir, sizeof win_user_dir, "%s/Library/Application Support/cm0102", home);
     {
         char tmp[1100];
         snprintf(tmp, sizeof tmp, "%s", win_user_dir);
@@ -103,6 +108,7 @@ int main(int argc, char **argv)
         }
     }
     win_trace = getenv("RECOMP_TRACE") && *getenv("RECOMP_TRACE");
+    win_read_settings();
 
     /* The command line as Windows gives it: the quoted program path, then the options. */
     char exe_win[1100];
