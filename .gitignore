@@ -12,3 +12,4 @@ compile_commands.json
 .vscode/
 .idea/
 __pycache__/
+.claude/worktrees/
