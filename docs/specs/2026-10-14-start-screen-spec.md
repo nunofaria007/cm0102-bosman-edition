@@ -47,6 +47,13 @@ Found while building slice 1:
 - The node keeps a slot value as a pointer-sized number, because a slot holds a number or a pointer. The original keeps 32 bits.
 - With no current screen, the original ends the program in set slot, get slot and the screen queries. The port returns without effect, 0 or 1.
 
+Found while building slice 2:
+- The screens and helpers work on one global screen stack, `g_screen_stack`, as the original works on the object at 0xb74450. The app must run the main loop on it.
+- The text function keeps `{`, `[`, `}` and `]` as plain characters. The original drops an empty tag, skips one argument for each `{` or `[`, and replaces a tag with content in a later pass (0x66f93e). The port writes at most 2047 characters, where the original has no limit. A `<` note with a space and no `>` after it makes the original read past the end of the format. The port stops at the end.
+- The text box `FUN_005ed070` is ported for a text that fits on one line. The line breaking of `FUN_004aeaf0` (comp_text.cpp) and the substitutions after the text are left out. The confirm screen reaches neither.
+- The menu builder returns 0 for 0 columns, where the original divides by zero.
+- `FUN_00804030` (a button with its own box) is ported with the other button helpers, though the start screen does not use it.
+
 ## Out of scope
 - The screens behind the menu items.
 - Keyboard, popup areas, scrollbars, text entry, widget drag, the idle timeout.
@@ -67,7 +74,7 @@ Merge danger: two-way door. Blast radius: none for the app until slice 4.
 Blocked by: none
 Delivers: the text function for plain text, `%s` and `%d`, the heading and sub-heading helpers, the button helpers, the menu builder and the Back and Next bar.
 Merge danger: two-way door. Blast radius: menus and headings of every later screen.
-- [ ] Each helper gives the same areas, widgets and pixels as the original for random arguments.
+- [x] Each helper gives the same areas, widgets and pixels as the original for random arguments.
 
 ### 3. Start screen build
 Blocked by: 1, 2

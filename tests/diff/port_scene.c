@@ -620,3 +620,8 @@ bool scene_command(const char *cmd, const char *args)
     }
     return false;
 }
+
+scrman_t *scene_manager(void)
+{
+    return &g_manager;
+}
