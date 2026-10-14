@@ -1,13 +1,9 @@
 #include "random.h"
-#include <CommonCrypto/CommonDigest.h>
+#include "exe_image.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-/* The cm0102.exe 3.9.68 that the differential test also checks. */
-static const char g_exe_sha256[] =
-    "0c78e7da6d0bcb4603fa179449bbe6d1b6b5e1c627a22c445d14d489bd9bff86";
 
 /* The table at 0xaa2454 lies at this offset in the exe file (.data). */
 #define TABLE_FILE_OFFSET 0x6a2454
@@ -66,41 +62,17 @@ void random_seed(s32 seed)
     /* The original then puts a pointer outside the table back to its start. */
 }
 
+bool random_use_image(void)
+{
+    size_t size;
+    const u8 *data = exe_image_file(&size);
+
+    if (!data || size < TABLE_FILE_OFFSET + sizeof(g_random_table)) return false;
+    memcpy(g_random_table, data + TABLE_FILE_OFFSET, sizeof(g_random_table));
+    return true;
+}
+
 bool random_load_table(const char *exe_path, char *error, size_t error_size)
 {
-    FILE *file = fopen(exe_path, "rb");
-    u8 *data = NULL;
-    long size;
-    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
-    char hex[2 * CC_SHA256_DIGEST_LENGTH + 1];
-
-    if (!file) {
-        snprintf(error, error_size,
-                 "Cannot open %s. The game needs cm0102.exe of Championship "
-                 "Manager 01/02 3.9.68 for its random numbers. "
-                 "Use --exe <path>.", exe_path);
-        return false;
-    }
-    if (fseek(file, 0, SEEK_END) == 0 && (size = ftell(file)) > 0 &&
-        fseek(file, 0, SEEK_SET) == 0 && (data = malloc((size_t)size)) &&
-        fread(data, 1, (size_t)size, file) == (size_t)size) {
-        CC_SHA256(data, (CC_LONG)size, digest);
-        for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
-            snprintf(hex + 2 * i, 3, "%02x", digest[i]);
-        }
-    } else {
-        size = 0;
-    }
-    fclose(file);
-    if (!size || strcmp(hex, g_exe_sha256)) {
-        snprintf(error, error_size,
-                 "%s is not cm0102.exe of Championship Manager 01/02 3.9.68 "
-                 "(SHA256 %s). Use --exe <path>.", exe_path,
-                 size ? hex : "unknown");
-        free(data);
-        return false;
-    }
-    memcpy(g_random_table, data + TABLE_FILE_OFFSET, sizeof(g_random_table));
-    free(data);
-    return true;
+    return exe_image_load(exe_path, error, error_size) && random_use_image();
 }

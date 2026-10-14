@@ -4,6 +4,7 @@
  */
 #include "port_database.h"
 #include "database.h"
+#include "exe_image.h"
 #include "key_index.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,7 +39,15 @@ bool database_command(const char *cmd, const char *args)
 
     if (!strcmp(cmd, "db_fresh")) {
         /* The state of the original at its start: the key ids of the file, no
-           cached name. */
+           cached name. The args are the path of cm0102.exe, which holds the
+           names of the key ids. */
+        char error[512] = "";
+
+        sscanf(args, "%1023s", path);
+        if (!exe_image_load(path, error, sizeof(error))) {
+            fprintf(stderr, "db_fresh: %s\n", error);
+            exit(1);
+        }
         key_ids_initial();
         g_db_empty_common_name = -1;
     } else if (!strcmp(cmd, "db_read")) {

@@ -2,6 +2,7 @@
 of 51,000 numbers in the exe. The port reads that table from the same exe."""
 import os
 import struct
+import tempfile
 
 from unicorn.x86_const import UC_X86_REG_FPCW
 
@@ -115,10 +116,20 @@ def test_random_load(ctx):
     ctx.expect_equal("random_load: a missing file fails", b"0", ctx.port.reply()[0], source="wanted")
     ctx.port.send("rn_load", os.path.join(ctx.data_dir, "arial_14.fnt"))
     ctx.expect_equal("random_load: another file fails", b"0", ctx.port.reply()[0], source="wanted")
+    # An exe with one byte changed has another hash, so it fails too.
+    with tempfile.TemporaryDirectory(dir=ctx.original.sandbox) as folder:
+        changed = os.path.join(folder, "changed.exe")
+        with open(exe, "rb") as src:
+            data = bytearray(src.read())
+        data[0x6a2454] ^= 1   # the first table number, at its file offset
+        with open(changed, "wb") as out:
+            out.write(data)
+        ctx.port.send("rn_load", changed)
+        ctx.expect_equal("random_load: a changed exe fails", b"0", ctx.port.reply()[0], source="wanted")
     # A failed load keeps the table.
     ctx.port.send("rn_table", 0, 5, TABLE_SIZE - 1)
     ctx.expect_equal("random_load: table kept", wanted, [int(w) for w in ctx.port.reply()])
-    return 5
+    return 6
 
 
 def test_rand(ctx):

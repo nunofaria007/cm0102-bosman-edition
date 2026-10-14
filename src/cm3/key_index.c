@@ -1,4 +1,5 @@
 #include "key_index.h"
+#include "exe_image.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -70,7 +71,9 @@ static void match(const key_id_entry_t *chain, s32 length, const char *name, s32
     for (s32 i = 0; i < length; i++) {
         const key_id_entry_t *e = &chain[i];
 
-        if (e->chain == done || !same_name(name, e->name)) continue;
+        if (e->chain == done) continue;
+        const char *text = exe_image_string(e->name);
+        if (!text || !same_name(name, text)) continue;
         g_key_ids[e->slot] = row;
         if (e->slot2 >= 0) g_key_ids[e->slot2] = row;
         done = e->chain;

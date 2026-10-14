@@ -12,6 +12,9 @@
  * the first equal name of each chain. A later row with the same name wins.
  * The port keeps them in g_key_ids, in the order of their addresses
  * (src/cm3/key_ids_table.c, made by tools/research/gen_key_ids.py). The
+ * The names are not in the repo: each chain entry holds the address of its
+ * name in the image of the player's cm0102.exe (exe_image.h), which must be
+ * loaded before key_index_match or key_index_set. The
  * enums below name the ones that the port reads so far, and the arrays
  * g_key_nations and g_key_continents copy them.
  */
@@ -25,7 +28,7 @@ typedef struct {
 } key_id_global_t;
 
 typedef struct {
-    const char *name;
+    u32 name;       /* the address of the name in cm0102.exe */
     s16 slot;       /* index into g_key_ids */
     s16 slot2;      /* a second key id that the name sets, or -1 */
     u8 chain;       /* in each chain the first equal name wins */

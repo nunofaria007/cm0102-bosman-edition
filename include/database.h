@@ -2,6 +2,7 @@
 #define DATABASE_H
 
 #include "cm_types.h"
+#include "date.h"
 #include <stddef.h>
 
 /*
@@ -92,18 +93,7 @@ typedef struct {
     s32 format;      /* +0x3f 1 or 2 */
 } db_index_entry_t;
 
-/*
- * A date, 8 bytes: the day of the year (0 for 1 Jan), the year, 1 in a
- * leap year, and 0. The dates and their functions belong to the dates
- * slice of the game setup spec. The load needs only FUN_0054a110 and two
- * dates of FUN_00549f70, which database.c has.
- */
-typedef struct {
-    s16 day;
-    u16 year;
-    u16 leap;
-    u16 zero;
-} db_date_t;
+/* The dates are cm_date_t of date.h. */
 
 typedef struct club club_t;
 typedef struct colour colour_t;
@@ -233,7 +223,7 @@ struct staff {
     db_name_t *first_name;     /* +0x04 */
     db_name_t *second_name;    /* +0x08 */
     db_name_t *common_name;    /* +0x0c */
-    db_date_t born;            /* +0x10 */
+    cm_date_t born;            /* +0x10 */
     s16 age;                   /* +0x18 inference */
     nation_t *nation;          /* +0x1a */
     nation_t *nation2;         /* +0x1e inference: second nationality */
@@ -241,13 +231,13 @@ struct staff {
     u8 b23;                    /* +0x23 cleared when +0x22 is 0 */
     club_t *national_club;     /* +0x24 */
     s8 national_job;           /* +0x28 codes as club_job */
-    db_date_t d29;             /* +0x29 */
-    db_date_t d31;             /* +0x31 */
+    cm_date_t d29;             /* +0x29 */
+    cm_date_t d31;             /* +0x31 */
     club_t *club;              /* +0x39 */
     s8 club_job;               /* +0x3d 1..10 non-player, 11 player, 12, 13
                                   and 15 both, 14 none */
-    db_date_t contract_end;    /* +0x3e inference */
-    db_date_t d46;             /* +0x46 */
+    cm_date_t contract_end;    /* +0x3e inference */
+    cm_date_t d46;             /* +0x46 */
     s32 i4e;                   /* +0x4e */
     s32 i52;                   /* +0x52 */
     u8 unknown_56[8];          /* +0x56 */
@@ -451,7 +441,7 @@ void database_national_clubs(void);
  * FUN_0053c190(club, staff, date, unlink, as_player): takes a staff row out
  * of the list of the club that its job there names. See database_links.c.
  */
-bool database_leave_club(club_t *c, staff_t *s, const db_date_t *date, bool unlink, bool as_player);
+bool database_leave_club(club_t *c, staff_t *s, const cm_date_t *date, bool unlink, bool as_player);
 
 /*
  * Index.dat, the continent table and the nation table, with the continent
@@ -489,7 +479,7 @@ s32 database_check_layouts(void);
  * for a valid day (1..31) and month (0..11), and the switch of
  * database_record_bytes to pointers after the id pass.
  */
-db_date_t database_date(s32 day, s32 month, s32 year);
+cm_date_t database_date(s32 day, s32 month, s32 year);
 void database_links_done(void);
 
 /* One record of the nation and continent tables, for the league tests. */

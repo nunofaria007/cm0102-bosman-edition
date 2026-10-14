@@ -86,7 +86,7 @@ def block_exit(lines, j):
 
 
 def read_chain(exe, image, start, end):
-    """[(name, global, chain)] in the order of the code."""
+    """[(address of name, globals, chain)] in the order of the code."""
     lines = disassemble(exe, start, end)
     at = {address: i for i, (address, _) in enumerate(lines)}
     calls = [i for i, (_, text) in enumerate(lines) if text.startswith(f"call {STRICMP:#x}")]
@@ -106,7 +106,8 @@ def read_chain(exe, image, start, end):
                 raise SystemExit(f"{address:#x}: no string push")
             k -= 1
         first = lines[k][0]
-        name = image.c_string(int(lines[k][1].split()[1], 16))
+        name = int(lines[k][1].split()[1], 16)
+        image.c_string(name)               # the name must be in the file
         j = i + 1
         while not lines[j][1].startswith(("jne", "je ")):
             if j - i > 4:
@@ -138,18 +139,6 @@ def read_chain(exe, image, start, end):
     return entries
 
 
-def c_text(name):
-    out = ""
-    for byte in name:
-        if byte in (0x22, 0x5C):
-            out += "\\" + chr(byte)
-        elif 0x20 <= byte < 0x7F:
-            out += chr(byte)
-        else:
-            out += f"\\{byte:03o}"
-    return out
-
-
 def key_globals(exe):
     """The globals that FUN_00601a40 sets to -1 first (0x601a4a..0x603864), by address."""
     found = set()
@@ -172,7 +161,9 @@ def main(exe):
     print(" * or that its name chains set, with their value in the file, and the name")
     print(" * chains. Each entry of a chain is a name, the one or two key ids that a row")
     print(" * with that name sets (as indexes into g_key_id_globals, -1 for none), and")
-    print(" * its chain: in each chain the first equal name wins.")
+    print(" * its chain: in each chain the first equal name wins. The names are not")
+    print(" * here: each entry holds the address of its name in cm0102.exe, which the")
+    print(" * port reads from the player's own file (exe_image.h).")
     print(" */")
     print('#include "key_index.h"')
     print()
@@ -193,7 +184,7 @@ def main(exe):
             if missing:
                 raise SystemExit(f"{symbol}: {name}: global {missing[0]:#x} is not a key id")
             slots = [slot[g] for g in stores] + [-1]
-            print(f'    {{"{c_text(name)}", {slots[0]}, {slots[1]}, {chain}}},')
+            print(f"    {{{name:#x}, {slots[0]}, {slots[1]}, {chain}}},")
         print("};")
         print(f"const s32 {symbol}_length = {len(entries)};")
         print()

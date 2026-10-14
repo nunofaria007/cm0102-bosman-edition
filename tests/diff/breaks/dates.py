@@ -72,5 +72,5 @@ BREAKS = [
      "    g_random_offset = cm_rand() % 0xffff;\n    g_random_index = cm_rand() % RANDOM_TABLE_SIZE;\n    g_random_end = RANDOM_TABLE_SIZE - 1;"),
     ("seed text", R, "\"Random Number seed: %d\"", "\"Random number seed: %d\""),
     ("table offset", R, "#define TABLE_FILE_OFFSET 0x6a2454", "#define TABLE_FILE_OFFSET 0x6a2458"),
-    ("no hash check", R, "    if (!size || strcmp(hex, g_exe_sha256)) {", "    if (!size) {"),
+    ("no hash check", "src/si/exe_image.c", "    if (!size || strcmp(hex, g_exe_sha256) ||", "    if (!size ||"),
 ]
