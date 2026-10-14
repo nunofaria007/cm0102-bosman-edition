@@ -17,13 +17,13 @@ Corrections to earlier inventories:
 
 ## Summary
 
-1. Next on "Select League(s)" calls `FUN_00828110(0)` (game creation) inside the input function (0x81e712). Game creation shows four progress texts in the progress box: "Player Initialisation" (100 steps), "Player histories" (771,692 steps), "Initialising game data" (44 steps) and "Initialising Leagues" (one step per day) [emu]. No screen is pushed during game creation.
+1. Next on "Select League(s)" calls `FUN_00828110(0)` (game creation) inside the input function (0x81e712). Game creation shows six progress texts in the progress box: "Player Initialisation" (100 steps), "Player histories" (771,692 steps), "Initialising game data" (44 steps), "Initialising Leagues" (one step per day), "Assessing Club Squads" and "Creating Shortlists" (5,413 steps each) [emu]. No screen is pushed during game creation.
 2. Game creation does not reload the database when it is in memory (0x828258). It looks for the CD first: it calls `GetLogicalDriveStringsA` and `GetDriveTypeA` and needs `cm0102.exe` on a CD-ROM drive, or it shows "Insert CD" in a loop with no exit (0x8281c0..0x828239). The port must leave this out.
 3. The game date starts at 1 Jan 2001 (`FUN_0081b890`, 0x81b938). Game creation sets the start date `DAT_00dd6ec8` from the league table: England starts on the Saturday nearest 10 Aug 2001, which is 11 Aug 2001, less 4 weeks: 14 Jul 2001 [emu: day 194 of 2001]. `FUN_005cc850` then runs the full game day by day from 1 Jan 2001 to 14 Jul 2001, 194 days with three slices each, under "Initialising Leagues". So game creation runs the whole simulation engine.
 4. After game creation the screens are: "Enter Name" (text entry), "Select Nationality" (scrolled list), "Select Team" (scrolled list), "Please Confirm" (Yes or No), "Manager Status" (Finish). Finish ends the setup loop. The first screen of the running game is the news screen "<manager name> News" (build 0x7881e0, news_screens.cpp).
 5. The database load is fully readable from the assembly and is about 1,500 lines of C (section 2). It has 22 table entries, a 157 to 110 byte staff conversion, a 52-byte preferences table, 23,000 reserve staff rows, 16 manager rows, 127 reserve competition rows, an id-to-pointer pass and about 1,100 key ids matched by name.
 6. All random numbers on this path come from one generator: `FUN_0090cfc0(n)`, a table of 51,000 numbers in the exe plus an offset from MSVC `rand()`. MSVC `rand()` is also called directly. Three globals hold the whole state (section 5).
-7. Game creation reaches at least 1,300 functions of the original [emu, section 6]. Static reach from `FUN_00828110` is 3,333 functions and 4 MB. The port has none of the game logic. This is the largest part of the port so far, and the slice plan (section 7) has to cut it.
+7. Game creation runs 1,034 functions of the original, about 1.06 MB by Ghidra sizes [emu, section 6]. Static reach from `FUN_00828110` is 3,333 functions and 4 MB. The port has none of the game logic. This is the largest part of the port so far, and the slice plan (section 7) has to cut it.
 
 ## 1. Screens the player sees
 
@@ -56,6 +56,8 @@ During game creation the player sees the "Select League(s)" screen with the prog
 | "Player histories" | 1, 501, 1001, ... of 771,692 (2 × 385,846, the staff history count) | inside step 13, `FUN_007bfd50` (constructor of `DAT_00b74350`) |
 | "Initialising game data" (0x9cc2ac) | 1..43 of 44 (0x2c) | `FUN_00828110` |
 | "Initialising Leagues" (0x9cd244) | 0..193 of 194 | `FUN_005cc850`, one step per day. Total = days from the game date to the start date (0x5cc9d0) |
+| "Assessing Club Squads" (0xa825ec) | 0..5,413 | `FUN_0083a1b0` (1,408 bytes), at the end of `FUN_005cc850` |
+| "Creating Shortlists" (0xa825d8) | 0..5,413 | `FUN_0083a1b0` |
 
 ### 1b. "Enter Name", build 0x820f50, input 0x821520
 
@@ -284,7 +286,7 @@ int load_database(const char *dir, int shared /* 1 */, int from_stream /* 0 */)
         s->id = staff_count - i;
         s->first = firsts - i; s->second = seconds - i; s->common = commons - i;
         /* same fields as a reserve row, but: */
-        s->b5f = 0; s->prefs = prefs_count - i;     /* prefs_count is still 0 here: -i, so NULL after resolve */
+        s->b5f = 0; s->prefs = prefs_count - i;     /* inference: prefs_count is still 0 here, so -i, NULL after resolve */
         s->nonplayer = nonplayer_count - i;
         first[firsts - i]   = { name = "", id = firsts - i, nation = -1, count = 1 };   /* 0x52add4 */
         second[seconds - i] = { name = "", id = seconds - i, nation = -1, count = 1 };
@@ -511,7 +513,7 @@ int create_game(void)                                          /* returns 1 or 0
     if (nation table == NULL) { load_database(CM3_DATA, 1); FUN_005d8480(settings); }   /* not on this path */
     FUN_00541e60();                                            /* 0x8282f1, squads: see 3c */
     command line "-verifypics", "-verifyhist", "-verifyplcfg", "-verifyeurocfg": test tools, leave out
-    FUN_00539750();                                            /* 912 bytes, pictures config (reads .pct files) [emu] */
+    FUN_00539750();                                            /* 912 bytes, reads the tactics files *.pct [emu] */
     FUN_00539ae0();                                            /* 176 bytes, comp history: keep rows of selected nations, qsort */
     DAT_00dd7114 = settings->i04 & 7;
     FUN_00524d70(DAT_00dd7114);                                /* 6,736 bytes, database trim, 3c */
@@ -734,7 +736,7 @@ void run_to_start(void)
 
 The progress total is the day count from 1 Jan 2001 to 14 Jul 2001, 194 [emu]. So a new game simulates 194 days, about 582 slices, before the player sees a screen. Each slice runs the match day, every competition and the daily updates.
 
-The game date after game creation is the start date, 14 Jul 2001 (inference from the loop condition; the emulator run did not reach the end, section 6).
+The game date after game creation is the start date, 14 Jul 2001, slice 0 [emu].
 
 ## 4. Record layouts
 
@@ -907,16 +909,129 @@ The port has no game logic. `src/cm3/database.c` is a 38-line stub. None of the 
 
 The run (scratchpad script `gc/trace/trace.py`, based on `tests/diff/original.py`) records the first entry of each function, per phase. It replaces these with host code: `malloc`, `operator new`, `calloc`, `realloc` (in place when shrinking, needed by `FUN_00524d70`), `fopen` (writes go to a sandbox folder), `fread`, `fwrite`, `fseek`, `ftell`, `fgetc`, `fclose`, `_access`, `_makepath`, `sprintf`, `time`, the findfirst wrappers, the progress box, the error box, free memory, and the Windows imports `GlobalAlloc`, `GetLogicalDriveStringsA` ("D:\"), `GetDriveTypeA` (5), `HeapSize` and some more.
 
-RESULTS_PLACEHOLDER
+Result with seed 12345 and the settings object all zero [emu]:
+
+- The load returns 1 in about 2 s of emulation. The counts are those of section 2b.
+- `FUN_00828110(0)` returns 1 after 502 s of emulation. Game date `DAT_00ae2c90` = {194, 2001, 0} (14 Jul 2001), slice `DAT_00ae2c88` = 0, start date `DAT_00dd6ec8` = {194, 2001, 0}.
+- Progress texts in order: "Loading database" (47 calls), "Player Initialisation" (100), "Player histories" (in step 13), "Initialising game data" (46 calls, steps 1..44), "Initialising Leagues" (194), then "Assessing Club Squads" and "Creating Shortlists" (total 5,413 each, from `FUN_0083a1b0` at 0x83a1bb and 0x83a23b, called at the end of `FUN_005cc850`).
+- Files read: the 20 .dat files, the tactics files `*.pct` (first through `FUN_00539750`, 0x53973f), `player_setup.cfg`, `pundit.cfg`, `weather.cfg`, `euro.cfg`, `events_eng.cfg`. Temporary files made and read back: `match_stats_matches.tmp`, `player stats history.tmp`, `staff history.tmp`, `injury_history.tmp`, `ban_history.tmp`, `computer events1.tmp`. The original keeps game history on disk in these files (`FILE_LLIST`, file_llist.CPP).
+- No error box in the final run. Earlier runs with an incomplete file layer gave errors in formation.cpp, tactics.cpp, fix_man.cpp and weather.cpp. So these files feed game creation.
+- 412 calls of `RaiseException` from the CRT `pow` (0x945ff0, called at 0x6ed8ab) were ignored by the stub. Section 8.
+
+Functions run, by phase. A function counts once, in the phase where it first runs. The load and league phases have 42 and 6 functions:
+
+- Load (42 functions, 125,712 bytes): `FUN_00417c10`, `00524d50`, `00528080`, `00528540` (21,904), `005315a0` (6,240), `00535930`, `0053b3d0`, `0053c190` (1,024), `0053dba0` (1,440), `00540a50` (5,136), `00542740`, `00549f70`, `0054a110`, `0054d580`, the 16 readers, `00601a40` (41,024), `0060d810` (6,080), `0060efd0` (9,744), `006115e0` (12,496), `006146b0` (10,352), `0066f4e0`, `0090bc50`, `0090c120`, `0090cd50`, `0090cf20`. Also `0054a130` and `0090d0a0` from the start-screen part of the test. `FUN_0053c190` and `FUN_00540a50` run, so the staff pass changes rows of the shipped data. `FUN_0090cfc0` does not run, so the load uses no random numbers.
+- Leagues (6 functions, 10,352 bytes): `FUN_00667150` (8,176), `00827d50`, `0066f4d0`, `0054a2d0`, `0054c5b0`, `0054c8e0`.
+- Game creation: 1,034 functions, 1,058,384 bytes by Ghidra sizes. 46 of them are larger than 4,000 bytes.
+- All phases: 1,082 functions, 1,194,448 bytes.
+
+Ghidra sizes overstate some functions: `FUN_00830520` (33,232) holds the 35 competition setup functions, which Ghidra did not split. Only the setup functions of entries 0..7 and 14 run. `FUN_006181d0` (74,928) may also hold more than one function (not checked).
 
 ### 6b. Grouped list
 
-GROUPS_PLACEHOLDER
+Game creation by progress step. "Large" lists the functions above 4,000 bytes.
+
+| Phase | Functions | Bytes | Large |
+|---|---|---|---|
+| 0 before the steps | 24 | 84,592 | `830520` (33,232), `535a80` (12,608), `828110` (10,416), `60ba80` (7,424), `524d70` (6,736) |
+| 0 Player Initialisation | 9 | 4,656 |  |
+| step 2 | 1 | 64 |  |
+| step 3 | 12 | 19,568 | `893dc0` (9,248) |
+| step 4 | 9 | 3,072 |  |
+| step 5 | 8 | 6,240 | `806450` (4,096) |
+| step 6 | 1 | 480 |  |
+| step 7 | 14 | 10,544 | `5ca4f0` (5,312) |
+| step 8 | 2 | 1,264 |  |
+| step 9 | 2 | 976 |  |
+| step 10 | 2 | 1,248 |  |
+| step 11 | 3 | 1,056 |  |
+| step 12 | 4 | 1,936 |  |
+| step 13 | 15 | 8,112 | `7bfd50` (4,016) |
+| step 14 | 1 | 880 |  |
+| step 15 | 3 | 4,400 |  |
+| step 16 | 9 | 5,008 |  |
+| step 17 | 20 | 12,944 | `5788c0` (4,720) |
+| step 18 | 1 | 352 |  |
+| step 19 | 1 | 432 |  |
+| step 20 | 1 | 240 |  |
+| step 21 | 1 | 208 |  |
+| step 22 | 17 | 9,856 |  |
+| step 23 | 35 | 39,504 | `6e2f20` (13,344), `7a3a10` (5,760), `76c120` (4,880) |
+| step 24 | 1 | 416 |  |
+| step 25 | 5 | 2,592 |  |
+| step 26 | 4 | 2,528 |  |
+| step 27 | 180 | 154,272 | `6e6340` (9,104), `687b10` (8,128), `51fc00` (7,056) |
+| step 28 | 2 | 336 |  |
+| step 29 | 1 | 288 |  |
+| step 30 | 1 | 352 |  |
+| step 31 | 3 | 2,624 |  |
+| step 32 | 19 | 25,200 | `864550` (8,400), `5968d0` (5,344) |
+| step 33 | 3 | 992 |  |
+| step 34 | 52 | 35,472 | `7d3df0` (8,912) |
+| step 36 | 7 | 3,504 |  |
+| step 37 | 27 | 35,264 | `844780` (8,608), `69d1b0` (6,560), `598800` (4,096) |
+| step 38 | 1 | 48 |  |
+| step 39 | 1 | 112 |  |
+| step 40 | 8 | 4,400 |  |
+| step 41 | 7 | 3,600 |  |
+| step 42 | 2 | 1,296 |  |
+| step 43 | 4 | 2,016 |  |
+| step 44 | 63 | 47,568 | `4c7ac0` (9,376) |
+| Initialising Leagues | 391 | 436,512 | `6181d0` (74,928), `697c40` (12,128), `6ec010` (11,424), `444930` (11,008), `49f570` (9,344), `51a150` (8,896), `6dbc50` (7,776), `6a69c0` (7,600), `6ddab0` (6,576), `6eecb0` (6,528), `6b7f20` (6,272), `6beeb0` (6,144), `6d9e50` (5,248), `59b9c0` (5,136), `6c0c60` (5,104), `695240` (4,912), `6b98c0` (4,816) |
+| Assessing Club Squads | 22 | 27,184 | `83cb40` (10,336), `862720` (7,728) |
+| Creating Shortlists | 35 | 54,176 | `846920` (13,248), `4d1600` (11,472), `83f3a0` (6,624), `840d80` (4,864) |
+
+Step 1 and step 35 add no new function. "0 before the steps" holds `FUN_00828110` itself, `FUN_00541e60`, `FUN_00539750`, `FUN_00539ae0`, `FUN_00524d70`, `FUN_005267c0`, `FUN_00544970`, `FUN_0053db40`, `FUN_00830520` and the England setup, `FUN_0054cab0`, `FUN_0054cdb0` and `FUN_00535a80`.
+
+Screens on the path after game creation (sizes from the next screen address; none in the port):
+
+| Function | Bytes | Note |
+|---|---|---|
+| "Manager Status" build 0x81ff10, input 0x820950 | 2,624, 1,008 | Network parts (server lines, 0x18 click) can wait |
+| `FUN_00820d40` add manager | 528 | |
+| "Enter Name" build 0x820f50, input 0x821520 | 1,488, 992 | Text entry widgets (`FUN_0055f990` with an entry style) |
+| "Select Nationality" build 0x821900, input 0x822040 | 1,856, 544 | Scrolled list |
+| "Select Team" build 0x822260, input 0x8228f0 | 1,680, 368 | Scrolled list, club click callback near 0x482fc6 (not read) |
+| `FUN_00822a60` push confirm | 64 | |
+| "Please Confirm" build 0x822aa0, input 0x822c50 | 432, 624 | |
+| `FUN_00826f20` take control, `FUN_005afd70`, `FUN_00600a50`, `FUN_005fb810`, `FUN_005fde40`, `FUN_005fdf40` | 496, 112, 576, 1,264, 256, 256 | Manager list and club control |
+| `FUN_00591840` message box | 368 | |
+| `FUN_007615d0`, `FUN_007643d0` side bar input | 11,776, 3,136 | Large. Also needed by every other screen |
+| `FUN_005cccd0` main loop, `FUN_005cde40` human turn | 4,368, 544 | |
+| News screen: `FUN_00788010` (push), build 0x7881e0, input 0x7892b0, exit 0x7897a0 | 4,720 (Ghidra, includes the build), 1,264 | First screen of the running game. Not read in detail |
+
+Leave out: the CD check, `-verify*` tools, the .lng copy, `duff.out`, the log texts and `FUN_0053dba0`, the network branches, the format-1 converters and the non-shared load branch.
 
 ## 7. Proposed slice order
 
-SLICES_PLACEHOLDER
+Each slice ends with a differential test against the emulator harness of section 6a. The harness needs to move from the scratchpad into `tests/diff` first (slice 0). Line counts are estimates for the port.
+
+0. **Harness** (about 400 lines of Python). Move the stubs of section 6a into `tests/diff/original.py`: a larger heap at 0x70000000, import stubs, the file layer with a temp folder from `mktemp -d`, `realloc` in place, a periodic EIP check. Add a function that turns a pointer of the original into a row index for a given table. Test: the load of the original runs and gives the counts of section 2b.
+1. **Dates and random numbers** (about 300 lines). `FUN_00549f70`, `FUN_0054a110`, `FUN_0054a130`, `FUN_0054a2d0`, `FUN_0054c5b0`, `FUN_0054c8e0`, `FUN_0054cab0`, `FUN_00417c10`, `FUN_0090cfc0`, `FUN_0090d0a0`, MSVC `rand`/`srand`, the 51,000-number table read from the user's exe. Test: many dates and weekdays, and 100,000 random numbers from the same state, with the three state values compared after.
+2. **Loader, tables and reserve rows** (about 700 lines). Section 2c up to the read loop and the conversion: index, readers, shared row counts, 127 reserve comp rows, 23,000 reserve staff rows, 16 manager rows, the preferences table. Ids stay ids. Test: run `FUN_00528540` in the emulator, turn every pointer field back into an index, and compare every table byte for byte with the port.
+3. **Resolve, staff pass, national clubs** (about 600 lines). Section 2c after the read and 2d, with -1 for NULL, the two NULL bugs of 2d and the common-name bug of 2c. `FUN_0053c190`, `FUN_00540a50`, `FUN_00542740`, `FUN_0053b3d0` (about 6,800 bytes of the original). Test: as slice 2.
+4. **Key ids** (about 300 lines of C plus generated tables). `FUN_00601a40` and the five matchers as `{name, global}` tables made by a script from the exe. Test: compare the about 1,100 globals.
+5. **Screens after game creation, with game creation faked** (about 1,500 lines). "Enter Name" with text entry, "Select Nationality", "Select Team", "Please Confirm", "Manager Status", and the side bar ids they use. Game creation is replaced by a stub that only sets the manager rows. Test: widget lists after each build, and the manager row after each click, against the emulator.
+6. **Game creation before the 44 steps** (about 2,500 lines, large). `FUN_00541e60`, `FUN_00539ae0`, `FUN_00524d70` (trim, 6,736 bytes), `FUN_005267c0`, `FUN_00544970`, `FUN_0053db40`, `FUN_00830520` and the start date, `FUN_00535a80` (Player Initialisation, 12,608 bytes, Ghidra garbles it). Test: tables and the random state after each function, same seed.
+7. **The 44 steps, without competitions** (very large, about 120 functions, 250 KB of the original). Split by step. Each step is one or more manager objects. Test: the object memory after each step. Steps 3 (tactics), 13 (histories, disk lists) and 23 are the largest.
+8. **Competitions** (step 27, 180 functions, 154 KB). `FUN_00669180`, the setup functions of entries 0..7 and 14, the competition classes and fixture making. Test: the competition objects and fixture lists.
+9. **Run to the start date** (`FUN_005cc850` and the 194-day run: about 450 functions, 520 KB). This is the game's daily loop, so it is the core of the whole port. Test: tables, objects, temp files and random state after each day.
+10. **News screen** (about 1,000 lines). The first screen of the running game.
+
+Slices 0 to 5 give a playable path up to "Manager Status" with real data and a faked game. Slices 6 to 9 are the game engine and need their own inventories, one per step group. A spec decision: the port could reach the news screen sooner by loading the game state after creation from a saved game made by the original. That needs the saved-game format, which is not read.
 
 ## 8. Open doubts
 
-DOUBTS_PLACEHOLDER
+- The default value of the settings object `[DAT_00ae3138]`. Its +0x04 bits give the database size option (`& 7`, to `FUN_00524d70` and `FUN_005267c0`) and the match-stats size (bits 0x400, 0x800). The emulator used all zeros. `game.cfg` was not read.
+- Whether a slice runs on 14 Jul 2001 before the news screen. After creation `DAT_00ae2c88` = 0 and `DAT_00ae2cfc` = 2 [emu, 0x5cc850], and the main loop compares them with `DAT_00ae2c78` (0x5cd361). Inference: they differ, so one slice runs first. Not traced.
+- The emulator ignored 412 `RaiseException` calls from `pow`. On Windows the x87 control word set by the CRT decides whether these happen. The run may differ from the real game in float results after the first such call. The first call is in `FUN_006ec010` (0x6ed8ab), during "Initialising Leagues" around day 93.
+- The emulator used seed 12345 and its own `time()` and clock values. The real game seeds from the time unless "-seed" is given.
+- `FUN_00535a80`, `FUN_00524d70` and `FUN_00828110` have large stack frames. Their Ghidra pseudocode is only a guide. The trim rules of `FUN_00524d70` (which staff it keeps) were not read.
+- The meaning of most fields of the player, non-player and staff records. Only the fields in section 4 have code evidence.
+- How the nation comp ids relate to the shared club-comp array (2b). The comp history resolve maps +0x04 against the club comp base for nation comp history rows too.
+- The meaning of the "Nation" row on "Select Team" (popup area or list) and the club click callback near 0x482fc6.
+- `DAT_00b63c98`+8 after Finish, which decides whether `FUN_0081fea0` pushes "Manager Status" again (1g step 2).
+- Which side bar items of `FUN_007615d0` the setup screens need. "Add Manager" is assumed to be one.
+- The fixture lists: where they are made and their layout. They are inside the competition objects of step 27.
+- `FUN_006181d0` (74,928 bytes by Ghidra) runs during the 194 days. Whether it is one function was not checked.
+- The temp files of the original (`*.tmp`) are part of the game state. A port must decide whether to keep them on disk or in memory. The game result must not depend on the choice.
