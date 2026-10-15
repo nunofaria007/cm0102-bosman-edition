@@ -9,3 +9,4 @@ Settled with Max on 2026-10-15. The full grilling and the spec come before the b
 - **One line per season (Q148):** the newest database of each season; other versions (October/April, ODB/SIM style) under "More versions".
 - **Release (Q149):** the season screen is the headline of 0.5.0.
 - **Credit:** the screen and the site credit the Update Team for every database.
+- **Layout (Max, 2026-10-15):** "A3 + both" in `docs/research/mockups/2026-10-15-season-picker.html` (the third screen): big tiles for all 25 seasons under coloured era headings (the originals in red, the 2000s in amber, the 2010s in green, the 2020s in blue), tiles tinted in their era colour with a coloured top edge, a status tag on each tile (Official, Installed, Download), a star on seasons with saved games, and a strip below with the chosen season, its database, the start date and "More versions".
