@@ -144,6 +144,7 @@ int main(int argc, char **argv)
     f_00947a13();
     fprintf(stderr, "cm0102_recomp: the entry point returned %u\n", cpu.eax);
     at_end();
+    win_save_window();
     SDL_Quit();
     return (int)cpu.eax;
 }

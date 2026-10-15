@@ -70,6 +70,8 @@ void win_sound_focus(int focused);
 
 /* Window, input and screen (user32.c, ddraw.c). */
 void win_video_init(void);
+/* Stores the window size, place and full screen state in window.txt (option remember_window). Call it at quit. */
+void win_save_window(void);
 void win_present(void);                /* show the primary surface */
 void win_poll_events(void);            /* SDL events to the message queue */
 uint32_t win_back_buffer(void);        /* flat address of the RGB565 back buffer, or 0 */
