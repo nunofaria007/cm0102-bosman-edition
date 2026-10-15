@@ -11,19 +11,26 @@
  * rating for the side, from the position ratings of the player data (1 to 20). A player's value in a
  * slot is his current ability (player data +0x05, 1 to 200) times that fit, divided by 20 (Max, Q98,
  * 2026-10-15): positional fit and skill together, so a natural player of low ability does not beat a
- * much better player who is able in the position. The picker fills the slot and player pair of the
- * highest value first. A swap pass then improves the total.
+ * much better player who is able in the position. The eleven is the assignment of the highest total
+ * value over all slots, found exactly with the Hungarian method (Q130). A player with a fit below 10
+ * plays only when no free player has 10 or more for the slot (Q131). The subs then come from the players
+ * left over, by the same rule. picker_compute picks without writing (best XI uses it, Q132);
+ * picker_pick also stores the pick. 0.3.0 filled one slot at a time, and its swap pass never brought in
+ * a bench player: on Max's Yeovil save Warner (a natural DR) sat on the bench.
  *
- * Candidates: the players of the squad (club +0xd7) whom the squad screen shows as able to play the next
- * match. 0x45cbe0 is the screen's own test (0x459b3d): not injured, not loaned out, not banned, not away
- * with a national team and eligible for the competition. A slot of a player who fails it shows red.
+ * Candidates: the players of the squad (club +0xd7, reserve-team players too, Q134) whom the squad
+ * screen shows as able to play the next match. 0x45cbe0 is the screen's own test (0x459b3d): not
+ * injured, not loaned out, not banned, not away with a national team and eligible for the competition.
+ * A slot of a player who fails it shows red.
  * - best: all candidates.
  * - match_fit: the candidates with condition 90% or more. When too few, the fittest of the others join.
  * - under_21: first the candidates under 21. The empty slots then get the best older players.
+ * The candidates of the first group come before all others (weight below), so a slot takes a player from
+ * outside the group only when no player of the group can take it.
  *
  * Goalkeeper slot: as in the original (0x6e2000, research section "scorer"), a player with a goalkeeper
  * rating below 10 (player data +0x0f) never takes a slot that allows a goalkeeper (position bit 0x1).
- * So no outfield player goes in goal. When no young keeper exists, the gap fill takes the best older one.
+ * So no outfield player goes in goal. When no young keeper exists, the best older one takes the slot.
  * With no keeper at all, the slot stays empty.
  *
  * No daily update: the getters for condition (0x62c590), injury (0x62c400) and the squad test (0x45cbe0)
@@ -32,6 +39,9 @@
  * record that no screen has updated today shows the value of its last update. */
 #include "win.h"
 
+#include <SDL.h>
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -40,6 +50,8 @@
 #define FITNESS 0xb63d28u        /* this of 0x62c400 and 0x62c590 */
 #define NATIONS 0xb74318u        /* this of 0x7757d0 */
 #define FIXTURES 0xae2a58u       /* this of 0x5acbe0 */
+#define PLAYER_MANAGER 0xb74c26u /* per player slot, 0x300 bytes apart: the manager */
+#define PLAYER_SLOT 0xb77c7au    /* s16: the current player slot */
 #define TODAY 0xae2c90u          /* the game date: s16 day of year, s16 year; this of 0x54c5b0 */
 #define AVAILABLE 0x45cbe0u      /* cdecl (staff, fixture, club, date): 0 when the player cannot play */
 #define SQUAD 0xd7u              /* club: 50 staff pointers */
@@ -118,9 +130,13 @@ RT_WRAP(0062c680, daily_update)
 
 typedef struct { uint32_t staff, data; int condition, age, ability; } Candidate;
 
+/* By condition, then by staff address, so that the order (and a pick among equal values) is the same on
+ * every system: qsort is not stable. */
 static int by_condition(const void *a, const void *b)
 {
-    return ((const Candidate *)b)->condition - ((const Candidate *)a)->condition;
+    const Candidate *x = a, *y = b;
+    if (x->condition != y->condition) return y->condition - x->condition;
+    return x->staff < y->staff ? -1 : x->staff > y->staff;
 }
 
 /* The fit of a player for a slot mask, 1 to 20: the lower of the position and the side rating. */
@@ -149,45 +165,105 @@ static int value(const Candidate *c, uint16_t mask)
     return (c->ability > 0 ? c->ability : 1) * fit(c, mask);
 }
 
-/* Fills the empty slots of team (an index into c, -1 for empty) with the candidates whose use[] is set. */
-static void fill(const Candidate *c, int n, const int *use, const uint16_t *masks, int slots, int *team)
+/* The order of a pick, as weights of one player in one slot: an empty slot is worst, then a player from
+ * outside the pick's first group (kinds 2 and 3), then a player with a fit below 10, then the score. Each
+ * step outweighs any sum of the steps below it, so the best total first fills every slot it can, then
+ * takes the fewest players from outside the first group, then the fewest with a fit below 10 (Q131), then
+ * the highest score. So a player with a fit below 10 plays only when no free player of his group has 10
+ * or more for that slot: else the swap would lower the count of such players. */
+#define W_LOW 100000LL           /* more than 20 slots x 200 x 20 */
+#define W_OUT (W_LOW * 21)
+#define W_EMPTY (W_OUT * 21)
+#define COLUMNS (50 + SLOTS)     /* the candidates and one "empty" column per slot */
+
+static long long weight(const Candidate *c, int first, uint16_t mask)
 {
-    int taken[50] = {0};
-    for (int s = 0; s < slots; s++)
-        if (team[s] >= 0) taken[team[s]] = 1;
-    /* The eleven first, then the substitutes: each time the best free pair of all. */
-    for (int part = 0; part < 2; part++) {
-        int lo = part ? SLOTS : 0, hi = part ? slots : SLOTS;
-        for (;;) {
-            int bs = -1, bp = -1, bv = -1;
-            for (int s = lo; s < hi; s++) {
-                if (team[s] >= 0) continue;
-                for (int p = 0; p < n; p++) {
-                    if (!use[p] || taken[p]) continue;
-                    int v = value(&c[p], masks[s]);
-                    if (v >= 0 && v > bv) { bv = v; bs = s; bp = p; }
-                }
+    int v = value(c, mask);
+    if (v < 0) return -W_EMPTY;
+    return v - (fit(c, mask) < ABLE ? W_LOW : 0) - (first ? 0 : W_OUT);
+}
+
+/* The assignment of rows (slots) to columns of the highest total weight, exactly: the Hungarian method
+ * on the cost -weight (rows <= columns, O(rows^2 x columns)). col_of[r] is the column of row r. */
+static void hungarian(int rows, int cols, long long w[][COLUMNS], int *col_of)
+{
+    long long u[SLOTS + 1] = {0}, v[COLUMNS + 1] = {0}, minv[COLUMNS + 1];
+    int p[COLUMNS + 1] = {0}, way[COLUMNS + 1] = {0}, used[COLUMNS + 1];
+    for (int i = 1; i <= rows; i++) {
+        p[0] = i;
+        int j0 = 0;
+        for (int j = 0; j <= cols; j++) { minv[j] = LLONG_MAX; used[j] = 0; }
+        do {
+            used[j0] = 1;
+            int i0 = p[j0], j1 = 0;
+            long long delta = LLONG_MAX;
+            for (int j = 1; j <= cols; j++) {
+                if (used[j]) continue;
+                long long cur = -w[i0 - 1][j - 1] - u[i0] - v[j];
+                if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+                if (minv[j] < delta) { delta = minv[j]; j1 = j; }
             }
-            if (bs < 0) break;
-            team[bs] = bp;
-            taken[bp] = 1;
-        }
-        /* Swap two players of this part when the sum of their values grows. */
-        for (int changed = 1, pass = 0; changed && pass < 20; pass++) {
-            changed = 0;
-            for (int a = lo; a < hi; a++)
-                for (int b = a + 1; b < hi; b++) {
-                    if (team[a] < 0 || team[b] < 0) continue;
-                    int now = value(&c[team[a]], masks[a]) + value(&c[team[b]], masks[b]);
-                    int va = value(&c[team[b]], masks[a]), vb = value(&c[team[a]], masks[b]);
-                    if (va >= 0 && vb >= 0 && va + vb > now) { int t = team[a]; team[a] = team[b]; team[b] = t; changed = 1; }
-                }
+            for (int j = 0; j <= cols; j++)
+                if (used[j]) { u[p[j]] += delta; v[j] -= delta; }
+                else minv[j] -= delta;
+            j0 = j1;
+        } while (p[j0]);
+        do { int j1 = way[j0]; p[j0] = p[j1]; j0 = j1; } while (j0);
+    }
+    for (int j = 1; j <= cols; j++)
+        if (p[j]) col_of[p[j] - 1] = j - 1;
+}
+
+/* Fills team[lo..hi) with the best assignment of the candidates not taken. */
+static void assign(const Candidate *c, int n, const int *first, const uint16_t *masks, int lo, int hi,
+                   int *taken, int *team)
+{
+    static long long w[SLOTS][COLUMNS];
+    int rows = 0, row_slot[SLOTS], cols = 0, col_cand[COLUMNS], col_of[SLOTS];
+    for (int s = lo; s < hi; s++) row_slot[rows++] = s;
+    for (int p = 0; p < n; p++)
+        if (!taken[p]) col_cand[cols++] = p;
+    int players = cols;
+    for (int r = 0; r < rows; r++) col_cand[cols++] = -1;        /* empty */
+    for (int r = 0; r < rows; r++)
+        for (int k = 0; k < cols; k++)
+            w[r][k] = col_cand[k] < 0 ? -W_EMPTY : weight(&c[col_cand[k]], first[col_cand[k]], masks[row_slot[r]]);
+    hungarian(rows, cols, w, col_of);
+    for (int r = 0; r < rows; r++) {
+        int k = col_of[r], s = row_slot[r];
+        team[s] = -1;
+        if (k < players && w[r][k] > -W_EMPTY) {
+            team[s] = col_cand[k];
+            taken[col_cand[k]] = 1;
         }
     }
 }
 
-static int pick(uint32_t club, uint32_t team_index, int kind)
+/* The pick: the eleven first, the best assignment of all candidates (Q130). The subs then come from the
+ * players left over, by the same rule. */
+static void solve(const Candidate *c, int n, const int *first, const uint16_t *masks, int slots, int *team)
 {
+    int taken[50] = {0};
+    assign(c, n, first, masks, 0, SLOTS, taken, team);
+    assign(c, n, first, masks, SLOTS, slots, taken, team);      /* MAX_SUBS <= SLOTS */
+}
+
+/* Set by the picker check (RECOMP_PICK_CHECK): picker_compute writes its candidates and its pick here. */
+static FILE *dump_to;
+
+/* A name of a staff record: the common name, else first and second name (staff +0xc, +0x4, +0x8 point
+ * to name records with the text at +0). */
+static void staff_name(uint32_t staff, char *out, size_t size)
+{
+    uint32_t common = rd32(g_mem, staff + 0xc), first = rd32(g_mem, staff + 0x4), second = rd32(g_mem, staff + 0x8);
+    if (common && g_mem[common]) snprintf(out, size, "%s", (const char *)(g_mem + common));
+    else snprintf(out, size, "%s %s", first ? (const char *)(g_mem + first) : "",
+                  second ? (const char *)(g_mem + second) : "");
+}
+
+static int compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
+{
+    memset(out, 0, sizeof *out);
     uint32_t manager = rd32(g_mem, club + MANAGER);
     uint32_t m[1] = {manager};
     uint32_t tactic = manager ? call_this(0x5fbd00u, rd32(g_mem, HUMANS), 1, m) : 0;
@@ -221,9 +297,8 @@ static int pick(uint32_t club, uint32_t team_index, int kind)
     }
     qsort(c, (size_t)n, sizeof *c, by_condition);
 
-    int first[50], all[50], n_first = 0, gk = 0;
+    int first[50], n_first = 0, gk = 0;
     for (int i = 0; i < n; i++) {
-        all[i] = 1;
         if (kind == 1) first[i] = 1;
         else if (kind == 3) first[i] = c[i].age < 21;
         else {                    /* the fit players, at least enough for the team, and a goalkeeper */
@@ -235,21 +310,55 @@ static int pick(uint32_t club, uint32_t team_index, int kind)
     }
 
     int team[SLOTS + MAX_SUBS];
-    for (int s = 0; s < slots; s++) team[s] = -1;
-    fill(c, n, first, masks, slots, team);
-    fill(c, n, all, masks, slots, team);     /* gaps: the best of the others */
+    solve(c, n, first, masks, slots, team);
 
-    /* Store it: drop the undo copy and clear (0x896fe0), then each slot and the captain. */
-    uint32_t drop[4] = {club, team_index, 0, 1}, clear[4] = {club, team_index, 0, 0};
-    uint32_t store = rd32(g_mem, STORE);
-    call_this(0x896fe0u, store, 4, drop);
-    call_this(0x896fe0u, store, 4, clear);
-    int picked = 0, captain = -1, best = 0;
+    out->slots = slots;
     for (int s = 0; s < slots; s++) {
-        if (team[s] < 0) continue;
-        uint32_t staff = c[team[s]].staff;
+        out->masks[s] = masks[s];
+        out->staff[s] = team[s] >= 0 ? c[team[s]].staff : 0;
+        out->fit[s] = team[s] >= 0 ? fit(&c[team[s]], masks[s]) : 0;
+        out->score[s] = team[s] >= 0 ? value(&c[team[s]], masks[s]) : 0;
+    }
+    if (dump_to) {
+        fprintf(dump_to, "pick\t%d\t", kind);
+        for (int s = 0; s < slots; s++) fprintf(dump_to, "%s%x", s ? " " : "", masks[s]);
+        fprintf(dump_to, "\n");
+        for (int i = 0; i < n; i++) {
+            char name[128];
+            staff_name(c[i].staff, name, sizeof name);
+            char ratings[3 * 11 + 1];
+            for (uint32_t k = 0; k < 11; k++)
+                snprintf(ratings + 3 * k, 4, "%02x ", rd8(g_mem, c[i].data + 0x0f + k));
+            ratings[3 * 11 - 1] = 0;
+            fprintf(dump_to, "cand\t%d\t%s\t%s\t%d\t%d\t%d\t%d", i, name, ratings, c[i].ability, c[i].age,
+                    c[i].condition, first[i]);
+            for (int s = 0; s < slots; s++) fprintf(dump_to, "\t%d", fit(&c[i], masks[s]));
+            for (int s = 0; s < slots; s++) fprintf(dump_to, "\t%d", value(&c[i], masks[s]));
+            fprintf(dump_to, "\n");
+        }
+        fprintf(dump_to, "team\t");
+        for (int s = 0; s < slots; s++) fprintf(dump_to, "%s%d", s ? " " : "", team[s]);
+        fprintf(dump_to, "\n");
+    }
+    int picked = 0;
+    for (int s = 0; s < slots; s++) picked += out->staff[s] != 0;
+    return picked;
+}
+
+/* Stores a pick as the club's selection: drop the undo copy and clear (0x896fe0), then each slot and the
+ * captain. */
+static int store(uint32_t club, uint32_t team_index, const Pick *p)
+{
+    uint32_t drop[4] = {club, team_index, 0, 1}, clear[4] = {club, team_index, 0, 0};
+    uint32_t sel = rd32(g_mem, STORE);
+    call_this(0x896fe0u, sel, 4, drop);
+    call_this(0x896fe0u, sel, 4, clear);
+    int picked = 0, captain = -1, best = 0;
+    for (int s = 0; s < p->slots; s++) {
+        if (!p->staff[s]) continue;
+        uint32_t staff = p->staff[s];
         uint32_t set[4] = {club, (uint32_t)s, staff, team_index};
-        call_this(0x896a90u, store, 4, set);
+        call_this(0x896a90u, sel, 4, set);
         picked++;
         if (s < SLOTS) {          /* the captain: the best value of 0x6e1cf0, as 0x6e1940 takes */
             uint32_t k[3] = {staff, 0, club};
@@ -259,16 +368,50 @@ static int pick(uint32_t club, uint32_t team_index, int kind)
     }
     if (captain >= 0) {
         uint32_t cap[3] = {club, (uint32_t)captain, team_index};
-        call_this(0x897760u, store, 3, cap);
+        call_this(0x897760u, sel, 3, cap);
     }
     return picked;
+}
+
+int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
+{
+    picking = 1;
+    int n = compute(club, team_index, kind, out);
+    picking = 0;
+    return n;
 }
 
 /* kind 1: best team, 2: most match-fit, 3: under-21. Returns the number of players picked. */
 int picker_pick(uint32_t club, uint32_t team_index, int kind)
 {
-    picking = 1;
-    int n = pick(club, team_index, kind);
-    picking = 0;
-    return n;
+    Pick p;
+    if (!picker_compute(club, team_index, kind, &p)) return 0;
+    return store(club, team_index, &p);
+}
+
+/* The picker check (tests/smoke/picker_check.py): with RECOMP_PICK_CHECK=<file>, at the first human turn
+ * the runtime computes the three picks of the player's club into the file, runs "Pick best team" and
+ * ends the program with code 0. */
+void picker_check_turn(void)
+{
+    static int done;
+    const char *path = getenv("RECOMP_PICK_CHECK");
+    if (done || !path || !*path) return;
+    done = 1;
+    uint32_t manager = rd32(g_mem, PLAYER_MANAGER + (uint32_t)(int16_t)rd16(g_mem, PLAYER_SLOT) * 0x300u);
+    uint32_t club = manager ? rd32(g_mem, manager + 0x39) : 0;
+    if (manager && !club) club = rd32(g_mem, manager + 0x24);
+    dump_to = fopen(path, "w");
+    if (!dump_to) rt_fatal("picker check: cannot write %s", path);
+    Pick p;
+    for (int kind = 1; kind <= 3; kind++) picker_compute(club, 0, kind, &p);
+    fclose(dump_to);
+    dump_to = NULL;
+    int n = picker_pick(club, 0, 1);
+    FILE *f = fopen(path, "a");
+    if (f) { fprintf(f, "picked\t%d\n", n); fclose(f); }
+    fprintf(stderr, "recomp: picker check of club %#x done, %d players stored\n", club, n);
+    if (rt_on_fatal) rt_on_fatal();
+    SDL_Quit();
+    exit(0);
 }

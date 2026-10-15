@@ -32,7 +32,6 @@ extern const uint32_t rt_site_squad_clear;
 #define PENALTY_VIEW 0x800u      /* node slot 7: the Penalty Takers view */
 #define REBUILD 0xfffffff5u      /* -0xb: the screen loop builds the screen again (0x7fd3a9) */
 
-int picker_pick(uint32_t club, uint32_t team, int kind);
 
 static uint32_t call_this(uint32_t fn, uint32_t self, int n, const uint32_t *args)
 {

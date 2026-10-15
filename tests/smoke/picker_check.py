@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""Picker check: the Assistant's picks from a saved game against the best possible assignment.
+
+Usage:
+    python3 tests/smoke/picker_check.py <cm0102_recomp> <game folder> <save> [--dir <fixtures folder>]
+        [--expect SLOT=Name]... [--never SLOT=Name]... [--keep <file>]
+
+The run copies the save (from the fixtures folder, tests/fixtures/fixtures.py) into a new empty user folder
+and loads it. At the first human turn the runtime (RECOMP_PICK_CHECK, src/recomp_rt/win/picker.c) computes
+the three picks (best, most match-fit, under-21) of the player's club without writing them, dumps the
+candidates, the value of each candidate in each slot and the picks, then runs "Pick best team" and ends.
+
+Checks for each pick:
+    - the eleven and the subs have the best total of all assignments. The order of a total: fewest empty
+      slots, then fewest players from outside the pick's first group (kinds 2 and 3), then fewest players
+      with a fit below 10, then the highest score (current ability x fit / 20). This script finds the best
+      total by its own method (a search over the slots taken), not the runtime's.
+    - no player with a fit below 10 plays while a free player of the same group has 10 or more there
+    - no player is picked twice, and the subs come from the players left over
+    - --expect DR=Warner: a slot of that label holds the player (surname match); --never: no such slot does
+--keep copies the dump to a file. It has one "cand" line per candidate: name, the position ratings, current
+ability, age, condition, first group, then the fit and the value of each slot.
+
+Examples (the Yeovil save is a copy of Max's game; never use his own save):
+    picker_check.py build/cm0102_recomp ../clean-3968 yeovil.sav --expect DR=Warner --expect DC=Sodje
+        --never DMC=O'Brien
+    picker_check.py build/cm0102_recomp ../clean-3968 start.sav
+"""
+import os
+import shutil
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures"))
+import fixtures  # noqa: E402
+import smoke_run  # noqa: E402
+
+ABLE = 10
+KINDS = {1: "best", 2: "most match-fit", 3: "under-21"}
+
+
+def label(mask):
+    """The position text of a slot mask, for example DMC or FC."""
+    if mask & 1:
+        return "GK"
+    pos = "".join(t for bit, t in ((0x2, "SW"), (0x4, "D"), (0x8, "DM"), (0x10, "M"), (0x20, "AM"), (0x40, "F"))
+                  if mask & bit)
+    side = "L" if mask & 0x80 else "R" if mask & 0x800 else "C" if mask & 0x700 else ""
+    return pos + side
+
+
+def parse(path):
+    """The dump: {kind: {"masks": [...], "cands": [...], "team": [...]}} and the picked count."""
+    picks, cur, picked = {}, None, None
+    for line in open(path, encoding="latin-1"):
+        f = line.rstrip("\n").split("\t")
+        if f[0] == "pick":
+            cur = picks[int(f[1])] = {"masks": [int(m, 16) for m in f[2].split()], "cands": [], "team": []}
+        elif f[0] == "cand":
+            # cand, index, name, ratings (player data +0x0f to +0x19, hex), ability, age, condition, first,
+            # fits..., values... (one per slot; -1: cannot)
+            n = len(cur["masks"])
+            nums = [int(x) for x in f[4:]]
+            cur["cands"].append({"name": f[2], "ratings": f[3], "ability": nums[0], "age": nums[1], "condition": nums[2],
+                                 "first": nums[3], "fit": nums[4:4 + n], "value": nums[4 + n:4 + 2 * n]})
+        elif f[0] == "team":
+            cur["team"] = [int(x) for x in f[1].split()]
+        elif f[0] == "picked":
+            picked = int(f[1])
+    return picks, picked
+
+
+def key(cand, slot):
+    """The order of one slot's filler, as a tuple (higher is better). None: the player cannot take it."""
+    v = cand["value"][slot]
+    if v < 0:
+        return None
+    return (0, -(1 - cand["first"]), -(cand["fit"][slot] < ABLE), v)
+
+
+EMPTY = (-1, 0, 0, 0)
+
+
+def add(a, b):
+    return tuple(x + y for x, y in zip(a, b))
+
+
+def best_total(cands, slots, used):
+    """The best total of filling slots with the candidates not in used: a search over the subsets of
+    slots taken after each candidate (dynamic programming), independent of the runtime's method."""
+    n = len(slots)
+    full = (1 << n) - 1
+    best = {0: (0, 0, 0, 0)}
+    for i, c in enumerate(cands):
+        if i in used:
+            continue
+        nxt = dict(best)
+        for taken, total in best.items():
+            for k, s in enumerate(slots):
+                if taken >> k & 1:
+                    continue
+                kk = key(c, s)
+                if kk is None:
+                    continue
+                t = taken | 1 << k
+                cand = add(total, kk)
+                if t not in nxt or cand > nxt[t]:
+                    nxt[t] = cand
+        best = nxt
+    result = None
+    for taken, total in best.items():
+        empties = n - bin(taken).count("1")
+        t = add(total, tuple(e * empties for e in EMPTY))
+        if result is None or t > result:
+            result = t
+    return result
+
+
+def total(cands, team, slots):
+    t = (0, 0, 0, 0)
+    for s in slots:
+        p = team[s]
+        t = add(t, EMPTY if p < 0 else key(cands[p], s))
+    return t
+
+
+def check_pick(kind, pick, expect, never):
+    masks, cands, team = pick["masks"], pick["cands"], pick["team"]
+    eleven, subs = list(range(min(11, len(masks)))), list(range(11, len(masks)))
+    problems = []
+    picked = [p for p in team if p >= 0]
+    if len(picked) != len(set(picked)):
+        problems.append("a player is picked twice")
+    for s, p in enumerate(team):
+        if p >= 0 and key(cands[p], s) is None:
+            problems.append(f"{cands[p]['name']} cannot take slot {s} ({label(masks[s])})")
+    if problems:
+        return problems
+    got, want = total(cands, team, eleven), best_total(cands, eleven, set())
+    if got != want:
+        problems.append(f"eleven total {got}, best possible {want}")
+    in_eleven = {team[s] for s in eleven if team[s] >= 0}
+    got, want = total(cands, team, subs), best_total(cands, subs, in_eleven)
+    if got != want:
+        problems.append(f"subs total {got}, best possible from the players left {want}")
+    for s in eleven:
+        p = team[s]
+        if p < 0 or cands[p]["fit"][s] >= ABLE:
+            continue
+        for q, c in enumerate(cands):
+            if q not in in_eleven and c["first"] >= cands[p]["first"] and c["value"][s] >= 0 \
+                    and c["fit"][s] >= ABLE:
+                problems.append(f"{cands[p]['name']} plays {label(masks[s])} at fit {cands[p]['fit'][s]} "
+                                f"while {c['name']} (fit {c['fit'][s]}) is free")
+    if kind == 1:
+        for rule, want_in in [(e, True) for e in expect] + [(n, False) for n in never]:
+            slot_label, _, name = rule.partition("=")
+            hit = any(team[s] >= 0 and label(masks[s]) == slot_label and
+                      cands[team[s]]["name"].split()[-1] == name for s in eleven)
+            if hit != want_in:
+                problems.append(f"{name} {'not ' if want_in else ''}at {slot_label}")
+    return problems
+
+
+def show(kind, pick):
+    masks, cands, team = pick["masks"], pick["cands"], pick["team"]
+    print(f"\n{KINDS[kind]} ({len(cands)} candidates)")
+    print(f"  {'slot':5} {'player':26} {'fit':>3} {'CA':>4} {'score':>6}")
+    for s, p in enumerate(team):
+        if s == 11:
+            print("  subs")
+        if p < 0:
+            print(f"  {label(masks[s]):5} (empty)")
+            continue
+        c = cands[p]
+        print(f"  {label(masks[s]):5} {c['name'][:26]:26} {c['fit'][s]:>3} {c['ability']:>4} {c['value'][s] / 20:>6.1f}")
+
+
+def main(argv):
+    args = argv[1:]
+    folder, keep, expect, never, rest = fixtures.DEFAULT_DIR, None, [], [], []
+    i = 0
+    while i < len(args):
+        if args[i] in ("--dir", "--keep"):
+            if args[i] == "--dir":
+                folder = args[i + 1]
+            else:
+                keep = os.path.abspath(args[i + 1])
+            i += 2
+        elif args[i] in ("--expect", "--never"):
+            (expect if args[i] == "--expect" else never).append(args[i + 1])
+            i += 2
+        else:
+            rest.append(args[i])
+            i += 1
+    if len(rest) != 3:
+        print(__doc__)
+        return 2
+    program, game, name = os.path.abspath(rest[0]), os.path.abspath(rest[1]), rest[2]
+    save = os.path.join(folder, name)
+    if not os.path.exists(save):
+        print(f"no saved game {save}")
+        return 2
+    with tempfile.TemporaryDirectory(prefix="cm0102-picker-") as work:
+        user = os.path.join(work, "user")
+        os.makedirs(user)
+        shutil.copyfile(save, os.path.join(user, name))
+        fixtures.write_settings(user, "classic", [])
+        dump = os.path.join(work, "pick.txt")
+        steps = smoke_run.scaled_steps("classic", work, fixtures.LOAD_STEPS) + ["600000 quit"]
+        r, took = fixtures.run(program, game, "classic", user, steps, {"RECOMP_PICK_CHECK": dump}, 900)
+        if not os.path.exists(dump):
+            print(r.stderr[-2000:])
+            print(f"FAIL: no pick dump (code {r.returncode})")
+            return 1
+        picks, picked = parse(dump)
+        if keep:
+            shutil.copyfile(dump, keep)
+    failed = 0
+    for kind in sorted(picks):
+        show(kind, picks[kind])
+        for p in check_pick(kind, picks[kind], expect, never):
+            print(f"  FAIL ({KINDS[kind]}): {p}")
+            failed += 1
+    if sorted(picks) != [1, 2, 3]:
+        print(f"FAIL: picks {sorted(picks)} in the dump")
+        failed += 1
+    if not picked:
+        print(f"FAIL: Pick best team stored {picked} players")
+        failed += 1
+    print(f"\n{name}: {'FAIL' if failed else 'ok'} after {took:.0f} s")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

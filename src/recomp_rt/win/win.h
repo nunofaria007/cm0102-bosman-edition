@@ -95,6 +95,19 @@ extern uint32_t win_hwnd;
 int holiday_widget_before(void);               /* at each widget create: 1 for the Go on Holiday item */
 void holiday_widget_after(void);               /* after that create: adds the new item */
 void holiday_next_turn(void);                  /* at each human turn, before the original */
+/* The Assistant's picks (picker.c). picker_compute picks without writing; picker_pick stores the pick as
+ * the club's selection. kind 1: best team, 2: most match-fit, 3: under-21. Both return the players picked. */
+#define PICK_SLOTS 20
+typedef struct {
+    int slots;                     /* 11 and the subs */
+    uint16_t masks[PICK_SLOTS];    /* the position mask of each slot */
+    uint32_t staff[PICK_SLOTS];    /* 0 for an empty slot */
+    int fit[PICK_SLOTS];           /* 1 to 20 */
+    int score[PICK_SLOTS];         /* current ability x fit (score x 20) */
+} Pick;
+int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
+int picker_pick(uint32_t club, uint32_t team_index, int kind);
+void picker_check_turn(void);                  /* at each human turn: the picker check of the tests */
 /* Faster commentary (commentary.c): at each widget create, before the rect is scaled. */
 void commentary_widget_before(void);
 
