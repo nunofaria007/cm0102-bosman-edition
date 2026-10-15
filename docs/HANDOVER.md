@@ -10,7 +10,7 @@ Read this first. Then read `GLOSSARY.md`, `docs/specs/2026-10-14-quality-of-life
 
 ## State of 0.2.0
 
-**Merged on `main`, not pushed (2026-10-15):** every 0.2.0 feature, the review fixes, version 0.2.0 in `CMakeLists.txt` and the `## 0.2.0` changelog. The option `assistant_selection` is gone. The site lists the 0.2.0 options in its FAQ.
+**Released as v0.2.0 (2026-10-15):** every 0.2.0 feature, the review fixes, version 0.2.0 in `CMakeLists.txt` and the `## 0.2.0` changelog. The option `assistant_selection` is gone. The site lists the 0.2.0 options in its FAQ.
 
 - Features: settings file, keys and window (#13 to #16), save folder (#17), clickable names (#11, #25), widescreen sweep, faster holiday days (#20), sound (#21), attribute colours (#19), match columns (#23, widescreen only).
 - Review: two Opus reviews (`docs/research/review-brief-0.2.0.md`), one Sonnet fixer (`docs/research/fix-brief-0.2.0.md`). The one must-fix (a stack pop count in `dsound.c`) is fixed.
@@ -19,10 +19,7 @@ Read this first. Then read `GLOSSARY.md`, `docs/specs/2026-10-14-quality-of-life
 - **Left out of 0.2.0 (Max):** the test speed-ups. Branch `worktree-agent-a74c7c18d9652aee1`, commit 7d14701 says what is left (match screen address in `waits.c`, test runs of the wait steps and of `tests/fixtures/fixtures.py`).
 - **Assistant A key:** branch `worktree-agent-a8d8677cceced7e8f`. Do not merge. Kept for its match-setup code (0.3.0, #12).
 
-**Open for Max:**
-1. Check the test downloads by ear and eye: sound, keys, full screen, colours, columns. Approve the colour bands (1-5 red, 6-10 amber, 11-15 light green, 16-20 bright green) and decide on columns in classic mode (now off there).
-2. Windows keys: the Back and full-screen shortcuts read the Cmd key as SDL's GUI key, which on Windows is the Windows key. Windows probably takes Win+F. Unknown if Win+[ works. Decide on Ctrl or F11 for Windows.
-3. Then push `main` and publish with `tools/release/make_release.sh ... --publish` on his yes (see "How to make a release").
+**Done:** Max checked the test build and approved the colour bands and widescreen-only columns. Published as v0.2.0 on 2026-10-15. The Windows keys question is now #26.
 
 ## Plans after 0.2.0
 
