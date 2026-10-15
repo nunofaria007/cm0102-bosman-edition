@@ -149,7 +149,7 @@ One line of the settings file that switches a feature on or off or sets its valu
 _Avoid_: preference, flag, toggle
 
 **Assistant selection**:
-The assistant manager picks the player's team, from the Assistant drop-down on the squad screen (0.3.0, #12): best team, most match-fit team or under-21 team. It scores each player by current ability times positional fit and finds the eleven with the highest total (0.3.1).
+The assistant manager picks the player's team, from the Assistant drop-down on the squad screen (0.3.0, #12): best team, most match-fit team or under-21 team. It scores each player by the average of the key shown attributes for the position times positional fit, and finds the eleven with the highest total (0.3.1).
 _Avoid_: auto pick, auto team, AI selection
 
 **Save backup**:
@@ -185,7 +185,7 @@ The player profile's attributes in Technical, Mental and Physical columns with h
 _Avoid_: attribute categories, sections
 
 **Hidden value**:
-A player value in the data that no screen of the original shows, such as current ability or potential ability. No feature shows it or feeds it into a shown number, except the assistant selection's score.
+A player value in the data that no screen of the original shows, such as current ability or potential ability. No feature shows it or feeds it into a shown number.
 _Avoid_: secret attribute, intrinsic (for the whole set)
 
 **Printout**:
