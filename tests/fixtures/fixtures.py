@@ -7,7 +7,7 @@ Usage:
         [--dir <fixtures folder>] [--mode classic|widescreen] [--set key=value]... [--days n]
 
 The saves stay outside git, because they hold the original's data. The default folder is
-/Users/max/Downloads/Game/test-fixtures (FIXTURES_DIR in the environment changes it).
+/Users/max/Projects/cm0102/test-fixtures (FIXTURES_DIR in the environment changes it).
 
 make: plays a new game with the steps of the smoke run (tests/smoke/smoke_run.py), -seed 1 and the
 test clock, to the first news screen, and saves it there as start.sav: Test Smoke, Arsenal, Saturday
@@ -40,7 +40,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "smoke"))
 import smoke_run  # noqa: E402
 
-DEFAULT_DIR = os.environ.get("FIXTURES_DIR", "/Users/max/Downloads/Game/test-fixtures")
+DEFAULT_DIR = os.environ.get("FIXTURES_DIR", "/Users/max/Projects/cm0102/test-fixtures")
 
 # Load a save from the first start, positions for 800x600. The save list of the Load Game screen shows
 # the saves of the user folder in name order. With one save, it is the first row.
