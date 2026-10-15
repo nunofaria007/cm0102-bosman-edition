@@ -17,8 +17,10 @@
  * Saved games: when the option save_folder names a folder, a file *.sav in the game folder maps to that
  * folder (save_dir) and not to U, and a search of the game folder lists the *.sav files of that folder
  * only. The game writes temp_save_file.sav and renames it to the name of the player, so both stay in
- * the same folder. Other files (settings.txt, game.cfg) stay in U. The runtime never moves, copies or
- * deletes a save of U. */
+ * the same folder. Other files (settings.txt, game.cfg) stay in U. The runtime changes a save of U only
+ * for the option save_backups (save_backup below): it keeps a copy of a save that the game writes over.
+ * A Delete of a save without a new save, as the Delete button of the load list makes, deletes the
+ * file and makes no backup. */
 #include "win.h"
 #include "host.h"
 #include "options.h"
@@ -171,14 +173,27 @@ static int copy_file(const char *from, const char *to)
     return ok;
 }
 
-/* Save backups (option save_backups). Before the game deletes a save or writes a new file over it, the old
- * file goes to backups/<name>.1.sav in its folder. backups/<name>.2.sav and .3.sav are the older copies,
+/* Save backups (option save_backups). Before a new save takes the place of an old one, the old file goes to
+ * backups/<name>.1.sav in its folder. The game does this in two calls: it deletes the old save, then renames
+ * temp_save_file.sav to the name (trace of a save over samesave.sav). So the delete makes a backup only when
+ * temp_save_file.sav lies beside the save (temp_save_beside). The Delete button of the load list has no
+ * new save and no backup. backups/<name>.2.sav and .3.sav are the older copies,
  * and the copy older than .3 is deleted. The file temp_save_file.sav, which the game writes first and then
  * renames, gets no backups. Only a file in backups/ is ever deleted here: when a step fails, a message goes
  * to stderr and the game goes on as without the option. h is the host form of the file in the game folder,
  * u its user form (the save folder or the user folder). copy = 1 copies the save and keeps it in place.
  * The result is 1 when the backup is made. */
 #define SAVE_BACKUPS 3
+
+/* 1 when temp_save_file.sav lies in the folder of the user form u of a save. */
+static int temp_save_beside(const char *u)
+{
+    const char *slash = strrchr(u, '/');
+    char temp[2048];
+    if (!slash) return 0;
+    snprintf(temp, sizeof temp, "%.*s/temp_save_file.sav", (int)(slash - u), u);
+    return exists(temp);
+}
 static int save_backup(const char *h, const char *u, int copy)
 {
     size_t gl = strlen(win_game_dir);
@@ -313,7 +328,7 @@ void win_windows_path(const char *host, char *out, size_t room)
  * exists in that folder is read from there. Every other file and every write is unchanged.
  * - The option database chooses the folder: 3.9.68 is the clean files' own Data, 3.9.60 and 3.9.65 are
  *   the folders Data-3.9.60 and Data-3.9.65 of the game folder (tools/clean_files/make_clean_files.py,
- *   DATA_SET_FOLDERS). The Setup Game screen sets the option (setup.c).
+ *   DATA_SET_FOLDERS). The Setup Game screen sets the option (database.c).
  * - The test switch RECOMP_DATA_DIR names any folder, for example a 3.9.60 data set that
  *   make_clean_files.py --data-3960 made. It wins over the option.
  * A missing folder gets a message, and the game reads its own Data. */
@@ -574,14 +589,15 @@ RT_IMPORT(GetFileAttributesA)
     rt_ret_stdcall(st.is_dir ? 0x10u : 0x20u, 1);
 }
 
-/* Delete and rename act on the user folder only. A file that exists only in the game folder stays. */
+/* Delete and rename act on the user folder only. A file that exists only in the game folder stays. A save
+ * that the game deletes to make room for a new one goes to backups/; a save that the player deletes does not. */
 RT_IMPORT(DeleteFileA)
 {
     const char *name = win_str(rt_arg(0));
     char h[2048], u[2048];
     int ok = 0;
     if (win_paths(name, h, u, sizeof h)) {
-        if (save_backup(h, u, 0)) ok = 1;       /* the save moved to backups/ */
+        if (temp_save_beside(u) && save_backup(h, u, 0)) ok = 1;   /* a new save follows: the old moved to backups/ */
         else if (exists(u)) ok = host_unlink(u) == 0;
         else if (exists(h)) { errno = EACCES; }
         else errno = ENOENT;
