@@ -66,6 +66,7 @@ static void check_defaults(void)
     CHECK(options_bool(OPT_ATTRIBUTE_COLOURS) == 1);
     CHECK(options_bool(OPT_FASTER_DAYS) == 1);
     CHECK(options_bool(OPT_MATCH_COLUMNS) == 1);
+    CHECK(options_bool(OPT_REMEMBER_WINDOW) == 1);
 }
 
 int main(void)

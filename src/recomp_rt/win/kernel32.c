@@ -248,6 +248,7 @@ RT_IMPORT(ExitProcess)
 {
     uint32_t code = rt_arg(0);
     WIN_TRACE("ExitProcess(%u)\n", code);
+    win_save_window();
     if (rt_on_fatal) rt_on_fatal();
     SDL_Quit();
     exit((int)code);

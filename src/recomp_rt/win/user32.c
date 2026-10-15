@@ -109,6 +109,52 @@ static void toggle_full_screen(void)
     win_screen_dirty = 1;
 }
 
+/* Remember the window (option remember_window): window.txt in the user folder, beside settings.txt,
+ * holds "x y w h full". The size and place are those of the window, not of full screen: the last
+ * windowed values are kept while the window is full screen. */
+#define FALLBACK_W 1280
+#define FALLBACK_H 800
+static int win_x, win_y, win_w, win_h;          /* the last windowed geometry */
+
+static void note_windowed(void)
+{
+    if (!window || (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP))) return;
+    SDL_GetWindowPosition(window, &win_x, &win_y);
+    SDL_GetWindowSize(window, &win_w, &win_h);
+}
+
+static void window_file(char *path, size_t n)
+{
+    snprintf(path, n, "%s/window.txt", win_user_dir);
+}
+
+void win_save_window(void)
+{
+    if (!window || !options_bool(OPT_REMEMBER_WINDOW)) return;
+    int full = (SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0;
+    note_windowed();
+    char path[1100];
+    window_file(path, sizeof path);
+    FILE *f = fopen(path, "w");
+    if (!f) return;
+    fprintf(f, "%d %d %d %d %d\n", win_x, win_y, win_w, win_h, full);
+    fclose(f);
+    fprintf(stderr, "recomp: window saved %d %d %d %d %d\n", win_x, win_y, win_w, win_h, full);
+}
+
+/* 1 when the stored window shows on a connected screen: its middle lies inside one. */
+static int window_on_screen(int x, int y, int w, int h)
+{
+    if (w < 200 || h < 150) return 0;
+    int cx = x + w / 2, cy = y + h / 2;
+    for (int i = 0; i < SDL_GetNumVideoDisplays(); i++) {
+        SDL_Rect r;
+        if (SDL_GetDisplayBounds(i, &r)) continue;
+        if (cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h) return 1;
+    }
+    return 0;
+}
+
 /* The window. CM0102_VERSION comes from the CMake project version. */
 #ifndef CM0102_VERSION
 #define CM0102_VERSION "dev"
@@ -116,9 +162,26 @@ static void toggle_full_screen(void)
 void win_video_init(void)
 {
     if (window) return;
-    window = SDL_CreateWindow("CM 01/02: Bosman Edition " CM0102_VERSION, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              (int)rt_screen_w, (int)rt_screen_h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED, w = (int)rt_screen_w, h = (int)rt_screen_h, full = 0;
+    if (options_bool(OPT_REMEMBER_WINDOW)) {
+        char path[1100];
+        window_file(path, sizeof path);
+        FILE *f = fopen(path, "r");
+        int sx, sy, sw, sh, sf;
+        int ok = f && fscanf(f, "%d %d %d %d %d", &sx, &sy, &sw, &sh, &sf) == 5;
+        if (f) fclose(f);
+        if (ok) {
+            if (window_on_screen(sx, sy, sw, sh)) { x = sx; y = sy; w = sw; h = sh; full = sf != 0; }
+            else { w = FALLBACK_W; h = FALLBACK_H; }          /* off every screen: 1280x800 in the middle */
+        }
+    }
+    window = SDL_CreateWindow("CM 01/02: Bosman Edition " CM0102_VERSION, x, y, w, h,
+                              SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!window) rt_fatal("SDL_CreateWindow: %s", SDL_GetError());
+    note_windowed();
+    if (full && SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP))
+        fprintf(stderr, "recomp: full screen: %s\n", SDL_GetError());
+    fprintf(stderr, "recomp: window opened %d %d %d %d %d\n", win_x, win_y, win_w, win_h, full);
     renderer = SDL_CreateRenderer(window, -1, 0);
     if (!renderer) renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (!renderer) rt_fatal("SDL_CreateRenderer: %s", SDL_GetError());
@@ -361,6 +424,7 @@ static void handle_event(SDL_Event *e)
 {
     switch (e->type) {
     case SDL_QUIT:
+        win_save_window();
         if (rt_on_fatal) rt_on_fatal();
         SDL_Quit();
         exit(0);
@@ -418,7 +482,8 @@ static void handle_event(SDL_Event *e)
     }
     case SDL_WINDOWEVENT:
         if (e->window.event == SDL_WINDOWEVENT_EXPOSED) win_screen_dirty = 1;
-        if (e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) update_scaling();
+        if (e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) { update_scaling(); note_windowed(); }
+        if (e->window.event == SDL_WINDOWEVENT_MOVED) note_windowed();
         if (e->window.event == SDL_WINDOWEVENT_FOCUS_LOST) win_sound_focus(0);
         if (e->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) win_sound_focus(1);
         break;
@@ -506,6 +571,7 @@ static void run_script(void)
         } else if (!strcmp(s->action, "dump")) { present_now(); win_dump_screen(s->text); }
         else if (!strcmp(s->action, "shot")) { present_now(); shot_window(s->text); }
         else if (!strcmp(s->action, "quit")) {
+            win_save_window();
             if (rt_on_fatal) rt_on_fatal();
             SDL_Quit();
             exit(0);
