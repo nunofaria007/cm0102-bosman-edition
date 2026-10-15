@@ -24,6 +24,7 @@ typedef enum {
     OPT_MATCH_COLUMNS,         /* switch, on */
     OPT_REMEMBER_WINDOW,       /* switch, on */
     OPT_SAVE_BACKUPS,          /* switch, on */
+    OPT_CONDITION_COLOURS,     /* switch, on */
     OPT_COUNT
 } OptionId;
 

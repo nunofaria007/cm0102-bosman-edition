@@ -23,7 +23,7 @@ Research for issues #19 (attribute colours), #23 (position, condition and match 
 - The value: one shared label call at **0x87ac15** (returns **0x87ac1a**) for every value cell. The branches before it choose text and colour by the value byte at `[esp+0x14]`. Code: 0x87aa12..0x87ac15.
   - value >= 0 (an attribute 1..20): `sprintf("%d")` (format 0x98806c) at 0x87abde, text colour `[0xaebdec]` yellow, loaded at **0x87abf1**.
   - 0xfc: condition, `0x62c590(player, 1)` printed as `"%d%%"` (0x98e8d4), or a fixed string (0xa86304) when `0x62c400(player) == 2`. Text colour `[0xaebdd4]` orange. The run shows "88%".
-  - 0xfd: form (0x4cc2e0), 0xfe: preferred foot or a fixed text, 0xff: morale words (thresholds on player +0x30, +0x3b), 0xf9: "  -". Colours `[0xaebdd4]` or `[0xaebdec]`.
+  - 0xfd: morale word (0x4cc2e0), 0xfe: a text from 0x7c1660, 0xff: preferred foot (thresholds on player +0x30, +0x3b: "Left Only" 0xa86374, "Either" 0xa86344, "Right Only" 0xa86338; corrected in slice 5 of 0.3.0), 0xf9: "  -". Colours `[0xaebdd4]` or `[0xaebdec]`.
 - Font 2, text flags 0xc, area 28. Code: trace line `col=1 row=0 ... tcol=ffe0 text='2' area=28 stk=87ac1a`.
 
 ### Squad screen lists (View: Attributes and others)
@@ -143,3 +143,9 @@ Facts found while building `src/recomp_rt/win/columns.c`:
 - The tactics screen pauses the match. The list does not change while the screen is open, so it needs no refresh. The Player Ratings view updates through 0x723350, and the runtime updates the conditions after it.
 - A click on a left-bar button during a match takes effect only at the next commentary line.
 - Classic 800x600: the Player Ratings view with the condition column fits. On the tactics screen, the positions column cuts long texts ("D/DM RLC" shows as "D/DM").
+
+## Build notes (slice 5 of 0.3.0, condition and morale colours)
+
+- `0x4cc2e0` (thiscall, `(player, text, size)`, ret 0xc) writes the morale word from the byte at `[player+0x61]+0x45`: below 4 "Very Low" (0x9a8320), below 8 "Low" (0x9a82fc), below 12 "Ok" (0x9a82dc), below 15 "Good" (0x9a82b8), below 18 "Very Good" (0x9a8290), else "Superb" (0x9a826c). Code: 0x4cc2e0..0x4cc392. Callers: 0x45bbb8, 0x45c480, 0x45c973 (squad list), 0x4799fb, 0x47a261, 0x47a710, 0x480303, 0x480b8d, 0x48101d, 0x80e6c1, 0x8b807d, 0x87ab00 (profile).
+- `0x62c590` (thiscall on 0xb63d28, `(player, kind)`, ret 8) gives the condition percentage in ax for kind 1. The squad list Selection view prints it at 0x45bbee..0x45bbf7.
+- The runtime colours a label when its text is the value of the last getter call (columns.c), so it needs no list of call sites.

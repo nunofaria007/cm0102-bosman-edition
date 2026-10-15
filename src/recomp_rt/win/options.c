@@ -41,6 +41,8 @@ static const OptionDef defs[OPT_COUNT] = {
         "remember_window = on opens the window with the size, place and full screen state that it had at the last quit."},
     [OPT_SAVE_BACKUPS] = {"save_backups", KIND_SWITCH, "on", NULL,
         "save_backups = on keeps the last three copies of each save in the folder backups next to the saves."},
+    [OPT_CONDITION_COLOURS] = {"condition_colours", KIND_SWITCH, "on", NULL,
+        "condition_colours = on colours condition percentages and morale words: red, amber or green."},
 };
 
 #define TEXT_MAX 1100

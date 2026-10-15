@@ -68,6 +68,7 @@ static void check_defaults(void)
     CHECK(options_bool(OPT_MATCH_COLUMNS) == 1);
     CHECK(options_bool(OPT_REMEMBER_WINDOW) == 1);
     CHECK(options_bool(OPT_SAVE_BACKUPS) == 1);
+    CHECK(options_bool(OPT_CONDITION_COLOURS) == 1);
 }
 
 int main(void)
@@ -136,7 +137,8 @@ int main(void)
 
     /* 5. Words for the switches, and a bad value keeps the default. */
     put("space_to_continue = FALSE\nshortcuts = yes\nsharp_picture = off\nsound = true\n"
-        "clickable_names = maybe\ndisplay = tiny\nattribute_colours = off\r\nfaster_days = off\r\n");
+        "clickable_names = maybe\ndisplay = tiny\nattribute_colours = off\r\nfaster_days = off\r\n"
+        "condition_colours = off\n");
     options_load(path);
     CHECK(options_bool(OPT_SPACE_TO_CONTINUE) == 0);
     CHECK(options_bool(OPT_SHORTCUTS) == 1);
@@ -146,6 +148,8 @@ int main(void)
     CHECK(options_enum(OPT_DISPLAY) == DISPLAY_WIDESCREEN);
     CHECK(options_bool(OPT_ATTRIBUTE_COLOURS) == 0);
     CHECK(options_bool(OPT_FASTER_DAYS) == 0);
+    CHECK(options_bool(OPT_CONDITION_COLOURS) == 0);
+    CHECK(options_bool(OPT_MATCH_COLUMNS) == 1);
 
     host_unlink(path);
     rmdir(dir);
