@@ -2,9 +2,13 @@
 """Smoke run: the recompiled game plays the start screen, a new game and some days without a person.
 
 Usage:
-    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen] [--record]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen] [--record] [--tolerance n]
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen] [--days n]
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --match [--days n]
+
+--tolerance n: a colour channel that differs by n or less counts as equal. The Linux build differs from the
+Mac reference pictures by 1 in some channels (the compilers round floating point differently), so its
+smoke run uses --tolerance 1.
 
 Same-save check (--same-save): the run plays the same new game five times, with -seed 1, the test
 clock (RECOMP_FIXED_CLOCK=1) and the same steps to "Go on Holiday". The runtime saves the game n game
@@ -143,7 +147,7 @@ def read_bmp(path):
     return w, abs(h), bpp, rows
 
 
-def differing_share(a, b, box=None):
+def differing_share(a, b, box=None, tol=0):
     wa, ha, pa, ra = read_bmp(a)
     wb, hb, pb, rb = read_bmp(b)
     if (wa, ha, pa) != (wb, hb, pb):
@@ -153,7 +157,8 @@ def differing_share(a, b, box=None):
     for y in range(y0, y1):
         x, z = ra[y][x0 * pa:x1 * pa], rb[y][x0 * pa:x1 * pa]
         if x != z:
-            diff += sum(1 for i in range(0, len(x), pa) if x[i:i + pa] != z[i:i + pa])
+            diff += sum(1 for i in range(0, len(x), pa)
+                        if any(abs(c - d) > tol for c, d in zip(x[i:i + pa], z[i:i + pa])))
     return diff / ((x1 - x0) * (y1 - y0))
 
 
@@ -352,6 +357,7 @@ def main(argv):
         return same_save(os.path.abspath(argv[1]), os.path.abspath(argv[2]), mode, days)
     program, game, ref = os.path.abspath(argv[1]), os.path.abspath(argv[2]), os.path.abspath(argv[3])
     record = "--record" in argv[4:]
+    tol = int(argv[argv.index("--tolerance") + 1]) if "--tolerance" in argv[4:] else 0
     ref = os.path.join(ref, mode)
     with tempfile.TemporaryDirectory(prefix="cm0102-smoke-") as work:
         shots = os.path.join(work, "shots")
@@ -391,11 +397,14 @@ def main(argv):
                 ok = False
                 print(f"FAIL  {name}: no reference picture {want} (run with --record)")
             else:
-                share = differing_share(got, want)
+                share = differing_share(got, want, tol=tol)
                 ok = share <= allowed
                 print(f"{'ok   ' if ok else 'FAIL '} {name}: {share:.1%} of pixels differ (allowed {allowed:.0%})")
             if record or not ok:
-                shutil.copyfile(got, want if record else os.path.join(ref, name + ".fail.bmp"))
+                try:
+                    shutil.copyfile(got, want if record else os.path.join(ref, name + ".fail.bmp"))
+                except OSError:
+                    print(f"      cannot write {name}.fail.bmp (read-only reference folder)")
             failed += not ok
     print("PASS" if not failed else "FAIL")
     return 1 if failed else 0
