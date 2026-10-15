@@ -12,7 +12,7 @@ v0.3.0 is out as a pre-release with Mac, Windows and Linux downloads. The 0.3.0 
 2. **Manual checks Max has not done:** the Windows keys (Ctrl+[, F11) on a Windows PC, `remember_window` on two screens and in full screen, the AppImage on a Steam Deck. u/gundenaf says the Windows build runs on the Deck through Proton.
 3. **Open spec checks:** #30 "no match in 60 days" message has no test (no such club in the test saves), and the same-save comparison against a manual Return from holiday is not done.
 4. Player requests and credits: `docs/requests.md`. Credit each requester by name, feature by feature, when their feature ships. Releases are announced as an update at the end of the original Reddit post (not a new post) and as a forum post. The 0.3.0 texts are in `/Users/max/Projects/cm0102/release-0.3.0-reddit-post.md`. Whether Max has posted them: unknown. The screenshots of the Reddit thread showed 16 of 17 comments; only u/gundenaf made suggestions in them.
-5. Clean-up for Max to approve: 16 worktrees in `.claude/worktrees/` (slice-1 to slice-12 and four agent ones) are merged into main and each holds a `build/` folder. `agent-a8d8677cceced7e8f` (old A key) is also obsolete now that #12 shipped. The old `build.stale` in the test-speed worktree came from the move. Nothing was deleted.
+5. The worktrees of the 0.3.0 build were removed on 2026-10-15 (Max's permission). Their branches stay in git.
 
 Facts from 0.3.0:
 - Saved test games in `/Users/max/Projects/cm0102/test-fixtures`: `start.sav` (Arsenal 14.7.01, first friendly 18.7.01) and `prematch.sav` (16.7.01, Basel friendly 20.7.01; another game, other fixtures).
@@ -25,38 +25,16 @@ Facts from 0.3.0:
 
 ## The product
 
-- **CM 01/02: Bosman Edition**, an unofficial port of Championship Manager 01/02 (3.9.68) to Mac and Windows. The whole original is recompiled from x86 to C (`tools/recomp/`, runtime `src/recomp_rt/`, target `cm0102_recomp`).
-- GitHub `maxevans60/cm0102-bosman-edition`. Site https://maxevans60.github.io/cm0102-bosman-edition/ from `site/`.
-- **v0.1.0** (2026-10-14) and **v0.2.0** (2026-10-15) are released as pre-releases: universal Mac `.dmg`, 64-bit Windows installer, widescreen 1280x800, clean files only.
-
-## State of 0.2.0
-
-**Released as v0.2.0 (2026-10-15):** every 0.2.0 feature, the review fixes, version 0.2.0 in `CMakeLists.txt` and the `## 0.2.0` changelog. The option `assistant_selection` is gone. The site lists the 0.2.0 options in its FAQ.
-
-- Features: settings file, keys and window (#13 to #16), save folder (#17), clickable names (#11, #25), widescreen sweep, faster holiday days (#20), sound (#21), attribute colours (#19), match columns (#23, widescreen only).
-- Review: two Opus reviews (`docs/research/review-brief-0.2.0.md`), one Sonnet fixer (`docs/research/fix-brief-0.2.0.md`). The one must-fix (a stack pop count in `dsound.c`) is fixed.
-- Tests on the merged code: both smoke modes, `--same-save` with five runs (one with every option off), `test_load.py` (needs `/Users/max/.venvs/cm0102/bin/python`), `ctest -R options`. All pass.
-- **Not checked (Max chose to skip):** a same-save check over a played match with the colours and columns on and off. Scripted runs from a pre-match save stop at the squad screen before the next friendly, so the save date was never reached. Evidence instead: both reviews found no write path, the columns code only reads, and the columns show in a live match.
-- **Left out of 0.2.0 (Max):** the test speed-ups. Branch `worktree-agent-a74c7c18d9652aee1`, commit 7d14701 says what is left (match screen address in `waits.c`, test runs of the wait steps and of `tests/fixtures/fixtures.py`).
-- **Assistant A key:** branch `worktree-agent-a8d8677cceced7e8f`. Do not merge. Kept for its match-setup code (0.3.0, #12).
-
-**Done:** Max checked the test build and approved the colour bands and widescreen-only columns. Published as v0.2.0 on 2026-10-15. The Windows keys question is now #26.
-
-## Plans after 0.2.0
-
-**v0.2.0 is released (2026-10-15)**, with the site, the forum post and a Reddit post. Max approved these for 0.3.0 (issues in the milestone):
-- #12 Assistant drop-down on the squad screen (Q64 to Q67), #22 player comparison, squad depth, best XI.
-- #26 Windows shortcut keys (bug: Ctrl+[ and F11), #27 save backups, #28 remember the window, #29 colours for condition and morale, #30 holiday until the next match, #31 faster match commentary, #32 larger text, #33 print to PDF, #34 save names with club and date, #35 Linux and Steam Deck.
-- #30 and #31 need a same-save check over a played match. Finish the test speed-ups first (branch `worktree-agent-a74c7c18d9652aee1`): the saved test games make that check possible.
-- Grilling, then the spec, before the build.
-
-**Maybe** (label `maybe`, no milestone): #24 team talks. Max likes the idea of notifications for something other than holiday results (not yet decided what).
-Decided against: a "more frequent" violent conduct option (Q61), a screenshot key, a warning before quit (the original has one), highlights of young players (needs hidden potential values).
+- **CM 01/02: Bosman Edition**, an unofficial port of Championship Manager 01/02 (3.9.68) to Mac, Windows and Linux. The whole original is recompiled from x86 to C (`tools/recomp/`, runtime `src/recomp_rt/`, target `cm0102_recomp`).
+- GitHub `maxevans60/cm0102-bosman-edition`. Site https://maxevans60.github.io/cm0102-bosman-edition/ from `site/` (pictures come from `site-assets.zip` on the release).
+- Pre-releases: v0.1.0 and v0.2.0 (Mac, Windows), v0.3.0 (Mac, Windows, Linux AppImage; three data sets: 3.9.60, 3.9.65, 3.9.68). All 2026-10-14/15.
+- **Maybe** (label `maybe`, no milestone): #24 team talks, #36 2D match view. Later, no milestone: #37 Android, #38 iOS.
+- Decided against: a "more frequent" violent conduct option (Q61), a screenshot key, a warning before quit (the original has one), highlights of young players (needs hidden potential values), a newer match engine (it would change results).
 
 ## How to make a release
 
 1. Bump `project(... VERSION x.y.z)` and add the `CHANGELOG.md` section. Commit.
-2. Dry run: `tools/release/make_release.sh --game /Users/max/Projects/cm0102/clean-3968 --sdl2-mac /Users/max/Projects/cm0102/sdl2 --sdl2-mingw /Users/max/Projects/cm0102/sdl2/mingw-2.32.10 --site-assets /Users/max/Projects/cm0102/site-release-assets`. Then the same with `--publish` after Max says yes.
+2. Dry run: `tools/release/make_release.sh --game /Users/max/Projects/cm0102/clean-3968 --data-3960 /Users/max/Projects/cm0102/data-3960 --data-3965 /Users/max/Projects/cm0102/data-3965 --sdl2-mac /Users/max/Projects/cm0102/sdl2 --sdl2-mingw /Users/max/Projects/cm0102/sdl2/mingw-2.32.10 --site-assets /Users/max/Projects/cm0102/site-release-assets`. Then the same with `--publish` after Max says yes. Colima must run for the Linux step. The checkout must be clean.
 3. The site workflow runs on the release (the Pages environment allows `main` and tags `v*`). If not: `gh workflow run pages.yml --ref main`.
 
 ## Tests
