@@ -10,8 +10,10 @@
  * formation stays. A player's fit for a slot is the lower of his rating for the position and his
  * rating for the side, from the position ratings of the player data (1 to 20). A player's score in a
  * slot is the average of the key shown attributes of the slot's position times that fit, divided by 20
- * (Max, Q138, Q139, 2026-10-15). The shown attributes come from the game's getter 0x5431e0, as on the
- * screen (1 to 20). Current ability is not used: on Max's Yeovil save it put Weale in goal over
+ * (Max, Q138 to Q140, 2026-10-15). The shown attributes come from the game's getter 0x5431e0 (1 to 20),
+ * as the squad screen shows them for the player's own club. The getter does not apply the screen's
+ * mask of unknown attributes (0x543280), so a pick for another club (best XI, Q108) would use values
+ * the screen hides (Q111): that slice must apply the mask. Current ability is not used: on Max's Yeovil save it put Weale in goal over
  * D. Williams (Agility 20), because fixed attributes such as Agility, Jumping and Technique do not feed
  * current ability. The eleven is the assignment of the highest total
  * value over all slots, found exactly with the Hungarian method (Q130). A player with a fit below 10
@@ -41,7 +43,6 @@
  * record that no screen has updated today shows the value of its last update. */
 #include "win.h"
 
-#include <SDL.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,6 +64,7 @@
 #define ABILITY 0x05u            /* player data: s16 current ability, 1 to 200 */
 #define SLOTS 11
 #define MAX_SUBS 9               /* the store holds 20 slots */
+_Static_assert(SLOTS + MAX_SUBS <= PICK_SLOTS, "a Pick holds the eleven and the subs");
 #define DEFAULT_SUBS 5           /* without a fixture in the next 30 days. Inference: league rules */
 #define FIT 90                   /* condition in % for "most match-fit" */
 #define NATURAL 15               /* the game's "natural" rating (0x5b7d20) */
@@ -114,7 +116,9 @@ static uint32_t next_fixture(uint32_t club)
     return fixture;
 }
 
-/* Set during picker_pick: the wrap of 0x62c680 skips the daily fitness update. */
+/* Set during picker_compute: the wrap of 0x62c680 skips the daily fitness update. The store of
+ * picker_pick runs without it: its calls (0x896fe0, 0x896a90, 0x897760, 0x6e1cf0) do not reach the
+ * daily update or the random numbers (research, section "store"). */
 static int picking;
 
 void o_0062c680(void);
@@ -162,8 +166,10 @@ static int by_condition(const void *a, const void *b)
     return x->staff < y->staff ? -1 : x->staff > y->staff;
 }
 
-/* The fit of a player for a slot mask, 1 to 20: the lower of the position and the side rating. When
- * bit is not NULL it gets the position bit of the mask whose rating gives the fit (the first on a tie). */
+/* The fit of a player for a slot mask, 1 to 20: the lower of the position and the side rating. For D or
+ * DM with a side, the wing-back rating (+0x16) counts as a position rating, as in the original's scorer
+ * 0x6e2f20. When bit is not NULL it gets the position bit of the mask whose rating gives the fit (the
+ * first on a tie; D or DM for the wing-back rating). */
 static int fit_bit(const Candidate *c, uint16_t mask, uint16_t *bit)
 {
     int pos = 0, side = 20;
@@ -173,6 +179,10 @@ static int fit_bit(const Candidate *c, uint16_t mask, uint16_t *bit)
             int r = rd8(g_mem, c->data + positions[i].at);
             if (r > pos) { pos = r; if (bit) *bit = positions[i].bit; }
         }
+    if (!(mask & 1) && (mask & 0x880) && (mask & 0xc)) {
+        int r = rd8(g_mem, c->data + 0x16);
+        if (r > pos) { pos = r; if (bit) *bit = (mask & 0x4) ? 0x4 : 0x8; }
+    }
     if (!(mask & 1)) {
         if (mask & 0x80) side = rd8(g_mem, c->data + 0x18);
         else if (mask & 0x800) side = rd8(g_mem, c->data + 0x17);
@@ -253,7 +263,7 @@ static void hungarian(int rows, int cols, long long w[][COLUMNS], int *col_of)
 static void assign(const Candidate *c, int n, const int *first, const uint16_t *masks, int lo, int hi,
                    int *taken, int *team)
 {
-    static long long w[SLOTS][COLUMNS];
+    long long w[SLOTS][COLUMNS];
     int rows = 0, row_slot[SLOTS], cols = 0, col_cand[COLUMNS], col_of[SLOTS];
     for (int s = lo; s < hi; s++) row_slot[rows++] = s;
     for (int p = 0; p < n; p++)
@@ -330,7 +340,8 @@ static int compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
         c[n].ability = (int16_t)rd16(g_mem, c[n].data + ABILITY);    /* for the picker check only */
         for (uint32_t k = 1; k <= ATTRIBUTES; k++) {    /* cdecl (staff, index): the shown value, 1 to 20 */
             uint32_t a[2] = {staff, k};
-            c[n].attr[k] = (uint8_t)call_cdecl(0x5431e0u, 2, a);
+            uint32_t v = call_cdecl(0x5431e0u, 2, a) & 0xff;
+            c[n].attr[k] = (uint8_t)(v > 20 ? 20 : v);
         }
         n++;
     }
@@ -430,14 +441,15 @@ int picker_pick(uint32_t club, uint32_t team_index, int kind)
 }
 
 /* The picker check (tests/smoke/picker_check.py): with RECOMP_PICK_CHECK=<file>, at the first human turn
- * the runtime computes the three picks of the player's club into the file, runs "Pick best team" and
- * ends the program with code 0. */
-void picker_check_turn(void)
+ * the runtime computes the three picks of the player's club into the file and runs "Pick best team".
+ * Then it returns 1, and the human turn (testrun.c) ends the program with code 0. Else it returns 0. */
+int picker_check_turn(void)
 {
     static int done;
     const char *path = getenv("RECOMP_PICK_CHECK");
-    if (done || !path || !*path) return;
+    if (done || !path || !*path) return 0;
     done = 1;
+    /* The manager's club (staff +0x39), else his national team (+0x24), as holiday_next.c club_of. */
     uint32_t manager = rd32(g_mem, PLAYER_MANAGER + (uint32_t)(int16_t)rd16(g_mem, PLAYER_SLOT) * 0x300u);
     uint32_t club = manager ? rd32(g_mem, manager + 0x39) : 0;
     if (manager && !club) club = rd32(g_mem, manager + 0x24);
@@ -451,7 +463,5 @@ void picker_check_turn(void)
     FILE *f = fopen(path, "a");
     if (f) { fprintf(f, "picked\t%d\n", n); fclose(f); }
     fprintf(stderr, "recomp: picker check of club %#x done, %d players stored\n", club, n);
-    if (rt_on_fatal) rt_on_fatal();
-    SDL_Quit();
-    exit(0);
+    return 1;
 }

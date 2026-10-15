@@ -23,6 +23,7 @@ Checks for each pick:
     - no player is picked twice, and the subs come from the players left over
     - --expect DR=Warner: a slot of that label holds the player (full name or surname); --never: no such
       slot does. SAVE_CHECKS adds the checks of yeovil.sav and start.sav.
+    - SAVE_ATTRS: one player's shown attributes, against a wrong attribute index in the runtime
 --keep copies the dump to a file. It has one "cand" line per candidate: name, the position ratings, the 31
 shown attributes, current ability, age, condition, first group, then the fit and the value of each slot.
 
@@ -58,13 +59,17 @@ KEYS = {
     "AM": ["Passing", "Creativity", "Decisions", "Technique", "Flair"],
     "FC": ["Finishing", "Off The Ball", "Anticipation", "Technique", "Pace"],
 }
-# Position bits of a slot mask and the index of their rating in the dumped ratings (player data +0x0f..).
 # The checks of the best pick for each test save (Q137, Q141), added to --expect and --never.
 SAVE_CHECKS = {
     "yeovil.sav": (["GK=Dean Williams", "AMC=Moukoko", "DR=Warner", "DC=Sodje", "FC=Georcelin", "FC=Alford"],
                    ["DMC=O'Brien"]),
     "start.sav": (["FC=Henry", "FC=Bergkamp"], []),
 }
+# Shown attributes of one player for each test save: a wrong getter index fails here (Influence 16 and
+# Jumping 17 differ for D. Williams).
+SAVE_ATTRS = {"yeovil.sav": ("Dean Williams", {"Agility": 20, "Bravery": 20, "Determination": 20,
+                                                "Influence": 14, "Jumping": 15})}
+# Position bits of a slot mask and the index of their rating in the dumped ratings (player data +0x0f..).
 POSITIONS = [(0x1, 0), (0x2, 1), (0x4, 2), (0x8, 3), (0x10, 4), (0x20, 5), (0x40, 6)]
 
 
@@ -75,6 +80,8 @@ def own_fit_value(cand, mask):
     for bit, i in POSITIONS:
         if mask & bit and r[i] > pos:
             best_bit, pos = bit, r[i]
+    if not mask & 1 and mask & 0x880 and mask & 0xc and r[7] > pos:     # wing-back rating for D or DM wide
+        best_bit, pos = (0x4 if mask & 0x4 else 0x8), r[7]
     side = 20
     if not mask & 1:
         side = r[9] if mask & 0x80 else r[8] if mask & 0x800 else r[10] if mask & 0x700 else 20
@@ -269,9 +276,9 @@ def main(argv):
         dump = os.path.join(work, "pick.txt")
         steps = smoke_run.scaled_steps("classic", work, fixtures.LOAD_STEPS) + ["600000 quit"]
         r, took = fixtures.run(program, game, "classic", user, steps, {"RECOMP_PICK_CHECK": dump}, 900)
-        if not os.path.exists(dump):
+        if not os.path.exists(dump) or r.returncode != 0 or "picker check of club" not in r.stderr:
             print(r.stderr[-2000:])
-            print(f"FAIL: no pick dump (code {r.returncode})")
+            print(f"FAIL: no complete pick dump (code {r.returncode})")
             return 1
         picks, picked = parse(dump)
         if keep:
@@ -281,6 +288,13 @@ def main(argv):
         show(kind, picks[kind])
         for p in check_pick(kind, picks[kind], expect, never):
             print(f"  FAIL ({KINDS[kind]}): {p}")
+            failed += 1
+    if name in SAVE_ATTRS and 1 in picks:
+        who, want = SAVE_ATTRS[name]
+        c = next((c for c in picks[1]["cands"] if c["name"] == who), None)
+        got = {k: c["attrs"][ATTRS.index(k)] for k in want} if c else None
+        if got != want:
+            print(f"FAIL: {who} shows {got}, expected {want}")
             failed += 1
     if sorted(picks) != [1, 2, 3]:
         print(f"FAIL: picks {sorted(picks)} in the dump")

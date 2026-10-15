@@ -107,7 +107,7 @@ typedef struct {
 } Pick;
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
 int picker_pick(uint32_t club, uint32_t team_index, int kind);
-void picker_check_turn(void);                  /* at each human turn: the picker check of the tests */
+int picker_check_turn(void);                   /* at each human turn: the picker check; 1 when done */
 /* Faster commentary (commentary.c): at each widget create, before the rect is scaled. */
 void commentary_widget_before(void);
 

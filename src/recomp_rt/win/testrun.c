@@ -35,7 +35,11 @@ void o_005cde40(void);
 RT_WRAP(005cde40, human_turn)
 {
     holiday_next_turn();
-    picker_check_turn();
+    if (picker_check_turn()) {     /* RECOMP_PICK_CHECK: the dump is written */
+        if (rt_on_fatal) rt_on_fatal();
+        SDL_Quit();
+        exit(0);
+    }
     if (save_after == -2) {
         const char *v = getenv("RECOMP_SAVE_AFTER_DAYS");
         save_after = v && *v ? atoi(v) : -1;
