@@ -294,10 +294,25 @@ static uint32_t virtual_key(SDL_Keycode k)
     }
 }
 
-/* The script of a run without a person. */
-typedef struct { uint64_t at; char action[16]; int a, b; char text[512]; } Step;
+/* The script of a run without a person. A wait step ends a part of the script. The steps of each part
+ * run in time order, with their times from the start of the part: the window opening for the first
+ * part, the moment its wait was reached for each later part. A step may leave out its time (0). */
+#define WAIT_DEFAULT_MS 120000
+typedef struct {
+    uint64_t at;
+    char action[16];
+    int a, b;
+    char text[512];
+    int part;                           /* the number of waits before this step */
+    int kind;                           /* wait: the state (waits.c) */
+    uint32_t value;
+} Step;
 static Step *steps;
 static int step_count, step_next, script_loaded;
+static uint64_t part_start;             /* ms since the window opened at the start of the current part */
+static int waiting;                     /* 1 while the wait step steps[step_next] runs */
+static uint64_t wait_began;
+static uint32_t wait_polls;
 
 static void load_script(void)
 {
@@ -305,17 +320,29 @@ static void load_script(void)
     const char *s = getenv("RECOMP_SCRIPT");
     if (!s) return;
     char *copy = strdup(s), *save = NULL;
+    int part = 0;
     for (char *item = strtok_r(copy, ";", &save); item; item = strtok_r(NULL, ";", &save)) {
         Step st;
         memset(&st, 0, sizeof st);
         unsigned long long at = 0;
-        int n = sscanf(item, " %llu %15s", &at, st.action);
-        if (n < 2) continue;
+        char *rest = item;
+        while (*rest == ' ' || *rest == '\t' || *rest == '\n') rest++;
+        if (*rest >= '0' && *rest <= '9') at = strtoull(rest, &rest, 10);
+        if (sscanf(rest, " %15s", st.action) < 1) continue;
         st.at = at;
+        st.part = part;
         if (!strcmp(st.action, "dump") || !strcmp(st.action, "type") || !strcmp(st.action, "press") ||
-            !strcmp(st.action, "shot"))
-            sscanf(item, " %*u %*s %511s", st.text);
-        else sscanf(item, " %*u %*s %d %d", &st.a, &st.b);
+            !strcmp(st.action, "shot") || !strcmp(st.action, "wait"))
+            sscanf(rest, " %*s %511s %d", st.text, &st.a);
+        else sscanf(rest, " %*s %d %d", &st.a, &st.b);
+        if (!strcmp(st.action, "wait")) {
+            if (!waits_parse(st.text, &st.kind, &st.value)) {
+                fprintf(stderr, "recomp: script: unknown state in \"wait %s\"\n", st.text);
+                exit(2);
+            }
+            if (st.a <= 0) st.a = WAIT_DEFAULT_MS;
+            part++;
+        }
         if (!strcmp(st.action, "type")) {
             /* One character every 100 ms: the window procedure keeps only the last WM_CHAR. */
             size_t n = strlen(st.text);
@@ -340,12 +367,51 @@ static void load_script(void)
         }
     }
     free(copy);
-    for (int i = 1; i < step_count; i++) {          /* in time order, keeping the order of equal times */
+    /* In parts, each in time order with its wait last, keeping the order of equal times. */
+    for (int i = 1; i < step_count; i++) {
         Step s = steps[i];
         int j = i;
-        while (j > 0 && steps[j - 1].at > s.at) { steps[j] = steps[j - 1]; j--; }
+        while (j > 0) {
+            Step *p = &steps[j - 1];
+            int pw = !strcmp(p->action, "wait"), sw = !strcmp(s.action, "wait");
+            int after = p->part != s.part ? p->part > s.part : pw != sw ? pw : p->at > s.at;
+            if (!after) break;
+            steps[j] = *p;
+            j--;
+        }
         steps[j] = s;
     }
+}
+
+/* Ends the program at once, as the quit step does, with this exit code. */
+static void script_exit(int code)
+{
+    if (rt_on_fatal) rt_on_fatal();
+    SDL_Quit();
+    exit(code);
+}
+
+/* The wait step steps[step_next]: 1 when reached. After the timeout the program ends with code 3. */
+static int wait_done(Step *s, uint64_t now)
+{
+    if (!waiting) {
+        waiting = 1;
+        wait_began = now;
+        wait_polls = waits_poll_count();
+        fprintf(stderr, "recomp: script wait %s (at most %d ms)\n", s->text, s->a);
+    }
+    if (waits_reached(s->kind, s->value, wait_polls)) {
+        fprintf(stderr, "recomp: script reached %s after %llu ms\n", s->text, (unsigned long long)(now - wait_began));
+        waiting = 0;
+        return 1;
+    }
+    if (now - wait_began >= (uint64_t)s->a) {
+        char state[256];
+        waits_describe(state, sizeof state);
+        fprintf(stderr, "recomp: script: wait %s timed out after %d ms. Now: %s\n", s->text, s->a, state);
+        script_exit(3);
+    }
+    return 0;
 }
 
 static SDL_Keycode swallow_key = SDLK_UNKNOWN;    /* a key that did the work of an option */
@@ -470,9 +536,17 @@ static void run_script(void)
 {
     if (!script_loaded) load_script();
     uint64_t now = SDL_GetTicks64() - opened_at;
-    while (step_next < step_count && steps[step_next].at <= now) {
-        Step *s = &steps[step_next++];
-        fprintf(stderr, "recomp: script %llu %s %d %d %s\n", (unsigned long long)s->at, s->action, s->a, s->b, s->text);
+    while (step_next < step_count && part_start + steps[step_next].at <= now) {
+        Step *s = &steps[step_next];
+        if (!strcmp(s->action, "wait")) {
+            if (!wait_done(s, now)) break;
+            step_next++;
+            part_start = now;
+            continue;
+        }
+        step_next++;
+        fprintf(stderr, "recomp: script %llu %s %d %d %s\n", (unsigned long long)(part_start + s->at), s->action, s->a,
+                s->b, s->text);
         if (!strcmp(s->action, "move")) post_mouse(WM_MOUSEMOVE, s->a, s->b);
         else if (!strcmp(s->action, "click") || !strcmp(s->action, "down")) {
             post_mouse(WM_MOUSEMOVE, s->a, s->b);
@@ -499,11 +573,7 @@ static void run_script(void)
             present_now();
         } else if (!strcmp(s->action, "dump")) { present_now(); win_dump_screen(s->text); }
         else if (!strcmp(s->action, "shot")) { present_now(); shot_window(s->text); }
-        else if (!strcmp(s->action, "quit")) {
-            if (rt_on_fatal) rt_on_fatal();
-            SDL_Quit();
-            exit(0);
-        }
+        else if (!strcmp(s->action, "quit")) script_exit(0);
     }
 }
 
@@ -582,6 +652,7 @@ RT_WRAP(0055f620, input_poll)
 {
     int key_down_in = key_click.on && (int32_t)(q_head - key_click.down_at) >= 0;
     keys_display = cpu.ecx;
+    waits_poll();
     o_0055f620();
     names_after_poll();
     if (key_down_in) key_click.polls++;
