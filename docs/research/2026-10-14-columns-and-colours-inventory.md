@@ -133,3 +133,13 @@ Outside the repo, in the session scratch folder `cols-shots/`: `before-profile.p
 - The row mapping between the Player Ratings records (0x49 bytes) and the match engine records (0x1be bytes).
 - How `0x90bde0` resolves "CM3_SOUNDS".
 - Which of 0x4d1600, 0x6ddab0, 0x72c1f0, 0x807450, 0x808690, 0x8b37c0 draw attributes. Staff profile and the player comparison screen.
+
+## Build notes (slices 9 and 11, 2026-10-15)
+
+Facts found while building `src/recomp_rt/win/columns.c`:
+
+- The match object at +4 of the tactics object is also at the global 0xb67a64 during a match (seen in a run). Its records at +0x4796 hold both teams, 20 each, team 0 first. The person pointer at +0x69 matches `persons + number * 0x6e` of the Player Ratings rows, so the runtime finds each row's record by the person. The rows of both teams line up this way.
+- Players of clubs outside the chosen leagues have person numbers past the count at 0xae2364 (0x7231bb tests it). The condition lookup must not use that limit.
+- The tactics screen pauses the match. The list does not change while the screen is open, so it needs no refresh. The Player Ratings view updates through 0x723350, and the runtime updates the conditions after it.
+- A click on a left-bar button during a match takes effect only at the next commentary line.
+- Classic 800x600: the Player Ratings view with the condition column fits. On the tactics screen, the positions column cuts long texts ("D/DM RLC" shows as "D/DM").

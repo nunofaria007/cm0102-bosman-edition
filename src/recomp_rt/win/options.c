@@ -29,8 +29,6 @@ static const OptionDef defs[OPT_COUNT] = {
         "save_folder = the folder for saved games, for example in iCloud Drive. Empty uses the normal folder."},
     [OPT_SOUND] = {"sound", KIND_SWITCH, "on", NULL,
         "sound = off mutes the game. With sound = on, the game's own Sound setting still applies."},
-    [OPT_ASSISTANT_SELECTION] = {"assistant_selection", KIND_SWITCH, "on", NULL,
-        "assistant_selection = on lets you press A on the tactics screen so your assistant picks the team and keeps your tactic."},
     [OPT_CLICKABLE_NAMES] = {"clickable_names", KIND_SWITCH, "on", NULL,
         "clickable_names = on lets you click a player or club name to open its profile."},
     [OPT_ATTRIBUTE_COLOURS] = {"attribute_colours", KIND_SWITCH, "on", NULL,
@@ -38,7 +36,7 @@ static const OptionDef defs[OPT_COUNT] = {
     [OPT_FASTER_DAYS] = {"faster_days", KIND_SWITCH, "on", NULL,
         "faster_days = on makes days pass faster while you are on holiday."},
     [OPT_MATCH_COLUMNS] = {"match_columns", KIND_SWITCH, "on", NULL,
-        "match_columns = on shows position, condition and match rating together on the match screens."},
+        "match_columns = on shows position, condition and match rating together on the match screens (widescreen only)."},
 };
 
 #define TEXT_MAX 1100

@@ -5,15 +5,16 @@ Usage:
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen] [--record]
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen] [--days n]
 
-Same-save check (--same-save): the run plays the same new game three times, with -seed 1, the test
+Same-save check (--same-save): the run plays the same new game five times, with -seed 1, the test
 clock (RECOMP_FIXED_CLOCK=1) and the same steps to "Go on Holiday". The runtime saves the game n game
-days (default 14) after the first news screen (RECOMP_SAVE_AFTER_DAYS) and stops. The three runs:
+days (default 14) after the first news screen (RECOMP_SAVE_AFTER_DAYS) and stops. The runs:
     normal   every option at its default, faster_days = off
     again    the same as normal: the runs are repeatable
     faster   faster_days = on: faster days changes no game decision
     silent   sound = off: sound changes no game decision
+    off      every switch option off: no option changes a game decision
 Each save must be byte for byte the same as the save of "normal". A failed check names the parts of
-the save file that differ. The check takes about eight minutes. A later option that must not change the
+the save file that differ. The check takes about ten minutes. A later option that must not change the
 game adds a run to SAME_SAVE_RUNS.
 
 The run uses a new empty save folder (RECOMP_USER_DIR is a temporary folder), so the game first shows its
@@ -139,6 +140,9 @@ SAME_SAVE_RUNS = [
     ("again", {"faster_days": "off"}),
     ("faster", {"faster_days": "on"}),
     ("silent", {"faster_days": "off", "sound": "off"}),
+    ("off", {"space_to_continue": "off", "shortcuts": "off", "sharp_picture": "off", "sound": "off",
+             "clickable_names": "off", "attribute_colours": "off", "faster_days": "off",
+             "match_columns": "off"}),
 ]
 SAVE_NAME = "samesave.sav"
 INTRO_CLICK = "1000 click 400 300"
