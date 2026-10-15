@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CM 01/02 Bosman Edition</title>
-<meta name="description" content="An unofficial port of Championship Manager 01/02 for today's Mac and Windows. Free download, widescreen, official 3.9.68 data.">
+<meta name="description" content="An unofficial port of Championship Manager 01/02 for today's Mac, Windows and Linux. Free download, widescreen, official data.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=TikTok+Sans:wdth,wght@75..150,300..900&display=swap" rel="stylesheet">
@@ -120,9 +120,9 @@ a { color: inherit; }
 .release .later { margin-top: 28px; color: var(--muted); }
 .shot { position: relative; aspect-ratio: 4 / 3; min-width: 0; width: 100%; }
 .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; border: 2px solid #2433b8; }
-.shot.wide { aspect-ratio: 1600 / 993; }
+.shot.wide { aspect-ratio: 1600 / 1000; align-self: start; }
 .shot figcaption { font-size: var(--step-small); color: var(--muted); margin-top: 10px; }
-.downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 32px; }
+.downloads { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 0 0 32px; }
 .dl {
   display: flex; align-items: center; justify-content: center; gap: .7em; padding: 20px 16px;
   background: rgba(120,120,128,.35); border: 2px solid #2433b8; color: #fff; text-decoration: none; text-align: center;
@@ -135,6 +135,7 @@ a { color: inherit; }
 .dl:hover small { color: #fff; }
 
 .steps, .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.steps { grid-template-columns: 1fr 1fr 1fr; }
 .plans ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .plans li { padding-left: 1.4em; position: relative; font-size: 1.125rem; line-height: 1.45; }
 .plans li::before { content: ""; position: absolute; left: 0; top: .45em; width: .55em; height: .55em; background: var(--accent); }
@@ -218,6 +219,7 @@ a { color: inherit; }
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="apple" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></symbol>
+  <symbol id="linux" viewBox="0 0 24 24"><path d="M12 2c-2.2 0-3.6 1.9-3.6 4.4 0 1.4.3 2.3-.4 3.6-.9 1.6-2.6 3.5-2.6 6.2 0 .7.1 1.3.3 1.8-.7.3-1.7.6-1.7 1.6 0 1.2 1.6 1.4 3.2 1.9 1.2.4 2.1.9 2.9.9.9 0 1.4-.6 1.9-.6h.9c.5 0 1 .6 1.9.6.8 0 1.7-.5 2.9-.9 1.6-.5 3.2-.7 3.2-1.9 0-1-1-1.3-1.7-1.6.2-.5.3-1.1.3-1.8 0-2.7-1.7-4.6-2.6-6.2-.7-1.3-.4-2.2-.4-3.6C15.6 3.9 14.2 2 12 2zm-1.4 3.6c.4 0 .7.5.7 1.1s-.3 1.1-.7 1.1-.7-.5-.7-1.1.3-1.1.7-1.1zm2.8 0c.4 0 .7.5.7 1.1s-.3 1.1-.7 1.1-.7-.5-.7-1.1.3-1.1.7-1.1zM12 8.6c.8 0 1.9.5 1.9.9 0 .5-1.1 1.1-1.9 1.1s-1.9-.6-1.9-1.1c0-.4 1.1-.9 1.9-.9z"/></symbol>
   <symbol id="win" viewBox="0 0 24 24"><path d="M1 1h10.5v10.5H1zM12.5 1H23v10.5H12.5zM1 12.5h10.5V23H1zM12.5 12.5H23V23H12.5z"/></symbol>
 </svg>
 
@@ -238,11 +240,11 @@ a { color: inherit; }
     <span class="edition">Bosman <em>Edition</em></span>
   </h1>
   <div class="flank left">
-    <p>Championship Manager 01/02, rebuilt to run on Mac and Windows.</p>
+    <p>Championship Manager 01/02, rebuilt to run on Mac, Windows and Linux.</p>
   </div>
   <div class="flank right">
     <div class="fact">Free download<br>Version <span data-version>0.2.0</span>
-      <div class="marks"><a data-link="mac" href="#release" aria-label="Download for Mac"><svg aria-hidden="true"><use href="#apple"/></svg></a><a data-link="win" href="#release" aria-label="Download for Windows"><svg aria-hidden="true"><use href="#win"/></svg></a></div>
+      <div class="marks"><a data-link="mac" href="#release" aria-label="Download for Mac"><svg aria-hidden="true"><use href="#apple"/></svg></a><a data-link="win" href="#release" aria-label="Download for Windows"><svg aria-hidden="true"><use href="#win"/></svg></a><a data-link="linux" href="#release" aria-label="Download for Linux"><svg aria-hidden="true"><use href="#linux"/></svg></a></div>
     </div>
   </div>
 </header>
@@ -254,16 +256,18 @@ a { color: inherit; }
     <div class="downloads" data-in>
       <a class="dl" data-link="mac" href="https://github.com/maxevans60/cm0102-bosman-edition/releases"><svg aria-hidden="true"><use href="#apple"/></svg><span>Download for Mac<small data-note="mac">Coming soon</small></span></a>
       <a class="dl" data-link="win" href="https://github.com/maxevans60/cm0102-bosman-edition/releases"><svg aria-hidden="true"><use href="#win"/></svg><span>Download for Windows<small data-note="win">Coming soon</small></span></a>
+      <a class="dl" data-link="linux" href="https://github.com/maxevans60/cm0102-bosman-edition/releases"><svg aria-hidden="true"><use href="#linux"/></svg><span>Download for Linux<small data-note="linux">Coming soon</small></span></a>
     </div>
     <div class="release">
       <div class="panel" data-in>
         <h3 class="sub">You get</h3>
         <ul>
           <li>The whole game from the 2008 free release, with the last official patch, 3.9.68.</li>
-          <li>The original 2001/02 database, with no fan updates.</li>
+          <li>Three official databases to choose from for each new game: the original 2001/02 data, its December 2001 update and the 2002/03 data. No fan updates.</li>
           <li>Widescreen at 1280 × 800, in a window you can resize. The old 800 × 600 layout is one setting away.</li>
           <li>One Mac app for Apple silicon and Intel, macOS 11 or later.</li>
           <li>An installer for 64-bit Windows 10 and 11.</li>
+          <li>One AppImage for 64-bit Linux, which also runs on the Steam Deck in desktop mode.</li>
         </ul>
         <ul class="later">
           <li>Not in this version yet: network play and printing.</li>
@@ -278,24 +282,25 @@ a { color: inherit; }
 
 <section class="screen" id="new" aria-labelledby="new-title">
   <div class="inner">
-    <h2 class="bar" id="new-title">New in <em>0.2.0</em></h2>
+    <h2 class="bar" id="new-title">New in <em>0.3.0</em></h2>
     <div class="release">
       <div class="panel" data-in>
         <h3 class="sub">Added</h3>
         <ul>
-          <li>The game's own sounds. They stop when the window is in the background.</li>
-          <li>Attribute numbers coloured by value: red for 1 to 5, amber for 6 to 10, light green for 11 to 15 and bright green for 16 to 20.</li>
-          <li>During a match, positions and condition next to the match rating on the tactics screen, and condition for both teams in Player Ratings. Widescreen only.</li>
-          <li>Click a player's or club's name to open their profile.</li>
-          <li>Space to continue, Escape to close a popup, and the mouse back button for Back. On a Mac, Cmd+[ is Back and Cmd+F is full screen.</li>
-          <li>Sharper text, faster days on holiday, and saves in any folder you choose, for example iCloud Drive.</li>
+          <li>A Linux version, which also runs on the Steam Deck.</li>
+          <li>Choose the database for a new game on the Setup Game screen.</li>
+          <li>An Assistant menu on the squad screen picks the best team, the fittest team or an under-21 team.</li>
+          <li>Holiday until next match: the holiday ends the day before your club plays.</li>
+          <li>A Fastest commentary speed, twice as fast as Very Fast.</li>
+          <li>Save names with your club and the date, backups of your last three saves, and a window that opens where you left it.</li>
+          <li>Condition and morale in red, amber and green.</li>
         </ul>
         <ul class="later">
-          <li>Each one can be switched off in settings.txt, and none of them change match results.</li>
+          <li>Each option can be switched off in settings.txt. The changelog on GitHub lists every change.</li>
         </ul>
       </div>
       <figure class="shot wide" data-in style="margin:0">
-        <img src="assets/s2@2x.png" width="1600" height="993" alt="A player profile during a match: Abdoulai Demba of Yeovil, with each attribute number coloured from red to green by value." loading="lazy">
+        <img src="assets/s3@2x.png" width="1600" height="1000" alt="The Arsenal squad screen after Pick best team: Seaman in goal, Cole, Keown, Campbell and Luzhny in defence, Vieira and Parlour in midfield, Bergkamp and Henry up front." loading="lazy">
       </figure>
     </div>
   </div>
@@ -306,12 +311,12 @@ a { color: inherit; }
     <h2 class="bar" id="next-title">Coming <em>next</em></h2>
     <div class="plans" data-plans>
       <div class="panel" data-in>
-        <h3 class="sub">Version 0.3.0</h3>
+        <h3 class="sub">Version 0.4.0</h3>
         <ul>
-          <li>Your assistant can pick the team for you.</li>
           <li>Compare two players side by side.</li>
-          <li>A squad depth chart.</li>
-          <li>A best XI view.</li>
+          <li>A squad depth chart and a best XI view.</li>
+          <li>An HD layout for big screens.</li>
+          <li>Print to PDF.</li>
         </ul>
       </div>
     </div>
@@ -339,6 +344,14 @@ a { color: inherit; }
           <li><span>Click through the installer. The game appears in the <b>Start menu</b> and on the desktop.</span></li>
         </ol>
       </div>
+      <div class="panel" data-in>
+        <h3 class="sub"><svg aria-hidden="true"><use href="#linux"/></svg>Linux and Steam Deck</h3>
+        <ol>
+          <li><span>Download the <b>.AppImage</b> file. On a Steam Deck, do this in <b>Desktop Mode</b>.</span></li>
+          <li><span>Right-click the file, open <b>Properties</b> and allow it to run as a program.</span></li>
+          <li><span>Double-click the file to start the game. On the Steam Deck, the trackpad moves the mouse.</span></li>
+        </ol>
+      </div>
     </div>
   </div>
 </section>
@@ -352,10 +365,10 @@ a { color: inherit; }
       <details><summary>How does it run on a modern computer?</summary>
         <p>Every instruction of the original Windows program is translated into C and compiled for your machine. No emulator runs underneath, so the match engine and the rest of the game are the ones from 2002.</p></details>
       <details><summary>Where are my saved games?</summary>
-        <p>On a Mac: <code>~/Library/Application Support/cm0102</code>. On Windows: <code>%APPDATA%\cm0102</code>. A new release does not change this folder.</p></details>
+        <p>On a Mac: <code>~/Library/Application Support/cm0102</code>. On Windows: <code>%APPDATA%\cm0102</code>. On Linux: <code>~/.local/share/cm0102</code>. A new release does not change this folder. Older copies of each save are in the <code>backups</code> folder inside it.</p></details>
       <details><summary>How do I get the 800 × 600 layout back?</summary>
         <p>Open <code>settings.txt</code> in the save folder and change the line to <code>display = classic</code>. Then start the game again.</p></details>
-      <details><summary>Which settings can I change in version 0.2.0?</summary>
+      <details><summary>Which settings can I change in version 0.3.0?</summary>
         <p>Open <code>settings.txt</code> in the save folder. Each option has one line, and a switch takes <code>on</code> or <code>off</code>. The defaults are:</p>
         <ul>
           <li><code>display = widescreen</code> draws the game at 1280 × 800. <code>classic</code> draws it at 800 × 600.</li>
@@ -368,9 +381,13 @@ a { color: inherit; }
           <li><code>attribute_colours = on</code> colours attribute numbers by value.</li>
           <li><code>faster_days = on</code> makes days pass faster while you are on holiday.</li>
           <li><code>match_columns = on</code> shows position, condition and match rating together on the match screens. It works in widescreen only.</li>
+          <li><code>save_backups = on</code> keeps the last three copies of each save in the <code>backups</code> folder.</li>
+          <li><code>remember_window = on</code> opens the window at the size and place it had when you quit.</li>
+          <li><code>condition_colours = on</code> colours condition and morale: red, amber or green.</li>
+          <li><code>database = 3.9.68</code> is the database for the next new game. <code>3.9.60</code> is the original 2001/02 data and <code>3.9.65</code> its December 2001 update. The Database button on the Setup Game screen changes this line.</li>
         </ul></details>
       <details><summary>Is the database updated?</summary>
-        <p>No. It is the 2001/02 season with the last official patch, 3.9.68. Fan patches and newer databases are not included.</p></details>
+        <p>You can choose. The default is the data of the last official patch, 3.9.68, which has the 2002/03 squads. The original 2001/02 data and its December 2001 update are on the Database button of the Setup Game screen. Fan databases are not included.</p></details>
       <details><summary>Something does not work</summary>
         <p>Open an issue on GitHub. Say which computer you use and what you clicked before the problem.</p></details>
     </div>
@@ -433,7 +450,7 @@ document.documentElement.classList.add('js');
 
   // Point the download buttons at the newest release, pre-releases included.
   var ua = navigator.platform || navigator.userAgent;
-  var isMac = /Mac/.test(ua), isWin = /Win/.test(ua);
+  var isMac = /Mac/.test(ua), isWin = /Win/.test(ua), isLinux = /Linux/.test(ua) && !/Android/.test(navigator.userAgent);
   fetch('https://api.github.com/repos/maxevans60/cm0102-bosman-edition/releases?per_page=5')
     .then(function (r) { return r.ok ? r.json() : []; })
     .then(function (list) {
@@ -442,15 +459,15 @@ document.documentElement.classList.add('js');
       var ver = rel.tag_name.replace(/^v/, '');
       document.querySelectorAll('[data-version]').forEach(function (v) { v.textContent = ver; });
       var find = function (re) { return (rel.assets || []).filter(function (a) { return re.test(a.name); })[0]; };
-      var files = { mac: find(/\.dmg$/i), win: find(/setup\.exe$/i) };
-      ['mac', 'win'].forEach(function (k) {
+      var files = { mac: find(/\.dmg$/i), win: find(/setup\.exe$/i), linux: find(/\.appimage$/i) };
+      ['mac', 'win', 'linux'].forEach(function (k) {
         var f = files[k]; if (!f) return;
         document.querySelectorAll('[data-link="' + k + '"]').forEach(function (a) { a.href = f.browser_download_url; });
         var n = document.querySelector('[data-note="' + k + '"]'); if (n) n.textContent = 'Version ' + ver + ', ' + Math.round(f.size / 1048576) + ' MB';
       });
-      var mine = isMac ? files.mac : isWin ? files.win : null;
+      var mine = isMac ? files.mac : isWin ? files.win : isLinux ? files.linux : null;
       if (mine) document.querySelectorAll('[data-dl-label]').forEach(function (b) {
-        b.href = mine.browser_download_url; b.textContent = 'Download for ' + (isMac ? 'Mac' : 'Windows');
+        b.href = mine.browser_download_url; b.textContent = 'Download for ' + (isMac ? 'Mac' : isWin ? 'Windows' : 'Linux');
       });
     }).catch(function () {});
 })();
