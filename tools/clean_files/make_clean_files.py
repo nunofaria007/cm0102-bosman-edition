@@ -4,6 +4,8 @@
 Usage:
     python3 tools/clean_files/make_clean_files.py ISO PATCH_EXE OUT_DIR [--update-manifest]
     python3 tools/clean_files/make_clean_files.py --check OUT_DIR [--manifest FILE]
+    python3 tools/clean_files/make_clean_files.py --data-3960 ISO DATA_DIR [--update-manifest]
+    python3 tools/clean_files/make_clean_files.py --check DATA_DIR --manifest tools/clean_files/manifest-3960.tsv
 
 ISO is the free release (CM0102.iso). PATCH_EXE is the official patch (cm0102_3968.exe).
 OUT_DIR must not exist. The tool stops if a hash of an input is wrong.
@@ -12,6 +14,12 @@ file does not end up in a download. It then compares the files with the committe
 with the paths that differ. It never writes over the committed manifest, except with
 --update-manifest, which replaces the committed file on purpose.
 With --check, the tool compares OUT_DIR with the manifest and changes nothing.
+
+With --data-3960, the tool makes only the 3.9.60 data set (2001/02 data): the database files of the
+free release (group "CM3 Data" of data1.cab) that the 3.9.68 patch replaces, that is the *.dat files
+of PATCH_FILES. DATA_DIR must not exist. The clean files and their manifest do not change. The
+folder holds no other file, because the game reads every other Data file from the clean files. Its
+manifest is tools/clean_files/manifest-3960.tsv. The runtime reads it with RECOMP_DATA_DIR=DATA_DIR.
 
 Manifest format (tools/clean_files/manifest.tsv): lines starting with # are comments; each other
 line is "sha256<TAB>size<TAB>path", with the path relative to OUT_DIR and "/" between folders.
@@ -155,6 +163,45 @@ def apply_patch(work, out):
                 g.write(f.read(size))
 
 
+# The database files: the *.dat files that the patch replaces. The 3.9.60 data set is these files
+# from the free release.
+DATA_SET_FILES = [name for folder, name in PATCH_FILES if folder == "Data" and name.endswith(".dat")]
+DEFAULT_MANIFEST_3960 = os.path.join(HERE, "manifest-3960.tsv")
+
+
+def make_data_3960(out, manifest):
+    """Extract the free release's own database files (3.9.60) into the new folder out."""
+    parent = os.path.dirname(out)
+    os.makedirs(parent, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=parent, prefix=".data-3960-") as work:
+        iso_dir = os.path.join(work, "iso")
+        os.mkdir(iso_dir)
+        run(["bsdtar", "-xf", ARGS.iso, "data1.cab", "data1.hdr"], iso_dir)
+        gdir = tempfile.mkdtemp(dir=work)
+        run(["unshield", "-g", "CM3 Data", "-j", "-d", gdir, "x", os.path.join(iso_dir, "data1.cab")], iso_dir)
+        found = {}
+        for d, _, files in os.walk(gdir):
+            for name in files:
+                found[name.lower()] = os.path.join(d, name)
+        stage = os.path.join(work, "out")
+        os.mkdir(stage)
+        for name in DATA_SET_FILES:
+            if name.lower() not in found:
+                fail(f"group CM3 Data of data1.cab has no {name}")
+            os.replace(found[name.lower()], os.path.join(stage, name))
+        os.replace(stage, out)
+    rows = listing(out)
+    own = out + ".manifest.tsv"
+    title = "3.9.60 data set: the database files of CM0102.iso. Made by make_clean_files.py --data-3960."
+    write_manifest(rows, own, title)
+    print(f"{len(rows)} files, {sum(r[1] for r in rows)} bytes in {out}; manifest of these files: {own}")
+    if ARGS.update_manifest:
+        write_manifest(rows, manifest, title)
+        print(f"replaced the committed manifest {manifest}")
+        return 0
+    return check(out, manifest)
+
+
 def exe_version(path):
     """The version text that the game shows. The exe has no version resource, only the string
     "3.9.xx" in its data. Returns it if there is exactly one, else None."""
@@ -173,9 +220,9 @@ def listing(root):
     return sorted(rows, key=lambda r: r[0].lower())
 
 
-def write_manifest(rows, path):
+def write_manifest(rows, path, title="Clean files: CM0102.iso with cm0102_3968.exe applied. Made by make_clean_files.py."):
     with open(path, "w") as f:
-        f.write("# Clean files: CM0102.iso with cm0102_3968.exe applied. Made by make_clean_files.py.\n")
+        f.write(f"# {title}\n")
         f.write("# sha256\tsize\tpath\n")
         for rel, size, digest in rows:
             f.write(f"{digest}\t{size}\t{rel}\n")
@@ -208,14 +255,27 @@ def main():
     global ARGS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", metavar="OUT_DIR")
-    ap.add_argument("--manifest", default=DEFAULT_MANIFEST, help="the committed manifest to compare with")
+    ap.add_argument("--data-3960", action="store_true", help="make only the 3.9.60 data set: ISO DATA_DIR")
+    ap.add_argument("--manifest", help="the committed manifest to compare with")
     ap.add_argument("--update-manifest", action="store_true", help="replace the committed manifest")
     ap.add_argument("iso", nargs="?")
     ap.add_argument("patch", nargs="?")
     ap.add_argument("out", nargs="?")
     ARGS = ap.parse_args()
     if ARGS.check:
-        return check(ARGS.check, ARGS.manifest)
+        return check(ARGS.check, ARGS.manifest or DEFAULT_MANIFEST)
+    if ARGS.data_3960:
+        if not ARGS.iso or not ARGS.patch or ARGS.out:
+            ap.error("give ISO and DATA_DIR with --data-3960")
+        for tool in ("bsdtar", "unshield"):
+            if not shutil.which(tool):
+                fail(f"{tool} not found (brew install {tool})")
+        out = os.path.abspath(ARGS.patch)
+        if os.path.exists(out):
+            fail(f"{out} exists; give a new folder")
+        check_input(ARGS.iso, ISO_SIZE, ISO_SHA256, "free release")
+        return make_data_3960(out, ARGS.manifest or DEFAULT_MANIFEST_3960)
+    ARGS.manifest = ARGS.manifest or DEFAULT_MANIFEST
     if not (ARGS.iso and ARGS.patch and ARGS.out):
         ap.error("give ISO, PATCH_EXE and OUT_DIR, or --check OUT_DIR")
     for tool in ("bsdtar", "unshield"):
