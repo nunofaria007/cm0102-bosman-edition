@@ -11,7 +11,7 @@ such check, so a wrong address would only fail at run time. This list closes the
 import os
 import re
 
-CALLBACK_FILES = ("picker.c", "assistant.c")      # in src/recomp_rt/win
+CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c")      # in src/recomp_rt/win
 
 # address: (bytes of the first eight, name)
 CALLBACKS = {
@@ -20,6 +20,11 @@ CALLBACKS = {
     0x55F990: ("81ec00020000568b", "popup item create"),
     0x55FBA0: ("a10c29ae008b1510", "popup area create"),
     0x5ACBE0: ("81ec240200008b84", "fixture search"),
+    0x5E8290: ("83ec6c8b0d307ab6", "message box (title, text, flags)"),
+    0x5FCFF0: ("8b44240481ec0002", "commentary speed of a manager"),
+    0x5FD2F0: ("81ec00020000568b", "set the holiday flag"),
+    0x5FED50: ("8b44240481ec0002", "selection saved at the start of a holiday"),
+    0x6B2D60: ("6a006a006a016840", "push the Go on holiday confirm"),
     0x5FBD00: ("8b44240481ec0002", "tactic of a manager"),
     0x62C400: ("81ec08020000568b", "injury state"),
     0x62C590: ("568b742408578bf9", "condition"),
