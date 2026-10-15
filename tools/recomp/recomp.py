@@ -33,7 +33,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.setrecursionlimit(50000)
 from analysis import Analyzer  # noqa: E402
 from pe import Image  # noqa: E402
-from translate import PATCHED, FunctionWriter  # noqa: E402
+from callsites import CALL_SITES, SITES  # noqa: E402
+from translate import PATCHED, SITES_SEEN, FunctionWriter  # noqa: E402
 from widescreen import INSNS, PATCHES, TRUE_WIDTH  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -271,12 +272,19 @@ def main(argv):
         sites = sorted(a + 5 for a in TRUE_WIDTH)
         out.write("\nconst uint32_t rt_true_width_returns[] = {" + ", ".join("0x%xu" % a for a in sites) + "};\n")
         out.write(f"const uint32_t rt_true_width_count = {len(sites)};\n")
+        # The return addresses of the call sites that the runtime tests (callsites.py).
+        out.write("\n")
+        for name, (a, _) in sorted(CALL_SITES.items()):
+            out.write(f"const uint32_t rt_site_{name} = 0x{a + 5:x}u;\n")
     files.append(os.path.join(gen, "table.c"))
     t_translate = time.time() - t0
     if args.all:
         lost = sorted((set(PATCHES) | set(INSNS) | TRUE_WIDTH) - PATCHED)
         if lost:
             raise SystemExit("widescreen.py: no translated instruction at " + ", ".join("%#x" % a for a in lost))
+        lost = sorted(set(SITES) - SITES_SEEN)
+        if lost:
+            raise SystemExit("callsites.py: no translated instruction at " + ", ".join("%#x" % a for a in lost))
         lost = sorted(set(wrapped) - set(funcs))
         if lost:
             raise SystemExit("RT_WRAP of a function that was not translated: " + ", ".join("%#x" % a for a in lost))

@@ -38,7 +38,7 @@ static const OptionDef defs[OPT_COUNT] = {
     [OPT_FASTER_DAYS] = {"faster_days", KIND_SWITCH, "on", NULL,
         "faster_days = on makes days pass faster while you are on holiday."},
     [OPT_MATCH_COLUMNS] = {"match_columns", KIND_SWITCH, "on", NULL,
-        "match_columns = on shows position, condition and match rating together on the match screens."},
+        "match_columns = on shows position, condition and match rating together on the match screens (widescreen only)."},
 };
 
 #define TEXT_MAX 1100

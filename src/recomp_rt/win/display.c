@@ -59,6 +59,11 @@ static void scale_rect_args(int first)
 }
 
 void o_0055fba0(void);
+
+/* Match columns (columns.c): new column counts and column numbers for two lists of the match screens. */
+void columns_area_before(void);
+void columns_area_after(int area);
+void columns_widget_before(void);
 void o_0055f990(void);
 void o_005e40d0(void);
 void o_00800890(void);
@@ -68,8 +73,10 @@ void o_005e5ad0(void);
  * owner). */
 RT_WRAP(0055fba0, area_create)
 {
+    columns_area_before();
     scale_rect_args(0);
     o_0055fba0();
+    if (!rt_unwinding) columns_area_after((int16_t)cpu.eax);
 }
 
 /* The text with links 0x4aeaf0 (comp_text.cpp) makes a label for each line of its text and a button over
@@ -98,6 +105,7 @@ static int scale_link_args(void)
 /* Widget create, thiscall: (flags, x1, y1, x2, y2, column, row, ...). */
 RT_WRAP(0055f990, widget_create)
 {
+    columns_widget_before();
     if (rt_screen_w == CLASSIC_W || !scale_link_args()) scale_rect_args(1);
     o_0055f990();
 }

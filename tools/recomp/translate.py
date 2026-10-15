@@ -6,9 +6,11 @@ Before a call the locals go back into `cpu` and after it they come back. Memory 
 """
 from capstone import x86_const as X
 
+from callsites import SITES
 from widescreen import INSNS, PATCHES, TRUE_WIDTH
 
 PATCHED = set()     # the addresses of PATCHES that a translation used
+SITES_SEEN = set()  # the addresses of callsites.py SITES that a translation checked
 
 REG32 = ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
 LOW16 = {"ax": "eax", "cx": "ecx", "dx": "edx", "bx": "ebx", "sp": "esp", "bp": "ebp", "si": "esi", "di": "edi"}
@@ -174,6 +176,11 @@ class FunctionWriter:
                     if text != "call 0x5e5ad0":
                         raise SystemExit(f"widescreen.py: the instruction at {a:#x} is not call 0x5e5ad0")
                     PATCHED.add(a)
+                if a in SITES:
+                    name, target = SITES[a]
+                    if text != f"call {target:#x}" or insn.size != 5:
+                        raise SystemExit(f"callsites.py: the instruction at {a:#x} ({name}) is not call {target:#x}")
+                    SITES_SEEN.add(a)
             except Unhandled as exc:
                 del body[mark:]
                 self.unhandled.append((a, text, str(exc)))
