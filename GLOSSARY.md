@@ -131,7 +131,7 @@ A nation that the original finds by name after the load, such as England for the
 _Avoid_: main nation
 
 **Data set**:
-The season's data that a new game loads: the 2001/02 data of the free release (3.9.60) or the 2002/03 data of the official patch (3.9.68, the default). The option `database` names it.
+The season's data that a new game loads: the 2001/02 data of the free release (3.9.60), the 2001/02 December update of the official 3.9.65 patch (3.9.65) or the 2002/03 data of the official patch (3.9.68, the default). The option `database` names it. A download holds 3.9.60 and 3.9.65 in the folders Data-3.9.60 and Data-3.9.65 of the game folder.
 _Avoid_: database version, data pack, DB
 
 **Progress bar**:

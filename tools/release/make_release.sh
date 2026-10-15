@@ -2,10 +2,15 @@
 # Builds both downloads of one release, checks them and, with --publish, uploads a GitHub release.
 #
 # Usage:
-#   tools/release/make_release.sh --game <clean files> --sdl2-mac <folder> --sdl2-mingw <folder> --site-assets <folder> [--publish]
+#   tools/release/make_release.sh --game <clean files> --data-3960 <folder> --data-3965 <folder>
+#       --sdl2-mac <folder> --sdl2-mingw <folder> --site-assets <folder> [--publish]
 #
 #   --game         the clean files (tools/clean_files/make_clean_files.py). The script checks them
 #                  against tools/clean_files/manifest.tsv.
+#   --data-3960    the 3.9.60 data set (make_clean_files.py --data-3960), checked against manifest-3960.tsv
+#   --data-3965    the 3.9.65 data set (make_clean_files.py --data-3965), checked against manifest-3965.tsv
+#                  Both go into the game folder of each download as Data-3.9.60 and Data-3.9.65, where
+#                  the option database finds them (src/recomp_rt/win/files.c).
 #   --sdl2-mac     the folder with mac-arm64 and mac-x86_64 SDL2 builds (tools/mac/build_sdl2.sh)
 #   --sdl2-mingw   the SDL2 mingw development release (SDL2-2.x.y)
 #   --site-assets  the site's pictures (logo, screenshots). They go into site-assets.zip on the release,
@@ -19,10 +24,12 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GH_REPO="maxevans60/cm0102-bosman-edition"
-GAME=""; SDL_MAC=""; SDL_MINGW=""; SITE=""; PUBLISH=0
+GAME=""; DATA_3960=""; DATA_3965=""; SDL_MAC=""; SDL_MINGW=""; SITE=""; PUBLISH=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --game) GAME="$2"; shift 2 ;;
+        --data-3960) DATA_3960="$2"; shift 2 ;;
+        --data-3965) DATA_3965="$2"; shift 2 ;;
         --sdl2-mac) SDL_MAC="$2"; shift 2 ;;
         --sdl2-mingw) SDL_MINGW="$2"; shift 2 ;;
         --site-assets) SITE="$2"; shift 2 ;;
@@ -30,7 +37,7 @@ while [ $# -gt 0 ]; do
         *) echo "make_release.sh: unknown option $1" >&2; exit 2 ;;
     esac
 done
-for v in GAME SDL_MAC SDL_MINGW SITE; do
+for v in GAME DATA_3960 DATA_3965 SDL_MAC SDL_MINGW SITE; do
     [ -n "${!v}" ] || { echo "make_release.sh: give --$(echo $v | tr 'A-Z_' 'a-z-' | sed 's/sdl-/sdl2-/')." >&2; exit 2; }
 done
 [ -f "$GAME/cm0102.exe" ] || { echo "make_release.sh: $GAME has no cm0102.exe." >&2; exit 2; }
@@ -45,7 +52,26 @@ fi
 
 OUT="$REPO/build/release-$VERSION"
 mkdir -p "$OUT"
-MANIFEST="$REPO/tools/clean_files/manifest.tsv"
+CLEAN="$REPO/tools/clean_files"
+python3 -I "$CLEAN/make_clean_files.py" --check "$GAME" --manifest "$CLEAN/manifest.tsv"
+python3 -I "$CLEAN/make_clean_files.py" --check "$DATA_3960" --manifest "$CLEAN/manifest-3960.tsv"
+python3 -I "$CLEAN/make_clean_files.py" --check "$DATA_3965" --manifest "$CLEAN/manifest-3965.tsv"
+
+# The game folder of the downloads: the clean files and the two extra data sets. Its manifest is the
+# three manifests, with the data set paths in their folders.
+# --delete keeps a file of an earlier run out of it.
+STAGE="$OUT/game"
+mkdir -p "$STAGE"
+rsync -a --delete --exclude .DS_Store --exclude /Data-3.9.60 --exclude /Data-3.9.65 "$GAME/" "$STAGE/"
+rsync -a --delete --exclude .DS_Store "$DATA_3960/" "$STAGE/Data-3.9.60/"
+rsync -a --delete --exclude .DS_Store "$DATA_3965/" "$STAGE/Data-3.9.65/"
+GAME="$STAGE"
+MANIFEST="$OUT/manifest-download.tsv"
+{
+    cat "$CLEAN/manifest.tsv"
+    grep -v '^#' "$CLEAN/manifest-3960.tsv" | awk -F '\t' -v OFS='\t' '{ $3 = "Data-3.9.60/" $3; print }'
+    grep -v '^#' "$CLEAN/manifest-3965.tsv" | awk -F '\t' -v OFS='\t' '{ $3 = "Data-3.9.65/" $3; print }'
+} > "$MANIFEST"
 CHECK_ARGS=(--manifest "$MANIFEST")
 
 echo "== Mac"

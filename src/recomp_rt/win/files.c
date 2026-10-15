@@ -269,30 +269,55 @@ void win_windows_path(const char *host, char *out, size_t room)
 }
 
 
-/* Test switch: RECOMP_DATA_DIR names a folder of other database files, for example the 3.9.60 data set
- * (tools/clean_files/make_clean_files.py --data-3960). A file Data/<name> of the game folder that also
- * exists in that folder is read from there. Every other file and every write is unchanged. Without
- * the variable, nothing changes. */
+/* The data set (#39): a folder of other database files. A file Data/<name> of the game folder that also
+ * exists in that folder is read from there. Every other file and every write is unchanged.
+ * - The option database chooses the folder: 3.9.68 is the clean files' own Data, 3.9.60 and 3.9.65 are
+ *   the folders Data-3.9.60 and Data-3.9.65 of the game folder (tools/clean_files/make_clean_files.py,
+ *   DATA_SET_FOLDERS). The Setup Game screen sets the option (setup.c).
+ * - The test switch RECOMP_DATA_DIR names any folder, for example a 3.9.60 data set that
+ *   make_clean_files.py --data-3960 made. It wins over the option.
+ * A missing folder gets a message, and the game reads its own Data. */
+static int data_dir_known;
+static char data_dir[1024];
+
+void win_data_set_changed(void) { data_dir_known = 0; }
+
+static void data_dir_find(void)
+{
+    data_dir_known = 1;
+    data_dir[0] = 0;
+    const char *v = getenv("RECOMP_DATA_DIR");
+    if (v && *v) {
+        if (!host_realpath(v, data_dir, sizeof data_dir)) {
+            fprintf(stderr, "cm0102_recomp: RECOMP_DATA_DIR: no folder %s\n", v);
+            data_dir[0] = 0;
+        }
+        return;
+    }
+    int set = options_enum(OPT_DATABASE);
+    if (set == DATABASE_3968) return;
+    char name[64], found[256], path[2048];
+    snprintf(name, sizeof name, "Data-%s", options_string(OPT_DATABASE));
+    ci_lookup(win_game_dir, name, found, sizeof found);
+    snprintf(path, sizeof path, "%s/%s", win_game_dir, found[0] ? found : name);
+    if (!host_realpath(path, data_dir, sizeof data_dir)) {
+        fprintf(stderr, "cm0102_recomp: database = %s: no folder %s, so the game reads its own Data\n",
+                options_string(OPT_DATABASE), path);
+        data_dir[0] = 0;
+    }
+}
+
 static void data_dir_swap(char *h, size_t room)
 {
-    static int done;
-    static char dir[1024];
-    if (!done) {
-        done = 1;
-        const char *v = getenv("RECOMP_DATA_DIR");
-        if (v && *v && !host_realpath(v, dir, sizeof dir)) {
-            fprintf(stderr, "cm0102_recomp: RECOMP_DATA_DIR: no folder %s\n", v);
-            dir[0] = 0;
-        }
-    }
-    if (!dir[0]) return;
+    if (!data_dir_known) data_dir_find();
+    if (!data_dir[0]) return;
     size_t gl = strlen(win_game_dir);
     if (!in_game_dir(h, gl) || strncasecmp(h + gl, "/Data/", 6)) return;
     const char *name = h + gl + 6;
     if (!*name || strchr(name, '/')) return;
     char found[256], alt[2048];
-    ci_lookup(dir, name, found, sizeof found);
-    snprintf(alt, sizeof alt, "%s/%s", dir, found[0] ? found : name);
+    ci_lookup(data_dir, name, found, sizeof found);
+    snprintf(alt, sizeof alt, "%s/%s", data_dir, found[0] ? found : name);
     if (exists(alt) && strlen(alt) < room) snprintf(h, room, "%s", alt);
 }
 

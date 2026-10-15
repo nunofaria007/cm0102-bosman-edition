@@ -2,7 +2,8 @@
 """Smoke run: the recompiled game plays the start screen, a new game and some days without a person.
 
 Usage:
-    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen] [--record]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen]
+        [--database 3.9.60|3.9.65|3.9.68] [--record]
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen] [--days n]
 
 Same-save check (--same-save): the run plays the same new game five times, with -seed 1, the test
@@ -22,6 +23,10 @@ settings. Before the start it writes settings.txt with the mode (default: classi
 screens. With --record it writes them to <reference folder>/<mode>. Without it, it compares them with
 the reference pictures there. The reference pictures stay outside git, because they show the
 original's screens.
+
+With --database, settings.txt also chooses the data set of the new game, and the reference pictures are in
+<reference folder>/<mode>-<data set>. The game folder must hold the data set folders (Data-3.9.60 and
+Data-3.9.65, as in a download). Without it, the run uses the default 3.9.68 and <reference folder>/<mode>.
 
 Widescreen mode draws at 1280x800 and the runtime scales every area by 1280/800 across and 800/600
 down, so the run scales each click and the date box by the same factors.
@@ -230,7 +235,8 @@ def main(argv):
         return same_save(os.path.abspath(argv[1]), os.path.abspath(argv[2]), mode, days)
     program, game, ref = os.path.abspath(argv[1]), os.path.abspath(argv[2]), os.path.abspath(argv[3])
     record = "--record" in argv[4:]
-    ref = os.path.join(ref, mode)
+    database = argv[argv.index("--database") + 1] if "--database" in argv[4:] else None
+    ref = os.path.join(ref, mode + (f"-{database}" if database else ""))
     with tempfile.TemporaryDirectory(prefix="cm0102-smoke-") as work:
         shots = os.path.join(work, "shots")
         home = os.path.join(work, "home")
@@ -240,6 +246,8 @@ def main(argv):
         os.makedirs(user)
         with open(os.path.join(user, "settings.txt"), "w") as f:
             f.write(f"display = {mode}\n")
+            if database:
+                f.write(f"database = {database}\n")
         env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", RECOMP_NO_BOX="1",
                    RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots)))
         env["RECOMP_USER_DIR"] = user

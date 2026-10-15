@@ -70,3 +70,20 @@ Contents (bsdtar): fonts, readme_*.txt, setup.exe (6 Dec 2001) and update.dat (1
 - changes.txt ("Version 3.9.65 (Save game compatible)")
 
 The database files are full files. club.dat is 6,287,001 bytes, exactly 10,821 records of 581 bytes, with the same record layout as 3.9.60. staff.dat is 30,900,029 bytes (3.9.60: 30,150,534). So 3.9.65 can be a third data set (spec Q89 to Q97). The 3.9.65 changes.txt lists only game fixes, no data notes. Not checked: whether the 3.9.68 original runs a new game on the 3.9.65 data.
+
+## 6. Slice 11: the data set choice
+
+Three data sets: "2001/02, original data (3.9.60)", "2001/02, December update (3.9.65)" and "2002/03, updated data (3.9.68)", the default.
+
+- The 3.9.65 data set: `python3 tools/clean_files/make_clean_files.py --data-3965 cm0102v3965.exe /Users/max/Projects/cm0102/data-3965`. The tool checks the patch hash and takes entries 14 to 33 of update.dat. Their sizes match the 3.9.60 files in name order (index.dat 1,482 bytes in both, club.dat 6,287,001). 20 files, 51,540,017 bytes. Manifest: `tools/clean_files/manifest-3965.tsv`.
+- The option `database = 3.9.68` (or `3.9.60`, `3.9.65`) chooses the folder `Data-3.9.60` or `Data-3.9.65` of the game folder, with the same rule as `RECOMP_DATA_DIR` (`src/recomp_rt/win/files.c`). `RECOMP_DATA_DIR` wins over the option.
+- Setup Game: a tenth menu item, "Database: 2002/03 (3.9.68)", in the free cell after Web Sites. The runtime fills item 9 of the build's menu items and passes 10 to the menu builder (call 0x81bcc5, `tools/recomp/callsites.py`). A click moves the option to the next data set and writes it to settings.txt (`src/recomp_rt/win/database.c`).
+- The release script copies both data sets into the game folder of each download and checks them against their manifests.
+
+### Results (2026-10-15)
+
+- Smoke runs to holiday pass on 3.9.60 and 3.9.65 in both modes. Select Team on 3.9.60 and 3.9.65 shows the 2001/02 Premier Division (Blackburn, Bolton, Fulham). The first news screen is the same picture on all three data sets.
+- A save 5 game days after the first news screen differs in size by data set: 3.9.60 16,772,269 bytes, 3.9.65 16,944,272, 3.9.68 17,802,721. So the game reads each folder.
+- Save and load: a 3.9.60 save loads with 3.9.68 selected, a 3.9.65 save with 3.9.60, a 3.9.68 save with 3.9.60. Each continues the holiday and saves again 3 game days later.
+- On 3.9.68 only the Setup Game screen differs from the old smoke pictures, by the new button (5.0% of pixels classic, 4.8% widescreen). The new reference pictures are in `/Users/max/Projects/cm0102/smoke-ref-slice11`, with folders `<mode>-3.9.60` and `<mode>-3.9.65` for the other data sets. After the merge, they replace `smoke-ref`.
+- Download size, both data sets: the Mac DMG (UDZO) grows by about 23.06 MB (a DMG of the two folders alone is 23,076,200 bytes, an empty one 16,841). The Windows installer (solid LZMA) grows by about 10.4 MB (xz -9 of both folders: 10,373,176 bytes). For each set alone: gzip -9 8,837,371 (3.9.60) and 9,076,877 (3.9.65). Not measured: a full release build.
