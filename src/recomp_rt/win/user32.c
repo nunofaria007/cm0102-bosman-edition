@@ -7,13 +7,13 @@
  * the time since the window opened. Actions: move x y, down x y, up x y, click x y (down, then up 100 ms
  * later), rclick x y, key <virtual key>, char <code>, type <text> (one character each 100 ms),
  * press <key> (an SDL key press, as from the keyboard, for the keys of the options: for example
- * space, escape, gui+[, alt+left, gui+f, alt+return, or mouseback for the back button of a mouse),
+ * space, escape, gui+[, ctrl+[, gui+f, f11, or mouseback for the back button of a mouse),
  * resize w h (the window size), dump <file.bmp>, shot <file.bmp> (the window as shown, after the
  * scaling), quit. RECOMP_DUMP names a file to save the screen to when the program ends.
  *
  * The keys of the options (options.h): Space presses Continue Game (space_to_continue). Cmd+[ on a
- * Mac, Alt+Left on Windows and the back button of a mouse press the Back arrow, Escape closes an open
- * popup, and Cmd+F on a Mac or Alt+Enter on Windows switch full screen on and off (shortcuts). A key
+ * Mac, Ctrl+[ on Windows and the back button of a mouse press the Back arrow, Escape closes an open
+ * popup, and Cmd+F on a Mac or F11 on Windows switch full screen on and off (shortcuts). A key
  * that presses something on the screen of the game becomes a click of the left button there
  * (click_for_key), so the game's own input code runs, as for a click with the mouse. */
 #include "win.h"
@@ -229,18 +229,24 @@ static int shortcut_key(SDL_Keycode k, Uint16 mod)
 {
     int x, y;
 #ifdef __APPLE__
-    int back = k == SDLK_AC_BACK || (k == SDLK_LEFTBRACKET && (mod & KMOD_GUI));
-    int full = k == SDLK_f && (mod & KMOD_GUI);
+    int windows = getenv("RECOMP_KEYS_WINDOWS") != NULL; /* for the script test of the Windows keys */
 #else
-    int back = k == SDLK_AC_BACK || (k == SDLK_LEFT && (mod & KMOD_ALT));
-    int full = (k == SDLK_RETURN || k == SDLK_KP_ENTER) && (mod & KMOD_ALT);
+    int windows = 1;
 #endif
+    int back, full;
+    if (windows) {
+        back = k == SDLK_AC_BACK || (k == SDLK_LEFTBRACKET && (mod & KMOD_CTRL));
+        full = k == SDLK_F11 && !(mod & (KMOD_CTRL | KMOD_ALT | KMOD_GUI | KMOD_SHIFT));
+    } else {
+        back = k == SDLK_AC_BACK || (k == SDLK_LEFTBRACKET && (mod & KMOD_GUI));
+        full = k == SDLK_f && (mod & KMOD_GUI);
+    }
     int plain = !(mod & (KMOD_CTRL | KMOD_ALT | KMOD_GUI | KMOD_SHIFT));
     if (k == SDLK_SPACE && plain && options_bool(OPT_SPACE_TO_CONTINUE))
         return keys_continue_game(&x, &y) && click_for_key(x, y);
     if (!options_bool(OPT_SHORTCUTS)) return 0;
-    if (full) { toggle_full_screen(); return 1; }
-    if (back) { if (keys_back(&x, &y)) click_for_key(x, y); return 1; }
+    if (full) { fprintf(stderr, "recomp: key full screen\n"); toggle_full_screen(); return 1; }
+    if (back) { fprintf(stderr, "recomp: key back\n"); if (keys_back(&x, &y)) click_for_key(x, y); return 1; }
     if (k == SDLK_ESCAPE && plain) return keys_outside_popup(&x, &y) && click_for_key(x, y);
     return 0;
 }
@@ -420,7 +426,7 @@ static void handle_event(SDL_Event *e)
 }
 
 /* A key press of the script, through the event code of the keyboard (handle_event): for example
- * "space", "gui+[", "alt+left" or "mouseback". A space also gives its character, as the keyboard does. */
+ * "space", "gui+[", "ctrl+[" or "mouseback". A space also gives its character, as the keyboard does. */
 static void press_key(const char *name)
 {
     SDL_Event e;
