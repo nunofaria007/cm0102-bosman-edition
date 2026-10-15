@@ -34,6 +34,7 @@ sys.setrecursionlimit(50000)
 from analysis import Analyzer  # noqa: E402
 from pe import Image  # noqa: E402
 from callsites import CALL_SITES, SITES  # noqa: E402
+import callbacks  # noqa: E402
 from translate import PATCHED, SITES_SEEN, FunctionWriter  # noqa: E402
 from widescreen import INSNS, PATCHES, TRUE_WIDTH  # noqa: E402
 
@@ -288,6 +289,9 @@ def main(argv):
         lost = sorted(set(wrapped) - set(funcs))
         if lost:
             raise SystemExit("RT_WRAP of a function that was not translated: " + ", ".join("%#x" % a for a in lost))
+        bad = callbacks.check(image, set(funcs), os.path.join(RUNTIME, "win"))
+        if bad:
+            raise SystemExit("callbacks.py: " + "; ".join(bad))
 
     report = {
         "functions": stats["functions"],
