@@ -1,4 +1,4 @@
-# Handover, 2026-10-15 (about 2 am)
+# Handover, 2026-10-15
 
 Read this first. Then read `GLOSSARY.md`, `docs/specs/2026-10-14-quality-of-life-0.2.0-spec.md` and `docs/research/build-brief-0.2.0.md`.
 
@@ -10,27 +10,19 @@ Read this first. Then read `GLOSSARY.md`, `docs/specs/2026-10-14-quality-of-life
 
 ## State of 0.2.0
 
-**Merged on `main` and pushed** (issues closed):
-- Settings file reader with every option (`src/recomp_rt/win/options.c`).
-- Keys and window (#13 to #16): Space to continue, Cmd+[ and mouse back button, Escape for popups, Cmd+F full screen, sharp picture.
-- Save folder option (#17).
-- Clickable names (#11): hand cursor and underline on hover; the name buttons in news now land on the names in widescreen (#25).
-- Widescreen sweep: text widths scaled twice, tactics drag limit.
-- Repeatable test runs (`RECOMP_FIXED_CLOCK`, `RECOMP_SAVE_AFTER_DAYS`, `smoke_run.py --same-save`) and faster days on holiday (#20).
-- Sound through SDL audio, muted when the window has no focus (#21).
-- Save tools `tools/save/` (Max's "Yeovil 1m.sav" was made with them).
+**Merged on `main`, not pushed (2026-10-15):** every 0.2.0 feature, the review fixes, version 0.2.0 in `CMakeLists.txt` and the `## 0.2.0` changelog. The option `assistant_selection` is gone. The site lists the 0.2.0 options in its FAQ.
 
-**Not merged, work on disk** (the agents stopped at the account's session limit, which resets at 2:20 am):
-1. **Attribute colours (#19) and match columns (#23)**: worktree `.claude/worktrees/agent-a069b80021b6499a7`, uncommitted (display.c, options.c, columns.c, tools/recomp/callsites.py, recomp.py, translate.py, the research note). The agent reported both work in widescreen and both smoke modes pass. Left: a same-save check with the options on and off over a played match, the full test set once, commit. Colour bands proposed: 1-5 red, 6-10 amber, 11-15 light green, 16-20 bright green; Max approves on a screenshot. Classic-mode columns: show Max a screenshot, he decides.
-2. **Test speed-ups**: worktree `.claude/worktrees/agent-a74c7c18d9652aee1`, uncommitted (waits.c, user32.c, win.h). Wait-for-screen script steps were started; saved test games (`tests/fixtures/`, saves outside git in `/Users/max/Downloads/Game/test-fixtures/`) not yet. Finish it or restart it from the brief in the old task (see the 0.2.0 build brief, "Test speed").
-3. **Assistant A key**: branch `worktree-agent-a8d8677cceced7e8f` (commit 8d5345b). **Do not merge.** Max moved assistant selection to 0.3.0 as a squad screen drop-down (#12). Keep the branch for its match-setup code.
+- Features: settings file, keys and window (#13 to #16), save folder (#17), clickable names (#11, #25), widescreen sweep, faster holiday days (#20), sound (#21), attribute colours (#19), match columns (#23, widescreen only).
+- Review: two Opus reviews (`docs/research/review-brief-0.2.0.md`), one Sonnet fixer (`docs/research/fix-brief-0.2.0.md`). The one must-fix (a stack pop count in `dsound.c`) is fixed.
+- Tests on the merged code: both smoke modes, `--same-save` with five runs (one with every option off), `test_load.py` (needs `/Users/max/.venvs/cm0102/bin/python`), `ctest -R options`. All pass.
+- **Not checked (Max chose to skip):** a same-save check over a played match with the colours and columns on and off. Scripted runs from a pre-match save stop at the squad screen before the next friendly, so the save date was never reached. Evidence instead: both reviews found no write path, the columns code only reads, and the columns show in a live match.
+- **Left out of 0.2.0 (Max):** the test speed-ups. Branch `worktree-agent-a74c7c18d9652aee1`, commit 7d14701 says what is left (match screen address in `waits.c`, test runs of the wait steps and of `tests/fixtures/fixtures.py`).
+- **Assistant A key:** branch `worktree-agent-a8d8677cceced7e8f`. Do not merge. Kept for its match-setup code (0.3.0, #12).
 
-**Before releasing 0.2.0:**
-1. Finish and merge items 1 and 2 above.
-2. Remove the option `assistant_selection` from `options.c` and its test (it moves to 0.3.0).
-3. Review the whole 0.2.0 diff with two fresh Opus agents (one against the spec, one against standards). Fix findings with one Sonnet fixer and one brief.
-4. Build test downloads for Max (`tools/mac/make_app.sh`, `cmake --build build-win --target windows_installer`) into `/Users/max/Downloads/Game/builds/`. Max checks by ear and eye: sound, keys, full screen, colours, columns.
-5. Bump the version to 0.2.0 in `CMakeLists.txt`, add `## 0.2.0` to `CHANGELOG.md`, update the site's options list, then `tools/release/make_release.sh ... --publish` on Max's yes (see "How to make a release").
+**Open for Max:**
+1. Check the test downloads by ear and eye: sound, keys, full screen, colours, columns. Approve the colour bands (1-5 red, 6-10 amber, 11-15 light green, 16-20 bright green) and decide on columns in classic mode (now off there).
+2. Windows keys: the Back and full-screen shortcuts read the Cmd key as SDL's GUI key, which on Windows is the Windows key. Windows probably takes Win+F. Unknown if Win+[ works. Decide on Ctrl or F11 for Windows.
+3. Then push `main` and publish with `tools/release/make_release.sh ... --publish` on his yes (see "How to make a release").
 
 ## Plans after 0.2.0
 
