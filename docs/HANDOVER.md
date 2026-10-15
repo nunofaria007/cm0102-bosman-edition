@@ -12,6 +12,12 @@ Read this first in the next session, then `GLOSSARY.md`.
 
 Max settled the plan on 2026-10-14 (interview Q50 to Q58). Spec: `docs/specs/2026-10-14-quality-of-life-0.2.0-spec.md`, status Ready, eleven slices. Start the build in a fresh session with the to-spec skill: slice 1 first, then slices 2 to 5 in parallel worktrees with one shared brief, then 6 to 10. GitHub issues #11 to #21 are in milestone 0.2.0, #22 is in 0.3.0.
 
+## State of 0.2.0 (2026-10-15, about 1:30 am)
+
+- Merged: options reader, keys and full screen, save folder, clickable names, widescreen sweep, repeatable runs, faster days, sound.
+- Not merged, work on disk: colours and match columns (worktree agent-a069b80021b6499a7, uncommitted: display.c, options.c, columns.c, recomp tools); test speed-ups (worktree agent-a74c7c18d9652aee1, uncommitted: waits.c, user32.c). Both agents stopped at the account's session limit.
+- Before release: remove the option `assistant_selection` (it moves to 0.3.0 with #12), review with two Opus agents, build test downloads for Max, then publish on his yes.
+
 ## How to make the next release
 
 1. Bump `project(... VERSION x.y.z)` in `CMakeLists.txt` and add a `## x.y.z` section to `CHANGELOG.md`. Commit.
