@@ -8,7 +8,7 @@ A fix for the Assistant menu on the squad screen.
 
 - Pick best team, Pick most match-fit team and Pick under-21 team now score each player by the key attributes of the position, as the profile shows them. For example, a goalkeeper is scored on Handling, Reflexes, Agility, Positioning and Jumping. The score also counts how well the player fits the position.
 - The assistant finds the best eleven as a whole. In 0.3.0 it filled one position at a time, so a natural right back could sit on the bench while a centre back played at right back.
-- A player plays out of position only when nobody who can play there is free.
+- A player plays out of position only when no free player suits that position.
 
 ## 0.3.0 (pre-release)
 
