@@ -1,6 +1,6 @@
 #!/bin/bash
 # Runs inside the linux/amd64 container of make_appimage.sh. Mounts: /src (repo, read-only), /game (clean
-# files, read-only), /out (output), /smoke-ref (reference pictures, only with --smoke).
+# files, read-only), /out (output), /manifest.tsv (the manifest to check against), /smoke-ref (reference pictures, only with --smoke).
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -59,7 +59,7 @@ chmod +x "/out/$NAME"
 # 4. Check: x86-64 ELF, and every game file matches the manifest, none missing or extra.
 file "/out/$NAME" | grep -q "x86-64" || { echo "check: not an x86-64 AppImage" >&2; exit 1; }
 rm -rf /work/x && mkdir -p /work/x && unsquashfs -q -d /work/x/squashfs-root -o "$(stat -c %s /work/runtime)" "/out/$NAME" >/dev/null
-python3 -I - /src/tools/clean_files/manifest.tsv /work/x/squashfs-root/usr/share/game <<'PY'
+python3 -I - /manifest.tsv /work/x/squashfs-root/usr/share/game <<'PY'
 import hashlib, os, sys
 want = {}
 for l in open(sys.argv[1]):
