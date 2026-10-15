@@ -9,7 +9,7 @@
  *
  * Widget fields: +0x08 action id (dword), +0x0c flags (dword, 2: takes clicks, 8: text entry),
  * +0x10..+0x1c rect x1, y1, x2, y2 (dwords, inclusive), +0x44 text cursor (dword, -1: not typing),
- * +0x7a owner area (s16, -1: none).
+ * +0x7a owner area (s16, -1: none), +0x80 text (read in a test run).
  * Area fields: +0x04..+0x10 rect x1, y1, x2, y2 (dwords), +0x212 owner widget (s16, -1: top level),
  * +0xbed open (dword).
  *
@@ -19,6 +19,9 @@
  * - The Back arrow: a button with action id -2 in the arrow row (0x75e1f4..0x75e254; the start screen
  *   0x75dd31..0x75ddaa). The left bar input 0x7615d0 decides what -2 does (0x762c97). */
 #include "win.h"
+
+#include <stdio.h>
+#include <string.h>
 
 #define CONTINUE_ID 0x3e8
 #define BACK_ID (-2)
@@ -83,6 +86,43 @@ int keys_typing(void)
 int keys_continue_game(int *x, int *y) { return !keys_typing() && find_left_bar_button(CONTINUE_ID, x, y); }
 
 int keys_back(int *x, int *y) { return !keys_typing() && find_left_bar_button(BACK_ID, x, y); }
+
+/* The text of a widget, at +0x80, with a 0 at the end. A new line splits the text of a two-line button,
+ * for example "Kick Off\nMatch" (read from the left bar of the match screen in a test run). */
+static const char *label(uint32_t w) { return (const char *)(g_mem + w + 0x80); }
+
+/* 1 when a clickable button of the left bar has a text that starts with this prefix. */
+int keys_left_bar_label(const char *prefix)
+{
+    uint32_t d = screen_manager();
+    if (!d || rd32(g_mem, d) != 0) return 0;
+    int n = widget_count(d);
+    if (n < 0 || n > 0x4b0) return 0;
+    for (int i = 0; i < n; i++) {
+        uint32_t w = widget_at(d, i);
+        if (in_left_bar(w) && clickable(d, w) && !strncmp(label(w), prefix, strlen(prefix))) return 1;
+    }
+    return 0;
+}
+
+/* The texts of the clickable buttons of the left bar, for RECOMP_SCREEN_LOG. */
+void keys_left_bar_labels(char *out, size_t size)
+{
+    uint32_t d = screen_manager();
+    size_t used = 0;
+    out[0] = 0;
+    if (!d || rd32(g_mem, d) != 0) return;
+    int n = widget_count(d);
+    if (n < 0 || n > 0x4b0) return;
+    for (int i = 0; i < n && used + 20 < size; i++) {
+        uint32_t w = widget_at(d, i);
+        if (!in_left_bar(w) || !clickable(d, w) || !label(w)[0]) continue;
+        size_t at = used + (used ? 1 : 0);
+        used += (size_t)snprintf(out + used, size - used, "%s%.16s", used ? "|" : "", label(w));
+        for (size_t k = at; k < used; k++)
+            if (out[k] == '\n') out[k] = ' ';
+    }
+}
 
 /* A place outside every open popup, while a popup is open. In this mode a click that hits no row
  * of a popup closes it (0x560c30). */

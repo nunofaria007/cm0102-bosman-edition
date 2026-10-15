@@ -22,8 +22,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import smoke_run  # noqa: E402
 
 LEFT_BAR = (0, 0, 90, 600)
-# Steps of smoke_run.py up to the first news screen (95000 ms), without its dumps.
-NEW_GAME = [s for s in smoke_run.scaled_steps("classic", "") if int(s.split()[0]) < 95000 and " dump " not in s]
+# Steps of smoke_run.py up to the first news screen, without its dumps. The times of the later steps
+# count from the moment the first news screen shows (the wait step).
+_steps = smoke_run.scaled_steps("classic", "")
+NEW_GAME = [s for s in _steps[:_steps.index("wait first-news") + 1] if " dump " not in s]
+SAVE_AS = ["2500 click 45 342",                  # Game Options
+           "4500 click 140 334",                 # Save Game
+           "6000 type {name}",
+           "8000 click 705 572",                 # Ok
+           "15000 quit"]
 
 
 def run(program, game, user, save_folder, steps, home):
@@ -57,12 +64,7 @@ def main(argv):
         saves = os.path.join(work, "Saves CM Zoë")
         user1, user2 = os.path.join(work, "user1"), os.path.join(work, "user2")
         saved, loaded = os.path.join(work, "saved.bmp"), os.path.join(work, "loaded.bmp")
-        save_steps = NEW_GAME + [f"95000 dump {saved}",
-                                 "95500 click 45 342",          # Game Options
-                                 "97500 click 140 334",         # Save Game
-                                 "99000 type Test1",
-                                 "101000 click 705 572",        # Ok
-                                 "108000 quit"]
+        save_steps = NEW_GAME + [f"2000 dump {saved}"] + [x.format(name="Test1") for x in SAVE_AS]
         r = run(program, game, user1, saves, save_steps, home)
         check(r.returncode == 0, f"run 1 (new game, save) ended with code {r.returncode}")
         check(sav_files(saves) == ["Test1.sav"], f"save folder holds {sav_files(saves)}")
@@ -73,11 +75,15 @@ def main(argv):
               "game.cfg stays in the user folder")
 
         restore_steps = ["8200 click 522 272", "8500 click 662 524",    # settings: Background Changes Off, Ok
-                         "11500 click 277 242",                         # Restore Saved Game
-                         "14000 click 445 257",                         # the first file in the list
-                         "16000 click 705 572",                         # Ok
-                         "35000 click 399 330",                         # CD Not Required: Ok
-                         f"60000 dump {loaded}", "61000 quit"]
+                         "wait setup",
+                         "1000 click 277 242",                          # Restore Saved Game
+                         "3500 click 445 257",                          # the first file in the list
+                         "5000 click 705 572",                          # Ok
+                         "wait box",
+                         "1000 move 399 330",
+                         "2000 click 399 330",                          # CD Not Required: Ok
+                         "wait first-news",
+                         f"2000 dump {loaded}", "3000 quit"]
         r = run(program, game, user2, saves, restore_steps, home)
         check(r.returncode == 0, f"run 2 (restore) ended with code {r.returncode}")
         same = os.path.exists(loaded) and smoke_run.differing_share(saved, loaded, LEFT_BAR) < 0.01
@@ -86,8 +92,8 @@ def main(argv):
         bad = os.path.join(work, "file")
         open(bad, "w").close()                                          # a file: the folder cannot be created
         user3 = os.path.join(work, "user3")
-        r = run(program, game, user3, os.path.join(bad, "Saves"), NEW_GAME + [
-            "95500 click 45 342", "97500 click 140 334", "99000 type Test2", "101000 click 705 572", "108000 quit"], home)
+        r = run(program, game, user3, os.path.join(bad, "Saves"),
+                NEW_GAME + [x.format(name="Test2") for x in SAVE_AS], home)
         check("cannot create the folder" in r.stderr, "a save folder that cannot be created gives a message on stderr")
         check(sav_files(user3) == ["Test2.sav"], f"the save fell back to the user folder: {sav_files(user3)}")
     print("PASS" if not failed else "FAIL")

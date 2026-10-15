@@ -4,6 +4,7 @@
 Usage:
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen] [--record]
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen] [--days n]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --match [--days n]
 
 Same-save check (--same-save): the run plays the same new game five times, with -seed 1, the test
 clock (RECOMP_FIXED_CLOCK=1) and the same steps to "Go on Holiday". The runtime saves the game n game
@@ -14,8 +15,17 @@ days (default 14) after the first news screen (RECOMP_SAVE_AFTER_DAYS) and stops
     silent   sound = off: sound changes no game decision
     off      every switch option off: no option changes a game decision
 Each save must be byte for byte the same as the save of "normal". A failed check names the parts of
-the save file that differ. The check takes about ten minutes. A later option that must not change the
-game adds a run to SAME_SAVE_RUNS.
+the save file that differ. The runs play at the same time, about two minutes in all. A later option
+that must not change the game adds a run to SAME_SAVE_RUNS.
+
+Match check (--match): the same as the same-save check, but each run loads the saved test game
+prematch.sav (tests/fixtures/fixtures.py) and plays the friendly at Basel on Friday 20.7.01 to the end.
+The steps answer the Henry bid (Reject), go to the match, set the commentary speed to Very Fast and
+kick off. At half time they restart the match. After the match, Continue Game and one
+Space go on to Saturday 21.7.01 AM, where the runtime saves the game, 5 game days (default) after
+the load. Later days are not reached: the Bergkamp rumour of 21.7.01 needs an answer. The runs are
+in MATCH_RUNS and play at the same time, each in about two minutes. The mode is widescreen only,
+because the option match_columns draws only in widescreen.
 
 The run uses a new empty save folder (RECOMP_USER_DIR is a temporary folder), so the game first shows its
 settings. Before the start it writes settings.txt with the mode (default: classic). It saves five
@@ -41,6 +51,7 @@ pass on holiday, because Continue Game stops at random events (an offer for a pl
 answer. The news of the days is random, so screen 5 is only checked for a new date. In 30 s the
 game passes about two weeks, with more than five days in every run so far.
 """
+import concurrent.futures
 import os
 import shutil
 import struct
@@ -49,34 +60,46 @@ import sys
 import tempfile
 import time
 
-# Positions for classic mode, 800x600. Times in ms from the window opening. The database load after
-# Select League(s) takes about 20 s, so the steps after it wait with a margin.
+# Positions for classic mode, 800x600. A "wait <state>" step holds the later steps until the game
+# reaches the state (src/recomp_rt/win/waits.c). The times count in ms from the window opening, and
+# after a wait from the moment the state was reached. A wait that does not end in 120 s ends the run
+# with code 3 and names the state the game was in.
 STEPS = [
     "1000 click 400 300",                   # the intro: a click ends the logos and their sounds (INTRO_CLICK)
     "8000 dump {d}/1-settings.bmp",
     "8200 click 522 272",                   # settings: Background Changes Off
     "8500 click 662 524",                   # settings: Ok
-    "11000 dump {d}/2-setup.bmp",
-    "11500 click 277 177",                  # Start New Game
-    "14000 dump {d}/3-leagues.bmp",
-    "14500 click 705 572",                  # Next (England is selected)
-    "34000 move 399 330 | 638 328",
-    "35000 click 399 330 | 638 328",        # "CD Not Required": Ok (the box is not scaled in widescreen)
-    "46000 type Test",
-    "48000 click 560 310",
-    "49000 type Smoke",
-    "52000 click 705 572",                  # Enter Name: Next
-    "56000 click 705 572",                  # Select Nationality: Next
-    "60000 click 155 163",                  # Select Team: Arsenal
-    "63000 click 722 14",                   # Take Control
-    "67000 click 705 572",                  # Please Confirm: Yes
-    "72000 click 705 572",                  # Manager Status: Finish
-    "95000 dump {d}/4-news.bmp",
-    "95500 click 45 165",                   # manager menu (the manager's name)
-    "97500 click 150 427 | 199 474",        # Go on Holiday (popup items keep their size in widescreen)
-    "100000 click 705 572",                 # Please Confirm: Yes
-    "130000 dump {d}/5-holiday.bmp",
-    "131000 quit",
+    "wait setup",
+    "2000 dump {d}/2-setup.bmp",
+    "2500 click 277 177",                   # Start New Game
+    "wait leagues",
+    "2000 dump {d}/3-leagues.bmp",
+    "2500 click 705 572",                   # Next (England is selected)
+    "wait box",
+    "1000 move 399 330 | 638 328",
+    "2000 click 399 330 | 638 328",         # "CD Not Required": Ok (the box is not scaled in widescreen)
+    "wait typing",
+    "1000 type Test",
+    "3000 click 560 310",
+    "4000 type Smoke",
+    "7000 click 705 572",                   # Enter Name: Next
+    "wait screen:0x821900",
+    "1000 click 705 572",                   # Select Nationality: Next
+    "wait screen:0x822260",
+    "1000 click 155 163",                   # Select Team: Arsenal
+    "wait screen:0x454900",
+    "1000 click 722 14",                    # Take Control
+    "wait screen:0x822aa0",
+    "1000 click 705 572",                   # Please Confirm: Yes
+    "wait screen:0x81ff10",
+    "1000 click 705 572",                   # Manager Status: Finish
+    "wait first-news",
+    "2000 dump {d}/4-news.bmp",
+    "2500 click 45 165",                    # manager menu (the manager's name)
+    "4500 click 150 427 | 199 474",         # Go on Holiday (popup items keep their size in widescreen)
+    "7000 click 705 572",                   # Please Confirm: Yes
+    "37000 dump {d}/5-holiday.bmp",
+    "38000 quit",
 ]
 DATE_BOX = (0, 15, 90, 55)  # x0, y0, x1, y1 of the day and date in the left bar
 SCREENS = [("1-settings", 0.20), ("2-setup", 0.0), ("3-leagues", 0.0), ("4-news", 0.0), ("5-holiday", None)]
@@ -94,7 +117,7 @@ def scaled_steps(mode, shots, steps=STEPS):
         parts = step.format(d=shots).split()
         if wide and mode == "widescreen":
             parts[2:4] = wide.split()
-        elif parts[1] in ("click", "move", "down", "up", "rclick"):
+        elif parts[0] != "wait" and parts[1] in ("click", "move", "down", "up", "rclick"):
             parts[2] = str(int(parts[2]) * w // 800)
             parts[3] = str(int(parts[3]) * h // 600)
         out.append(" ".join(parts))
@@ -144,6 +167,59 @@ SAME_SAVE_RUNS = [
              "clickable_names": "off", "attribute_colours": "off", "faster_days": "off",
              "match_columns": "off"}),
 ]
+
+# The match check (--match): the steps after the load of prematch.sav (fixtures.LOAD_STEPS), positions
+# for 800x600 as in STEPS. The times after a wait count from the moment it was reached. Each Space has
+# a wait after it, so a busy machine does not lose one. Screens: news 0x7881e0, bid negotiation
+# 0x8e9760, reject confirm 0x8efda0, fixtures and results 0x717db0, squad 0x454900, "Proceed to the
+# match?" 0x7260f0, match 0x718e90 (RECOMP_SCREEN_LOG=1 prints them). A match event that stops the
+# match, for example a red card that opens the tactics screen 0x899ea0, needs more steps: Ok, then
+# Resume (label:Resume) at the same place as Kick Off.
+MATCH_SAVE = "prematch.sav"
+MATCH_STEPS = [
+    "1500 press space",                     # news of 16.7.01: the next item
+    "3500 press space",                     # the Henry bid: it blocks Continue Game
+    "5000 click 172 230",                   # Respond
+    "wait screen:0x8e9760",
+    "1000 click 502 573",                   # Reject
+    "wait screen:0x8efda0",
+    "1000 click 705 573",                   # Yes
+    "wait news",
+    "500 press space",                      # Continue Game: fixtures of 18.7.01
+    "wait day:18.7.01",
+    "500 press space",                      # results of 18.7.01, the same screen
+    "1500 move 400 30",
+    "wait continue",
+    "500 press space",                      # fixtures of 20.7.01
+    "wait day:20.7.01",
+    "500 press space",
+    "wait screen:0x454900",
+    "500 press space",
+    "wait screen:0x7260f0",
+    "1000 click 705 573",                   # Proceed to the match? Yes
+    "wait match",
+    "1000 click 45 254",                    # Commentary Speed
+    "2500 click 120 242 | 192 323",         # Very Fast (widescreen; the classic position is not checked)
+    "4000 click 45 120",                    # Kick Off Match
+    "wait label:Re-start 600000",           # half time
+    "1000 click 45 120",                    # Re-start Match
+    "wait label:Continue 600000",           # full time: Continue Game on the match screen
+    "1000 click 45 120",                    # Continue Game: results of 20.7.01
+    "wait continue",
+    "500 press space",                      # the day goes on to 21.7.01, where the runtime saves
+    "600000 quit",
+]
+# The runs of the match check, as SAME_SAVE_RUNS. Each pair of an option must give the save of normal.
+MATCH_RUNS = [
+    ("normal", {}),
+    ("again", {}),
+    ("columns-on", {"match_columns": "on"}),
+    ("columns-off", {"match_columns": "off"}),
+    ("colours-on", {"attribute_colours": "on"}),
+    ("colours-off", {"attribute_colours": "off"}),
+]
+MATCH_DAYS = 5      # 16.7.01 to 21.7.01
+
 SAVE_NAME = "samesave.sav"
 INTRO_CLICK = "1000 click 400 300"
 INTRO_WAIT = 20000  # ms
@@ -169,41 +245,64 @@ def save_parts(path):
     return parts
 
 
-def same_save(program, game, mode, days):
-    # No click ends the intro: with sound the intro takes about 19 s, without it 5.5 s, but both runs
-    # load and free the same sounds. A click would skip the second sound in one run only, and the
-    # memory of the two games would differ. So every step waits 20 s longer.
-    steps = [s for s in STEPS if "5-holiday" not in s and "quit" not in s and s != INTRO_CLICK]
-    steps = [f"{int(s.split(' ', 1)[0]) + INTRO_WAIT} {s.split(' ', 1)[1]}" for s in steps] + ["400000 quit"]
+def without_intro_click(steps):
+    """The steps without the click that ends the intro, and the steps before the first wait 20 s later.
+
+    With sound the intro takes about 19 s, without it 5.5 s, but both runs load and free the same
+    sounds. A click would skip the second sound in one run only, and the memory of the two games would
+    differ. The steps before the first wait count from the window opening, so only they move."""
+    steps = [s for s in steps if s != INTRO_CLICK]
+    first_wait = next(i for i, s in enumerate(steps) if s.startswith("wait "))
+    return [f"{int(s.split(' ', 1)[0]) + INTRO_WAIT} {s.split(' ', 1)[1]}" for s in steps[:first_wait]] + \
+        steps[first_wait:]
+
+
+def compare_runs(program, game, mode, runs, steps, days, save=None, timeout=600):
+    """Plays the runs at the same time, each with its option lines, and compares each saved game with
+    the save of the first run. save: a saved game to copy into each user folder first."""
+    def play(name, options, work):
+        run = os.path.join(work, name)
+        user, home, shots = (os.path.join(run, d) for d in ("user", "home", "shots"))
+        for d in (user, home, shots):
+            os.makedirs(d)
+        if save:
+            shutil.copyfile(save, os.path.join(user, os.path.basename(save)))
+        with open(os.path.join(user, "settings.txt"), "w") as f:
+            f.write(f"display = {mode}\n")
+            for key, value in options.items():
+                f.write(f"{key} = {value}\n")
+        env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", RECOMP_NO_BOX="1",
+                   RECOMP_USER_DIR=user,
+                   RECOMP_FIXED_CLOCK="1", RECOMP_SAVE_AFTER_DAYS=str(days),
+                   RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots, steps)))
+        start = time.time()
+        r = subprocess.run([program, "--game", game, "-seed", "1"], env=env, capture_output=True, text=True,
+                           timeout=timeout)
+        return r, os.path.join(user, SAVE_NAME), time.time() - start
+
+    # The runs play at the same time. The test clock and the wait steps make each run the same on a
+    # busy machine.
     saves = {}
     with tempfile.TemporaryDirectory(prefix="cm0102-same-save-") as work:
-        for name, options in SAME_SAVE_RUNS:
-            run = os.path.join(work, name)
-            user, home, shots = (os.path.join(run, d) for d in ("user", "home", "shots"))
-            for d in (user, home, shots):
-                os.makedirs(d)
-            with open(os.path.join(user, "settings.txt"), "w") as f:
-                f.write(f"display = {mode}\n")
-                for key, value in options.items():
-                    f.write(f"{key} = {value}\n")
-            env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", RECOMP_NO_BOX="1",
-                       RECOMP_USER_DIR=user,
-                       RECOMP_FIXED_CLOCK="1", RECOMP_SAVE_AFTER_DAYS=str(days),
-                       RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots, steps)))
-            start = time.time()
-            r = subprocess.run([program, "--game", game, "-seed", "1"], env=env, capture_output=True, text=True,
-                               timeout=600)
-            save = os.path.join(user, SAVE_NAME)
-            if r.returncode != 0 or not os.path.exists(save):
-                print(r.stderr[-2000:])
-                print(f"FAIL  {name}: no saved game (code {r.returncode})")
+        with concurrent.futures.ThreadPoolExecutor(len(runs)) as pool:
+            jobs = [(name, pool.submit(play, name, options, work)) for name, options in runs]
+            failed_runs = 0
+            for name, job in jobs:
+                r, path, took = job.result()
+                if r.returncode != 0 or not os.path.exists(path):
+                    print(r.stderr[-2000:])
+                    print(f"FAIL  {name}: no saved game (code {r.returncode}) after {took:.0f} s")
+                    failed_runs += 1
+                    continue
+                print(f"run   {name}: saved after {days} game days in {took:.0f} s")
+                saves[name] = path
+            if failed_runs:
+                print("FAIL")
                 return 1
-            print(f"run   {name}: saved after {days} game days in {time.time() - start:.0f} s")
-            saves[name] = save
         failed = 0
-        first = SAME_SAVE_RUNS[0][0]
+        first = runs[0][0]
         want = open(saves[first], "rb").read()
-        for name, _ in SAME_SAVE_RUNS[1:]:
+        for name, _ in runs[1:]:
             if open(saves[name], "rb").read() == want:
                 print(f"ok    {name}: the save is the same as {first}")
                 continue
@@ -213,6 +312,26 @@ def same_save(program, game, mode, days):
             print(f"FAIL  {name}: the save differs from {first} in: {', '.join(differ) or 'the file header'}")
     print("PASS" if not failed else "FAIL")
     return 1 if failed else 0
+
+
+def same_save(program, game, mode, days):
+    # No click ends the intro (without_intro_click).
+    steps = [s for s in STEPS if "5-holiday" not in s and "quit" not in s]
+    steps = without_intro_click(steps) + ["400000 quit"]
+    return compare_runs(program, game, mode, SAME_SAVE_RUNS, steps, days)
+
+
+def match(program, game, days):
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures"))
+    import fixtures  # noqa: E402  (fixtures.py imports this file)
+    save = os.path.join(fixtures.DEFAULT_DIR, MATCH_SAVE)
+    if not os.path.exists(save):
+        print(f"FAIL: no saved test game {save} (tests/fixtures/fixtures.py says where it comes from)")
+        return 1
+    # No click ends the intro (without_intro_click): with the click, the runs on a busy machine played
+    # different matches.
+    steps = without_intro_click(fixtures.LOAD_STEPS) + MATCH_STEPS
+    return compare_runs(program, game, "widescreen", MATCH_RUNS, steps, days, save, timeout=900)
 
 
 def main(argv):
@@ -225,6 +344,9 @@ def main(argv):
     if mode not in SIZES:
         print(f"unknown mode {mode}: use classic or widescreen")
         return 2
+    if "--match" in argv[3:]:
+        days = int(argv[argv.index("--days") + 1]) if "--days" in argv[3:] else MATCH_DAYS
+        return match(os.path.abspath(argv[1]), os.path.abspath(argv[2]), days)
     if "--same-save" in argv[3:]:
         days = int(argv[argv.index("--days") + 1]) if "--days" in argv[3:] else 14
         return same_save(os.path.abspath(argv[1]), os.path.abspath(argv[2]), mode, days)
