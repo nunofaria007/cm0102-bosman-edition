@@ -1,12 +1,22 @@
 # Handover, 2026-10-15
 
-Read this first. Then read `GLOSSARY.md`, `docs/specs/2026-10-14-quality-of-life-0.2.0-spec.md` and `docs/research/build-brief-0.2.0.md`.
+Read this first, then `GLOSSARY.md`. v0.2.0 is released. The next work is 0.3.0.
+
+## Next session: 0.3.0 features
+
+1. **Test speed-ups first.** Branch `worktree-agent-a74c7c18d9652aee1` (commit 7d14701 lists what is left). Find the match screen build address for `MATCH_BUILD` in `waits.c` with `RECOMP_SCREEN_LOG=1`, run both smoke modes and `--same-save` with the wait steps, then check the load steps of `tests/fixtures/fixtures.py` and make `start.sav`. A pre-match save (Arsenal, the Basel friendly on 20.7.01 is next) is in `/Users/max/Downloads/Game/test-fixtures/prematch.sav`.
+2. **Make the match same-save check work.** #30 and #31 need it. What failed on 2026-10-15:
+   - The left-bar button at (72, 161) in widescreen is Pause or Resume during a match and Continue Game outside it, so a run of Continue clicks pauses the match.
+   - The tactics screen pauses the match, and a click on Ok while paused does nothing.
+   - After the match, Continue stops at the squad screen before the next friendly (Baden), so `RECOMP_SAVE_AFTER_DAYS` 7 or 8 never fired. The game date at that point is unknown. A wait step (`wait day:...`, `wait screen:...`) fixes this kind of guess.
+3. **Grilling, then one spec for the 0.3.0 features**, then the build in slices with parallel agents and one review per spec (`feedback-cm0102-speed` in memory). Issues: #12, #22, #26 to #35 in the 0.3.0 milestone. #26 is a small bug fix and can go first.
+4. Site pictures: add new ones to `/Users/max/Downloads/Game/site-release-assets/` (now with `s2@2x.png`, the coloured profile). The release script zips that folder.
 
 ## The product
 
 - **CM 01/02: Bosman Edition**, an unofficial port of Championship Manager 01/02 (3.9.68) to Mac and Windows. The whole original is recompiled from x86 to C (`tools/recomp/`, runtime `src/recomp_rt/`, target `cm0102_recomp`).
 - GitHub `maxevans60/cm0102-bosman-edition`. Site https://maxevans60.github.io/cm0102-bosman-edition/ from `site/`.
-- **v0.1.0 is released** (pre-release, 2026-10-14): universal Mac `.dmg` with a styled window, 64-bit Windows installer, widescreen 1280x800, clean files only.
+- **v0.1.0** (2026-10-14) and **v0.2.0** (2026-10-15) are released as pre-releases: universal Mac `.dmg`, 64-bit Windows installer, widescreen 1280x800, clean files only.
 
 ## State of 0.2.0
 
