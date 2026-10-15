@@ -37,6 +37,8 @@ static const OptionDef defs[OPT_COUNT] = {
         "faster_days = on makes days pass faster while you are on holiday."},
     [OPT_MATCH_COLUMNS] = {"match_columns", KIND_SWITCH, "on", NULL,
         "match_columns = on shows position, condition and match rating together on the match screens (widescreen only)."},
+    [OPT_SAVE_BACKUPS] = {"save_backups", KIND_SWITCH, "on", NULL,
+        "save_backups = on keeps the last three copies of each save in the folder backups next to the saves."},
 };
 
 #define TEXT_MAX 1100
