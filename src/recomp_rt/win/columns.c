@@ -52,7 +52,8 @@ extern const uint32_t rt_site_ratings_area;
 #define GREY 0xae317eu
 #define PERSONS 0xae23bcu        /* pointer to the person records, 0x6e bytes each */
 #define MATCH 0xb67a64u          /* pointer to the match being played: the object at +4 of the tactics
-                                  * object (0x8aafd0), found at this address in a run */
+                                  * object (0x8aafd0). Inference: seen only in a run, with no static
+                                  * evidence yet (columns-and-colours inventory, match object note) */
 
 /* Scratch text and the column weights: the end of the game's text buffer 0xde1f64 (2000 bytes or more,
  * 0x53ee50 gets 2000 as its size). Screen code only writes short texts at its start. The runtime keeps
@@ -154,13 +155,15 @@ void columns_area_before(void)
     cols.pending = 2;
 }
 
-/* Called by the area create wrap after the original, with the new area. */
-void columns_area_after(int area)
+/* Called by the area create wrap after the original, with the new area. The wrap always calls it. When
+ * the original unwound, there is no new area: the scratch bytes go back and the pending state clears,
+ * but the area stays as it was. */
+void columns_area_after(int area, int unwound)
 {
     if (cols.pending != 2) return;
     scratch_restore();
     cols.pending = 0;
-    cols.area = area;
+    if (!unwound) cols.area = area;
 }
 
 /* Called by the widget create wrap (display.c) before the original: a widget of the moved area gets its

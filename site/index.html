@@ -160,6 +160,7 @@ a { color: inherit; }
 .faq details[open] summary::after { content: "\2212"; }
 .faq details[open] summary { color: var(--accent); }
 .faq details p { margin: 0; padding: 0 24px 22px; font-size: 1.125rem; line-height: 1.5; max-width: 70ch; }
+.faq details ul { margin: 0; padding: 0 24px 22px 44px; display: grid; gap: 8px; font-size: 1.125rem; line-height: 1.5; max-width: 70ch; }
 .faq code { font-family: inherit; font-weight: 600; color: var(--accent); }
 
 .foot { background: var(--red-deep); padding: 56px var(--margin) 40px; }
@@ -282,7 +283,6 @@ a { color: inherit; }
         <ul>
           <li>Sound.</li>
           <li>Click a player's or club's name to open their profile.</li>
-          <li>Your assistant can pick the team for you.</li>
           <li>Attributes coloured by value, as in the newer games.</li>
           <li>Faster days while you are on holiday.</li>
           <li>Space to continue, keyboard shortcuts and full screen.</li>
@@ -293,6 +293,7 @@ a { color: inherit; }
       <div class="panel" data-in>
         <h3 class="sub">Version 0.3.0</h3>
         <ul>
+          <li>Your assistant can pick the team for you.</li>
           <li>Compare two players side by side.</li>
           <li>A squad depth chart.</li>
           <li>A best XI view.</li>
@@ -339,6 +340,20 @@ a { color: inherit; }
         <p>On a Mac: <code>~/Library/Application Support/cm0102</code>. On Windows: <code>%APPDATA%\cm0102</code>. A new release does not change this folder.</p></details>
       <details><summary>How do I get the 800 × 600 layout back?</summary>
         <p>Open <code>settings.txt</code> in the save folder and change the line to <code>display = classic</code>. Then start the game again.</p></details>
+      <details><summary>Which settings can I change in version 0.2.0?</summary>
+        <p>Open <code>settings.txt</code> in the save folder. Each option has one line, and a switch takes <code>on</code> or <code>off</code>. The defaults are:</p>
+        <ul>
+          <li><code>display = widescreen</code> draws the game at 1280 × 800. <code>classic</code> draws it at 800 × 600.</li>
+          <li><code>space_to_continue = on</code> lets the space bar press Continue Game.</li>
+          <li><code>shortcuts = on</code> adds keys for Back, for closing a popup and for full screen.</li>
+          <li><code>sharp_picture = on</code> scales the picture to the window in whole pixels, so that text stays crisp.</li>
+          <li><code>save_folder =</code> is empty by default, which uses the normal folder. Set it to keep saves somewhere else, for example in iCloud Drive.</li>
+          <li><code>sound = on</code> plays the sound. <code>off</code> mutes the game.</li>
+          <li><code>clickable_names = on</code> lets you click a player or club name to open its profile.</li>
+          <li><code>attribute_colours = on</code> colours attribute numbers by value.</li>
+          <li><code>faster_days = on</code> makes days pass faster while you are on holiday.</li>
+          <li><code>match_columns = on</code> shows position, condition and match rating together on the match screens. It works in widescreen only.</li>
+        </ul></details>
       <details><summary>Is the database updated?</summary>
         <p>No. It is the 2001/02 season with the last official patch, 3.9.68. Fan patches and newer databases are not included.</p></details>
       <details><summary>Something does not work</summary>

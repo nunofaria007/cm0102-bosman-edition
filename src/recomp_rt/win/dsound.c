@@ -393,7 +393,7 @@ static void ds_CreateSoundBuffer(void)
         SOUND_LOG("sound: format not supported: tag %d, %d channels, %d Hz, %d bits\n", tag, channels, rate,
                   bits);
         wr32(g_mem, out, 0);
-        rt_ret_stdcall(DSERR_BADFORMAT, 3);
+        rt_ret_stdcall(DSERR_BADFORMAT, 4);
         return;
     }
     uint32_t b = win_make_object(buffer_vtable, BUF_SIZE);
@@ -445,7 +445,8 @@ RT_IMPORT(DSOUND_ord1)
 void o_0084cd10(void);
 
 /* The load of a WAV file into slot n of the sound object, thiscall (char slot, char *path): 1 when
- * the slot has a new buffer. The wrapper only gives the buffer's voice the file name for the log. */
+ * the slot has a new buffer. Evidence for the loader: docs/research/2026-10-14-import-inventory.md
+ * and the columns-and-colours inventory (0x84cd10). The argument layout is an inference. The wrapper only gives the buffer's voice the file name for the log. */
 RT_WRAP(0084cd10, sound_load)
 {
     uint32_t self = cpu.ecx;
