@@ -18,7 +18,17 @@
  * with a national team and eligible for the competition. A slot of a player who fails it shows red.
  * - best: all candidates.
  * - match_fit: the candidates with condition 90% or more. When too few, the fittest of the others join.
- * - under_21: first the candidates under 21. The empty slots then get the best older players. */
+ * - under_21: first the candidates under 21. The empty slots then get the best older players.
+ *
+ * Goalkeeper slot: as in the original (0x6e2000, research section "scorer"), a player with a goalkeeper
+ * rating below 10 (player data +0x0f) never takes a slot that allows a goalkeeper (position bit 0x1).
+ * So no outfield player goes in goal. When no young keeper exists, the gap fill takes the best older one.
+ * With no keeper at all, the slot stays empty.
+ *
+ * No daily update: the getters for condition (0x62c590), injury (0x62c400) and the squad test (0x45cbe0)
+ * first run the daily fitness update 0x62c680, which draws random numbers and changes the player. During
+ * the pick the runtime wraps 0x62c680 and skips it, so the pick only reads what the records hold. A
+ * record that no screen has updated today shows the value of its last update. */
 #include "win.h"
 
 #include <stdlib.h>
@@ -89,6 +99,22 @@ static uint32_t next_fixture(uint32_t club)
     return fixture;
 }
 
+/* Set during picker_pick: the wrap of 0x62c680 skips the daily fitness update. */
+static int picking;
+
+void o_0062c680(void);
+
+/* The daily fitness update of one player, thiscall (staff), ret 4. It draws random numbers and changes
+ * the player (0x62c680 pseudocode). */
+RT_WRAP(0062c680, daily_update)
+{
+    if (picking) {
+        rt_ret_stdcall(cpu.eax, 1);
+        return;
+    }
+    o_0062c680();
+}
+
 typedef struct { uint32_t staff, data; int condition, age, ability; } Candidate;
 
 static int by_condition(const void *a, const void *b)
@@ -113,9 +139,11 @@ static int fit(const Candidate *c, uint16_t mask)
     return pos < side ? pos : side;
 }
 
-/* The value of a player in a slot: the step (natural, able, other) first, then the ability. */
+/* The value of a player in a slot: the step (natural, able, other) first, then the ability. -1 when the
+ * player cannot take the slot: a goalkeeper slot needs a goalkeeper rating of 10 or more. */
 static int value(const Candidate *c, uint16_t mask)
 {
+    if ((mask & 1) && rd8(g_mem, c->data + 0x0f) < ABLE) return -1;
     int f = fit(c, mask);
     return (f >= NATURAL ? 2 : f >= ABLE ? 1 : 0) * 1000 + c->ability;
 }
@@ -136,7 +164,7 @@ static void fill(const Candidate *c, int n, const int *use, const uint16_t *mask
                 for (int p = 0; p < n; p++) {
                     if (!use[p] || taken[p]) continue;
                     int v = value(&c[p], masks[s]);
-                    if (v > bv) { bv = v; bs = s; bp = p; }
+                    if (v >= 0 && v > bv) { bv = v; bs = s; bp = p; }
                 }
             }
             if (bs < 0) break;
@@ -150,15 +178,14 @@ static void fill(const Candidate *c, int n, const int *use, const uint16_t *mask
                 for (int b = a + 1; b < hi; b++) {
                     if (team[a] < 0 || team[b] < 0) continue;
                     int now = value(&c[team[a]], masks[a]) + value(&c[team[b]], masks[b]);
-                    int swapped = value(&c[team[b]], masks[a]) + value(&c[team[a]], masks[b]);
-                    if (swapped > now) { int t = team[a]; team[a] = team[b]; team[b] = t; changed = 1; }
+                    int va = value(&c[team[b]], masks[a]), vb = value(&c[team[a]], masks[b]);
+                    if (va >= 0 && vb >= 0 && va + vb > now) { int t = team[a]; team[a] = team[b]; team[b] = t; changed = 1; }
                 }
         }
     }
 }
 
-/* kind 1: best team, 2: most match-fit, 3: under-21. Returns the number of players picked. */
-int picker_pick(uint32_t club, uint32_t team_index, int kind)
+static int pick(uint32_t club, uint32_t team_index, int kind)
 {
     uint32_t manager = rd32(g_mem, club + MANAGER);
     uint32_t m[1] = {manager};
@@ -234,4 +261,13 @@ int picker_pick(uint32_t club, uint32_t team_index, int kind)
         call_this(0x897760u, store, 3, cap);
     }
     return picked;
+}
+
+/* kind 1: best team, 2: most match-fit, 3: under-21. Returns the number of players picked. */
+int picker_pick(uint32_t club, uint32_t team_index, int kind)
+{
+    picking = 1;
+    int n = pick(club, team_index, kind);
+    picking = 0;
+    return n;
 }
