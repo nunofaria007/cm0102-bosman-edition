@@ -9,8 +9,13 @@
  *
  * The club: the manager of the player slot that has the turn (0xb74c26 + slot * 0x300, slot at
  * 0xb77c7a), club pointer at manager + 0x39, short name at club + 0x38, long name at club + 4. The side
- * bar reads the same fields at 0x762ff0..0x763017. A manager with no club keeps the original name. */
+ * bar reads the same fields at 0x762ff0..0x763017. A manager with no club keeps the original name.
+ *
+ * The club name is in code page 1252 (club.dat). The path code passes a name to the host as it is, and
+ * a host path is UTF-8, so the suggestion is converted to UTF-8 (cp1252.h). Without that a club like
+ * Köln or Málaga fails to save. */
 #include "win.h"
+#include "cp1252.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -21,18 +26,9 @@
 #define NAME_BUFFER 0xdd6ed4u      /* the text of the name entry of the file dialog */
 #define SAVE_ROUTINE 0x00838e10u   /* the save callback of Save Game */
 #define CLUB_MAX 24                /* characters of the club name in the suggestion */
+#define CLUB_BYTES 49              /* its bytes as UTF-8 (cp1252.h), with the end */
 
 static int leap(int y) { return (y % 4 == 0 && y % 100 != 0) || y % 400 == 0; }
-
-/* Copies a club name without the characters that a file name cannot hold on Windows. */
-static void copy_name(char *out, const char *in, int max)
-{
-    int n = 0;
-    for (; *in && n < max; in++)
-        if (!strchr("\\/:*?\"<>|", *in) && (unsigned char)*in >= 0x20) out[n++] = *in;
-    while (n > 0 && out[n - 1] == ' ') n--;
-    out[n] = 0;
-}
 
 /* The suggested name in out, or 0 when the player has no club. */
 static int suggest(char *out, size_t size)
@@ -41,9 +37,9 @@ static int suggest(char *out, size_t size)
     uint32_t manager = rd32(g_mem, PLAYER_MANAGER + slot * 0x300u);
     uint32_t club = manager ? rd32(g_mem, manager + 0x39) : 0;
     if (!club) return 0;
-    char name[CLUB_MAX + 1];
-    copy_name(name, (const char *)(g_mem + club + 0x38), CLUB_MAX);
-    if (!name[0]) copy_name(name, (const char *)(g_mem + club + 4), CLUB_MAX);
+    char name[CLUB_BYTES];
+    cp1252_file_name(name, sizeof name, (const char *)(g_mem + club + 0x38), CLUB_MAX);
+    if (!name[0]) cp1252_file_name(name, sizeof name, (const char *)(g_mem + club + 4), CLUB_MAX);
     if (!name[0]) return 0;
 
     int day = (int16_t)rd16(g_mem, GAME_DATE), year = (int16_t)rd16(g_mem, GAME_DATE + 2);
@@ -59,7 +55,7 @@ void o_0058f500(void);
 /* The file dialog, cdecl (14 arguments). */
 RT_WRAP(0058f500, file_dialog)
 {
-    char name[64];
+    char name[80];
     if (rt_arg(5) == NAME_BUFFER && rt_arg(6) == SAVE_ROUTINE && suggest(name, sizeof name))
         memcpy(g_mem + NAME_BUFFER, name, strlen(name) + 1);
     o_0058f500();
