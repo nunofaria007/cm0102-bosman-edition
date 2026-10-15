@@ -30,7 +30,7 @@
  * - match_fit: the candidates with condition 90% or more. When too few, the fittest of the others join.
  * - under_21: first the candidates under 21. The empty slots then get the best older players.
  * The candidates of the first group come before all others (weight below), so a slot takes a player from
- * outside the group only when no player of the group can take it.
+ * outside the group only when no player of the group can take it with a fit of 10 or more (Q142).
  *
  * Goalkeeper slot: as in the original (0x6e2000, research section "scorer"), a player with a goalkeeper
  * rating below 10 (player data +0x0f) never takes a slot that allows a goalkeeper (position bit 0x1).
@@ -210,15 +210,15 @@ static int value(const Candidate *c, uint16_t mask)
     return sum * f * 60 / n;
 }
 
-/* The order of a pick, as weights of one player in one slot: an empty slot is worst, then a player from
- * outside the pick's first group (kinds 2 and 3), then a player with a fit below 10, then the score. Each
+/* The order of a pick, as weights of one player in one slot: an empty slot is worst, then a player with a
+ * fit below 10, then a player from outside the pick's first group (kinds 2 and 3), then the score. Each
  * step outweighs any sum of the steps below it, so the best total first fills every slot it can, then
- * takes the fewest players from outside the first group, then the fewest with a fit below 10 (Q131), then
- * the highest score. So a player with a fit below 10 plays only when no free player of his group has 10
- * or more for that slot: else the swap would lower the count of such players. */
-#define W_LOW 1000000LL          /* more than 20 slots x 20 x 20 x 60 */
-#define W_OUT (W_LOW * 21)
-#define W_EMPTY (W_OUT * 21)
+ * takes the fewest players with a fit below 10 (Q131), then the fewest from outside the first group
+ * (Q142), then the highest score. So a player with a fit below 10 plays only when no free player, of any
+ * group, has 10 or more for that slot: else the swap would lower the count of such players. */
+#define W_OUT 1000000LL          /* more than 20 slots x 20 x 20 x 60 */
+#define W_LOW (W_OUT * 21)
+#define W_EMPTY (W_LOW * 21)
 #define COLUMNS (50 + SLOTS)     /* the candidates and one "empty" column per slot */
 
 static long long weight(const Candidate *c, int first, uint16_t mask)

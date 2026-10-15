@@ -12,14 +12,14 @@ candidates, the value of each candidate in each slot and the picks, then runs "P
 
 Checks for each pick:
     - the eleven and the subs have the best total of all assignments. The order of a total: fewest empty
-      slots, then fewest players from outside the pick's first group (kinds 2 and 3), then fewest players
-      with a fit below 10, then the highest score. This script finds the best total by its own method (a
+      slots, then fewest players with a fit below 10, then fewest players from outside the pick's first
+      group (kinds 2 and 3, Q142), then the highest score. This script finds the best total by its own method (a
       search over the slots taken), not the runtime's.
     - each fit and score equals this script's own sum from the dumped ratings and shown attributes. The
       score (Q138, Q139) is the average of the key shown attributes of the slot's position (KEYS) times
       fit / 20. The dump holds it as the sum of the key attributes x fit x 60 / their count, an integer;
       the table shows it divided by 1200.
-    - no player with a fit below 10 plays while a free player of the same group has 10 or more there
+    - no player with a fit below 10 plays while a free player, of any group, has 10 or more there (Q142)
     - no player is picked twice, and the subs come from the players left over
     - --expect DR=Warner: a slot of that label holds the player (full name or surname); --never: no such
       slot does. SAVE_CHECKS adds the checks of yeovil.sav and start.sav.
@@ -132,7 +132,7 @@ def key(cand, slot):
     v = cand["value"][slot]
     if v < 0:
         return None
-    return (0, -(1 - cand["first"]), -(cand["fit"][slot] < ABLE), v)
+    return (0, -(cand["fit"][slot] < ABLE), -(1 - cand["first"]), v)
 
 
 EMPTY = (-1, 0, 0, 0)
@@ -213,8 +213,7 @@ def check_pick(kind, pick, expect, never):
         if p < 0 or cands[p]["fit"][s] >= ABLE:
             continue
         for q, c in enumerate(cands):
-            if q not in in_eleven and c["first"] >= cands[p]["first"] and c["value"][s] >= 0 \
-                    and c["fit"][s] >= ABLE:
+            if q not in in_eleven and c["value"][s] >= 0 and c["fit"][s] >= ABLE:
                 problems.append(f"{cands[p]['name']} plays {label(masks[s])} at fit {cands[p]['fit'][s]} "
                                 f"while {c['name']} (fit {c['fit'][s]}) is free")
     if kind == 1:
