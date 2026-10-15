@@ -103,7 +103,7 @@ typedef struct {
     uint16_t masks[PICK_SLOTS];    /* the position mask of each slot */
     uint32_t staff[PICK_SLOTS];    /* 0 for an empty slot */
     int fit[PICK_SLOTS];           /* 1 to 20 */
-    int score[PICK_SLOTS];         /* current ability x fit (score x 20) */
+    int score[PICK_SLOTS];         /* key attribute average x fit / 20, times 1200 */
 } Pick;
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
 int picker_pick(uint32_t club, uint32_t team_index, int kind);

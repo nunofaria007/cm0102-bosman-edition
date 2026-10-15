@@ -13,17 +13,22 @@ candidates, the value of each candidate in each slot and the picks, then runs "P
 Checks for each pick:
     - the eleven and the subs have the best total of all assignments. The order of a total: fewest empty
       slots, then fewest players from outside the pick's first group (kinds 2 and 3), then fewest players
-      with a fit below 10, then the highest score (current ability x fit / 20). This script finds the best
-      total by its own method (a search over the slots taken), not the runtime's.
+      with a fit below 10, then the highest score. This script finds the best total by its own method (a
+      search over the slots taken), not the runtime's.
+    - each fit and score equals this script's own sum from the dumped ratings and shown attributes. The
+      score (Q138, Q139) is the average of the key shown attributes of the slot's position (KEYS) times
+      fit / 20. The dump holds it as the sum of the key attributes x fit x 60 / their count, an integer;
+      the table shows it divided by 1200.
     - no player with a fit below 10 plays while a free player of the same group has 10 or more there
     - no player is picked twice, and the subs come from the players left over
-    - --expect DR=Warner: a slot of that label holds the player (surname match); --never: no such slot does
---keep copies the dump to a file. It has one "cand" line per candidate: name, the position ratings, current
-ability, age, condition, first group, then the fit and the value of each slot.
+    - --expect DR=Warner: a slot of that label holds the player (full name or surname); --never: no such
+      slot does
+--keep copies the dump to a file. It has one "cand" line per candidate: name, the position ratings, the 31
+shown attributes, current ability, age, condition, first group, then the fit and the value of each slot.
 
 Examples (the Yeovil save is a copy of Max's game; never use his own save):
-    picker_check.py build/cm0102_recomp ../clean-3968 yeovil.sav --expect DR=Warner --expect DC=Sodje
-        --never DMC=O'Brien
+    picker_check.py build/cm0102_recomp ../clean-3968 yeovil.sav --expect "GK=Dean Williams" --expect AMC=Moukoko
+        --expect DR=Warner --expect DC=Sodje --never DMC=O'Brien
     picker_check.py build/cm0102_recomp ../clean-3968 start.sav
 """
 import os
@@ -37,6 +42,45 @@ import smoke_run  # noqa: E402
 
 ABLE = 10
 KINDS = {1: "best", 2: "most match-fit", 3: "under-21"}
+
+# The shown attributes in the order of the game's getter 0x5431e0 (1 to 31; names from 0x5428a0).
+ATTRS = ["Acceleration", "Aggression", "Agility", "Anticipation", "Balance", "Bravery", "Creativity",
+         "Crossing", "Decisions", "Determination", "Dribbling", "Finishing", "Flair", "Handling", "Heading",
+         "Influence", "Jumping", "Long Shots", "Marking", "Off The Ball", "Pace", "Passing", "Positioning",
+         "Reflexes", "Set Pieces", "Stamina", "Strength", "Tackling", "Teamwork", "Technique", "Work Rate"]
+# The key attributes of each position (spec 2026-10-15-features-0.4.0, Q138, Q139).
+KEYS = {
+    "GK": ["Handling", "Reflexes", "Agility", "Positioning", "Jumping"],
+    "DC": ["Tackling", "Marking", "Heading", "Positioning", "Strength", "Jumping"],
+    "DLR": ["Tackling", "Marking", "Pace", "Positioning", "Crossing"],
+    "DMC": ["Tackling", "Positioning", "Passing", "Teamwork", "Work Rate"],
+    "MC": ["Passing", "Decisions", "Teamwork", "Work Rate", "Technique"],
+    "MLR": ["Crossing", "Dribbling", "Pace", "Passing", "Technique"],
+    "AM": ["Passing", "Creativity", "Decisions", "Technique", "Flair"],
+    "FC": ["Finishing", "Off The Ball", "Pace", "Heading", "Dribbling"],
+}
+# Position bits of a slot mask and the index of their rating in the dumped ratings (player data +0x0f..).
+POSITIONS = [(0x1, 0), (0x2, 1), (0x4, 2), (0x8, 3), (0x10, 4), (0x20, 5), (0x40, 6)]
+
+
+def own_fit_value(cand, mask):
+    """Fit and value of a candidate in a slot, computed here from the dump's ratings and attributes."""
+    r = cand["ratings"]
+    best_bit, pos = 0, 0
+    for bit, i in POSITIONS:
+        if mask & bit and r[i] > pos:
+            best_bit, pos = bit, r[i]
+    side = 20
+    if not mask & 1:
+        side = r[9] if mask & 0x80 else r[8] if mask & 0x800 else r[10] if mask & 0x700 else 20
+    fit = min(pos, side)
+    if mask & 1 and r[0] < ABLE:
+        return fit, -1
+    wide = bool(mask & 0x880)
+    role = {0x1: "GK", 0x2: "DC", 0x4: "DLR" if wide else "DC", 0x8: "DMC", 0x10: "MLR" if wide else "MC",
+            0x20: "AM", 0x40: "FC"}.get(best_bit, "FC")
+    keys = KEYS[role]
+    return fit, sum(cand["attrs"][ATTRS.index(k)] for k in keys) * fit * 60 // len(keys)
 
 
 def label(mask):
@@ -57,11 +101,12 @@ def parse(path):
         if f[0] == "pick":
             cur = picks[int(f[1])] = {"masks": [int(m, 16) for m in f[2].split()], "cands": [], "team": []}
         elif f[0] == "cand":
-            # cand, index, name, ratings (player data +0x0f to +0x19, hex), ability, age, condition, first,
-            # fits..., values... (one per slot; -1: cannot)
+            # cand, index, name, ratings (player data +0x0f to +0x19, hex), the 31 shown attributes, ability,
+            # age, condition, first, fits..., values... (one per slot; -1: cannot)
             n = len(cur["masks"])
-            nums = [int(x) for x in f[4:]]
-            cur["cands"].append({"name": f[2], "ratings": f[3], "ability": nums[0], "age": nums[1], "condition": nums[2],
+            nums = [int(x) for x in f[5:]]
+            cur["cands"].append({"name": f[2], "ratings": [int(x, 16) for x in f[3].split()],
+                                 "attrs": [int(x) for x in f[4].split()], "ability": nums[0], "age": nums[1], "condition": nums[2],
                                  "first": nums[3], "fit": nums[4:4 + n], "value": nums[4 + n:4 + 2 * n]})
         elif f[0] == "team":
             cur["team"] = [int(x) for x in f[1].split()]
@@ -128,6 +173,14 @@ def check_pick(kind, pick, expect, never):
     masks, cands, team = pick["masks"], pick["cands"], pick["team"]
     eleven, subs = list(range(min(11, len(masks)))), list(range(11, len(masks)))
     problems = []
+    for c in cands:
+        for s, m in enumerate(masks):
+            own = own_fit_value(c, m)
+            if own != (c["fit"][s], c["value"][s]):
+                problems.append(f"{c['name']} in {label(m)}: fit and value {c['fit'][s]}, {c['value'][s]}, "
+                                f"expected {own[0]}, {own[1]}")
+    if problems:
+        return problems[:5]
     picked = [p for p in team if p >= 0]
     if len(picked) != len(set(picked)):
         problems.append("a player is picked twice")
@@ -156,7 +209,7 @@ def check_pick(kind, pick, expect, never):
         for rule, want_in in [(e, True) for e in expect] + [(n, False) for n in never]:
             slot_label, _, name = rule.partition("=")
             hit = any(team[s] >= 0 and label(masks[s]) == slot_label and
-                      cands[team[s]]["name"].split()[-1] == name for s in eleven)
+                      name in (cands[team[s]]["name"], cands[team[s]]["name"].split()[-1]) for s in eleven)
             if hit != want_in:
                 problems.append(f"{name} {'not ' if want_in else ''}at {slot_label}")
     return problems
@@ -165,7 +218,7 @@ def check_pick(kind, pick, expect, never):
 def show(kind, pick):
     masks, cands, team = pick["masks"], pick["cands"], pick["team"]
     print(f"\n{KINDS[kind]} ({len(cands)} candidates)")
-    print(f"  {'slot':5} {'player':26} {'fit':>3} {'CA':>4} {'score':>6}")
+    print(f"  {'slot':5} {'player':26} {'fit':>3} {'CA':>4} {'score':>6}")     # score: key average x fit / 20
     for s, p in enumerate(team):
         if s == 11:
             print("  subs")
@@ -173,7 +226,7 @@ def show(kind, pick):
             print(f"  {label(masks[s]):5} (empty)")
             continue
         c = cands[p]
-        print(f"  {label(masks[s]):5} {c['name'][:26]:26} {c['fit'][s]:>3} {c['ability']:>4} {c['value'][s] / 20:>6.1f}")
+        print(f"  {label(masks[s]):5} {c['name'][:26]:26} {c['fit'][s]:>3} {c['ability']:>4} {c['value'][s] / 1200:>6.1f}")
 
 
 def main(argv):

@@ -16,6 +16,7 @@ CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c")  
 # address: (bytes of the first eight, name)
 CALLBACKS = {
     0x45CBE0: ("5355568b74241085", "can the player play the fixture (squad screen test)"),
+    0x5431E0: ("8b44240481ec0002", "shown attribute of a player (staff, index 1 to 31)"),
     0x54C5B0: ("83ec10a06924ae00", "date plus days"),
     0x55F990: ("81ec00020000568b", "popup item create"),
     0x55FBA0: ("a10c29ae008b1510", "popup area create"),

@@ -8,10 +8,12 @@
  *
  * The slots are those of the player's active tactic (tactic +0x12d, a position mask per slot), so the
  * formation stays. A player's fit for a slot is the lower of his rating for the position and his
- * rating for the side, from the position ratings of the player data (1 to 20). A player's value in a
- * slot is his current ability (player data +0x05, 1 to 200) times that fit, divided by 20 (Max, Q98,
- * 2026-10-15): positional fit and skill together, so a natural player of low ability does not beat a
- * much better player who is able in the position. The eleven is the assignment of the highest total
+ * rating for the side, from the position ratings of the player data (1 to 20). A player's score in a
+ * slot is the average of the key shown attributes of the slot's position times that fit, divided by 20
+ * (Max, Q138, Q139, 2026-10-15). The shown attributes come from the game's getter 0x5431e0, as on the
+ * screen (1 to 20). Current ability is not used: on Max's Yeovil save it put Weale in goal over
+ * D. Williams (Agility 20), because fixed attributes such as Agility, Jumping and Technique do not feed
+ * current ability. The eleven is the assignment of the highest total
  * value over all slots, found exactly with the Hungarian method (Q130). A player with a fit below 10
  * plays only when no free player has 10 or more for the slot (Q131). The subs then come from the players
  * left over, by the same rule. picker_compute picks without writing (best XI uses it, Q132);
@@ -128,7 +130,28 @@ RT_WRAP(0062c680, daily_update)
     o_0062c680();
 }
 
-typedef struct { uint32_t staff, data; int condition, age, ability; } Candidate;
+#define ATTRIBUTES 31             /* the shown attributes, 1 to 31 in the getter 0x5431e0 (names: 0x5428a0) */
+enum { ACCELERATION = 1, AGGRESSION, AGILITY, ANTICIPATION, BALANCE, BRAVERY, CREATIVITY, CROSSING,
+       DECISIONS, DETERMINATION, DRIBBLING, FINISHING, FLAIR, HANDLING, HEADING, INFLUENCE, JUMPING,
+       LONG_SHOTS, MARKING, OFF_THE_BALL, PACE, PASSING, POSITIONING, REFLEXES, SET_PIECES, STAMINA,
+       STRENGTH, TACKLING, TEAMWORK, TECHNIQUE, WORK_RATE };
+
+/* The key attributes of each position (spec 2026-10-15-features-0.4.0, Q138, Q139), ended by 0. A
+ * sweeper uses the DC list, a slot without a side (a sub) the centre list, and AML, AMR and DM on a side
+ * the AMC and DMC lists. */
+enum { ROLE_GK, ROLE_DC, ROLE_DLR, ROLE_DMC, ROLE_MC, ROLE_MLR, ROLE_AM, ROLE_FC };
+static const uint8_t keys[][7] = {
+    [ROLE_GK] = {HANDLING, REFLEXES, AGILITY, POSITIONING, JUMPING},
+    [ROLE_DC] = {TACKLING, MARKING, HEADING, POSITIONING, STRENGTH, JUMPING},
+    [ROLE_DLR] = {TACKLING, MARKING, PACE, POSITIONING, CROSSING},
+    [ROLE_DMC] = {TACKLING, POSITIONING, PASSING, TEAMWORK, WORK_RATE},
+    [ROLE_MC] = {PASSING, DECISIONS, TEAMWORK, WORK_RATE, TECHNIQUE},
+    [ROLE_MLR] = {CROSSING, DRIBBLING, PACE, PASSING, TECHNIQUE},
+    [ROLE_AM] = {PASSING, CREATIVITY, DECISIONS, TECHNIQUE, FLAIR},
+    [ROLE_FC] = {FINISHING, OFF_THE_BALL, PACE, HEADING, DRIBBLING},
+};
+
+typedef struct { uint32_t staff, data; int condition, age, ability; uint8_t attr[ATTRIBUTES + 1]; } Candidate;
 
 /* By condition, then by staff address, so that the order (and a pick among equal values) is the same on
  * every system: qsort is not stable. */
@@ -139,14 +162,16 @@ static int by_condition(const void *a, const void *b)
     return x->staff < y->staff ? -1 : x->staff > y->staff;
 }
 
-/* The fit of a player for a slot mask, 1 to 20: the lower of the position and the side rating. */
-static int fit(const Candidate *c, uint16_t mask)
+/* The fit of a player for a slot mask, 1 to 20: the lower of the position and the side rating. When
+ * bit is not NULL it gets the position bit of the mask whose rating gives the fit (the first on a tie). */
+static int fit_bit(const Candidate *c, uint16_t mask, uint16_t *bit)
 {
     int pos = 0, side = 20;
+    if (bit) *bit = 0;
     for (unsigned i = 0; i < sizeof positions / sizeof *positions; i++)
         if (mask & positions[i].bit) {
             int r = rd8(g_mem, c->data + positions[i].at);
-            if (r > pos) pos = r;
+            if (r > pos) { pos = r; if (bit) *bit = positions[i].bit; }
         }
     if (!(mask & 1)) {
         if (mask & 0x80) side = rd8(g_mem, c->data + 0x18);
@@ -156,13 +181,23 @@ static int fit(const Candidate *c, uint16_t mask)
     return pos < side ? pos : side;
 }
 
-/* The value of a player in a slot: current ability times fit / 20, in twentieths so that no rounding
- * hides a difference. -1 when the player cannot take the slot: a goalkeeper slot needs a goalkeeper
- * rating of 10 or more. */
+static int fit(const Candidate *c, uint16_t mask) { return fit_bit(c, mask, NULL); }
+
+/* The value of a player in a slot: the sum of the key attributes of the position times fit times 60
+ * divided by their count (5 or 6), an exact integer. The score shown is value / 1200: the average of the
+ * key attributes times fit / 20. -1 when the player cannot take the slot: a goalkeeper slot needs a
+ * goalkeeper rating of 10 or more. */
 static int value(const Candidate *c, uint16_t mask)
 {
     if ((mask & 1) && rd8(g_mem, c->data + 0x0f) < ABLE) return -1;
-    return (c->ability > 0 ? c->ability : 1) * fit(c, mask);
+    uint16_t bit;
+    int f = fit_bit(c, mask, &bit), wide = (mask & 0x880) != 0;
+    int role = bit == 0x1 ? ROLE_GK : bit == 0x2 ? ROLE_DC : bit == 0x4 ? (wide ? ROLE_DLR : ROLE_DC)
+             : bit == 0x8 ? ROLE_DMC : bit == 0x10 ? (wide ? ROLE_MLR : ROLE_MC) : bit == 0x20 ? ROLE_AM
+             : ROLE_FC;
+    int sum = 0, n = 0;
+    for (const uint8_t *k = keys[role]; *k; k++, n++) sum += c->attr[*k];
+    return sum * f * 60 / n;
 }
 
 /* The order of a pick, as weights of one player in one slot: an empty slot is worst, then a player from
@@ -171,7 +206,7 @@ static int value(const Candidate *c, uint16_t mask)
  * takes the fewest players from outside the first group, then the fewest with a fit below 10 (Q131), then
  * the highest score. So a player with a fit below 10 plays only when no free player of his group has 10
  * or more for that slot: else the swap would lower the count of such players. */
-#define W_LOW 100000LL           /* more than 20 slots x 200 x 20 */
+#define W_LOW 1000000LL          /* more than 20 slots x 20 x 20 x 60 */
 #define W_OUT (W_LOW * 21)
 #define W_EMPTY (W_OUT * 21)
 #define COLUMNS (50 + SLOTS)     /* the candidates and one "empty" column per slot */
@@ -292,7 +327,11 @@ static int compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
         c[n].data = rd32(g_mem, staff + PLAYER_DATA);
         c[n].condition = (int16_t)call_this(0x62c590u, rd32(g_mem, FITNESS), 2, s2);
         c[n].age = (int16_t)rd16(g_mem, staff + AGE);
-        c[n].ability = (int16_t)rd16(g_mem, c[n].data + ABILITY);
+        c[n].ability = (int16_t)rd16(g_mem, c[n].data + ABILITY);    /* for the picker check only */
+        for (uint32_t k = 1; k <= ATTRIBUTES; k++) {    /* cdecl (staff, index): the shown value, 1 to 20 */
+            uint32_t a[2] = {staff, k};
+            c[n].attr[k] = (uint8_t)call_cdecl(0x5431e0u, 2, a);
+        }
         n++;
     }
     qsort(c, (size_t)n, sizeof *c, by_condition);
@@ -330,8 +369,9 @@ static int compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
             for (uint32_t k = 0; k < 11; k++)
                 snprintf(ratings + 3 * k, 4, "%02x ", rd8(g_mem, c[i].data + 0x0f + k));
             ratings[3 * 11 - 1] = 0;
-            fprintf(dump_to, "cand\t%d\t%s\t%s\t%d\t%d\t%d\t%d", i, name, ratings, c[i].ability, c[i].age,
-                    c[i].condition, first[i]);
+            fprintf(dump_to, "cand\t%d\t%s\t%s\t", i, name, ratings);
+            for (int k = 1; k <= ATTRIBUTES; k++) fprintf(dump_to, "%s%d", k > 1 ? " " : "", c[i].attr[k]);
+            fprintf(dump_to, "\t%d\t%d\t%d\t%d", c[i].ability, c[i].age, c[i].condition, first[i]);
             for (int s = 0; s < slots; s++) fprintf(dump_to, "\t%d", fit(&c[i], masks[s]));
             for (int s = 0; s < slots; s++) fprintf(dump_to, "\t%d", value(&c[i], masks[s]));
             fprintf(dump_to, "\n");
