@@ -17,6 +17,7 @@
  * that presses something on the screen of the game becomes a click of the left button there
  * (click_for_key), so the game's own input code runs, as for a click with the mouse. */
 #include "win.h"
+#include "host.h"
 #include "options.h"
 
 #include <SDL.h>
