@@ -91,6 +91,11 @@ int keys_left_bar_label(const char *prefix);   /* a left bar button with this te
 void keys_left_bar_labels(char *out, size_t size); /* the texts of the left bar buttons, for the log */
 extern uint32_t win_hwnd;
 
+/* Holiday until next match (holiday_next.c). */
+int holiday_widget_before(void);               /* at each widget create: 1 for the Go on Holiday item */
+void holiday_widget_after(void);               /* after that create: adds the new item */
+void holiday_next_turn(void);                  /* at each human turn, before the original */
+
 /* The wait step of the script (waits.c). */
 int waits_parse(const char *name, int *kind, uint32_t *value);   /* 0: no such state */
 int waits_reached(int kind, uint32_t value, uint32_t since);    /* since: waits_poll_count() at the start */

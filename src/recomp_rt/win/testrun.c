@@ -34,6 +34,7 @@ void o_005cde40(void);
 /* The human turn, cdecl (short *last date): 1 while the turn goes on. */
 RT_WRAP(005cde40, human_turn)
 {
+    holiday_next_turn();
     if (save_after == -2) {
         const char *v = getenv("RECOMP_SAVE_AFTER_DAYS");
         save_after = v && *v ? atoi(v) : -1;
