@@ -26,9 +26,14 @@ Read this first. Then read `GLOSSARY.md`, `docs/specs/2026-10-14-quality-of-life
 
 ## Plans after 0.2.0
 
-- **0.3.0** (milestone): #12 Assistant drop-down on the squad screen replacing Clear Squad (Pick best team, most match-fit, under-21, Clear squad; Q64 to Q67), #22 player comparison, squad depth, best XI.
-- **Maybe** (label `maybe`, no milestone): #24 team talks.
-- Decided against: a "more frequent" violent conduct option (Q61; research in `docs/research/2026-10-14-violent-conduct-inventory.md`).
+**v0.2.0 is released (2026-10-15)**, with the site, the forum post and a Reddit post. Max approved these for 0.3.0 (issues in the milestone):
+- #12 Assistant drop-down on the squad screen (Q64 to Q67), #22 player comparison, squad depth, best XI.
+- #26 Windows shortcut keys (bug: Ctrl+[ and F11), #27 save backups, #28 remember the window, #29 colours for condition and morale, #30 holiday until the next match, #31 faster match commentary, #32 larger text, #33 print to PDF, #34 save names with club and date, #35 Linux and Steam Deck.
+- #30 and #31 need a same-save check over a played match. Finish the test speed-ups first (branch `worktree-agent-a74c7c18d9652aee1`): the saved test games make that check possible.
+- Grilling, then the spec, before the build.
+
+**Maybe** (label `maybe`, no milestone): #24 team talks. Max likes the idea of notifications for something other than holiday results (not yet decided what).
+Decided against: a "more frequent" violent conduct option (Q61), a screenshot key, a warning before quit (the original has one), highlights of young players (needs hidden potential values).
 
 ## How to make a release
 
