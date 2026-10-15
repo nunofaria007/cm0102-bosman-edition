@@ -1,6 +1,9 @@
 /* The wait step of RECOMP_SCRIPT (user32.c): "wait <state> [timeout ms]" holds the later steps until the
  * game reaches a named state. The runtime reads the state from the memory of the game, not from the
- * picture. Only test runs with a script use this file. Play is unchanged without a script.
+ * picture. Only test runs with a script read the states. Two parts run in every game: waits_poll (at
+ * each input poll it counts the poll, notes the screen node and the date of the first news screen, and
+ * prints the screen log when RECOMP_SCREEN_LOG is set) and the wrap of the message box (it counts open
+ * boxes). Both only record. They do not change what the game does.
  *
  * A state of a screen counts only after an input poll 0x55f620 has run on that screen after the wait
  * started. The screen is then built and drawn and takes input (main loop 0x7fc7e0: build, draw, pump,
