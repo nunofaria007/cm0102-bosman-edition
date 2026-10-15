@@ -52,7 +52,7 @@ LOAD_STEPS = [
     "1000 click 277 242",                   # Load Game
     "4000 click 445 257",                   # the first save in the list
     "5000 click 705 573",                   # Ok
-    "wait popup",
+    "wait box",
     "1000 move 399 330 | 638 328",
     "2000 click 399 330 | 638 328",         # "CD Not Required": Ok (the box is not scaled in widescreen)
     "wait first-news",

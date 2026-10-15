@@ -21,6 +21,8 @@
  *               of the day of the first news screen that took input
  *   news        any news screen
  *   popup       a popup is open (input mode, the dword at the screen manager + 0, is 1; keys.c)
+ *   box         a message box of 0x5e8290 is open, for example "CD Not Required" after a new game or
+ *               a load. The box runs its own loop without the input poll, so this state needs no poll.
  *   typing      a text entry takes keys (keys.c)
  *   match       the match screen of the player's club, build MATCH_BUILD
  *   continue    Continue Game can take a click (keys.c)
@@ -44,16 +46,18 @@
 #define START_BUILD 0x81bab0u
 #define LEAGUES_BUILD 0x81d010u
 #define NEWS_BUILD 0x7881e0u
-#define MATCH_BUILD 0u
+#define MATCH_BUILD 0x718e90u   /* the match screen of the player's club, before and during the match */
 
-enum { W_SETUP, W_LEAGUES, W_LOADED, W_FIRST_NEWS, W_NEWS, W_POPUP, W_TYPING, W_MATCH, W_CONTINUE, W_DAY, W_SCREEN };
+enum { W_SETUP, W_LEAGUES, W_LOADED, W_FIRST_NEWS, W_NEWS, W_POPUP, W_TYPING, W_MATCH, W_CONTINUE, W_BOX, W_DAY,
+       W_SCREEN };
 
 static const char *const names[] = {"setup", "leagues", "loaded", "first-news", "news", "popup", "typing", "match",
-                                    "continue"};
+                                    "continue", "box"};
 
 static uint32_t polls;            /* input polls so far */
 static uint32_t polled_node;      /* the top node at the last input poll */
 static uint32_t first_news_date;  /* date and slice of the first news screen of this run, 0: none yet */
+static int in_box;                /* 1 while the message box 0x5e8290 runs */
 
 static uint32_t top_node(void) { return rd32(g_mem, TOP_NODE); }
 static uint32_t top_build(void) { uint32_t n = top_node(); return n ? rd32(g_mem, n) : 0; }
@@ -96,6 +100,7 @@ static int screen_up(uint32_t build)
 /* 1 when the state is reached. since: the poll count when the wait started. */
 int waits_reached(int kind, uint32_t value, uint32_t since)
 {
+    if (kind == W_BOX) return in_box;
     if (polls == since) return 0;                 /* no input poll since the wait started */
     uint32_t d = keys_display;
     int x, y;
@@ -123,10 +128,10 @@ void waits_describe(char *out, size_t size)
 {
     uint32_t d = keys_display, node = top_node();
     int x, y;
-    snprintf(out, size, "screen %#x, date %d/%d, made %u, popup %d, typing %d, continue %d, back %d",
+    snprintf(out, size, "screen %#x, date %d/%d, made %u, popup %d, box %d, typing %d, continue %d, back %d",
              node ? rd32(g_mem, node) : 0, (int16_t)rd16(g_mem, GAME_DATE), (int16_t)rd16(g_mem, GAME_DATE + 2),
-             rd32(g_mem, GAME_MADE), d ? (int)rd32(g_mem, d) : -1, keys_typing(), keys_continue_game(&x, &y),
-             keys_back(&x, &y));
+             rd32(g_mem, GAME_MADE), d ? (int)rd32(g_mem, d) : -1, in_box, keys_typing(),
+             keys_continue_game(&x, &y), keys_back(&x, &y));
 }
 
 /* At each input poll (user32.c), before the original runs. */
@@ -149,4 +154,14 @@ void waits_poll(void)
                 (int16_t)rd16(g_mem, GAME_DATE), (int16_t)rd16(g_mem, GAME_DATE + 2), now);
         snprintf(last, sizeof last, "%s", now);
     }
+}
+
+void o_005e8290(void);
+
+/* The message box of the game: its own loop draws it and waits for Ok. */
+RT_WRAP(005e8290, message_box)
+{
+    in_box++;
+    o_005e8290();
+    in_box--;
 }
