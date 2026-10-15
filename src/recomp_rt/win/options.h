@@ -25,11 +25,15 @@ typedef enum {
     OPT_REMEMBER_WINDOW,       /* switch, on */
     OPT_SAVE_BACKUPS,          /* switch, on */
     OPT_CONDITION_COLOURS,     /* switch, on */
+    OPT_DATABASE,              /* enum: 3.9.68 (default), 3.9.60, 3.9.65: the data set of a new game */
     OPT_COUNT
 } OptionId;
 
 /* Values of OPT_DISPLAY for options_enum. */
 enum { DISPLAY_WIDESCREEN = 0, DISPLAY_CLASSIC = 1 };
+
+/* Values of OPT_DATABASE for options_enum. */
+enum { DATABASE_3968 = 0, DATABASE_3960 = 1, DATABASE_3965 = 2 };
 
 /* Reads the settings file at path, or writes it when it is missing, and adds the lines that it lacks.
  * Call it once, at start. Before it, and when the file cannot be read, every getter gives the default. */
@@ -41,6 +45,10 @@ int options_bool(OptionId id);
 const char *options_string(OptionId id);
 /* The value of an enum option: the index in its list of values. */
 int options_enum(OptionId id);
+
+/* Sets an enum option to value and writes it to the settings file: the option's line gets the new
+ * value, and every other line stays as it is. Returns 0 when value does not fit the option. */
+int options_set_enum(OptionId id, const char *value);
 
 /* The name of an option in the file, for messages. */
 const char *options_name(OptionId id);

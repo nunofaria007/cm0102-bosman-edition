@@ -69,6 +69,8 @@ static void check_defaults(void)
     CHECK(options_bool(OPT_REMEMBER_WINDOW) == 1);
     CHECK(options_bool(OPT_SAVE_BACKUPS) == 1);
     CHECK(options_bool(OPT_CONDITION_COLOURS) == 1);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3968);
+    CHECK(!strcmp(options_string(OPT_DATABASE), "3.9.68"));
 }
 
 int main(void)
@@ -150,6 +152,37 @@ int main(void)
     CHECK(options_bool(OPT_FASTER_DAYS) == 0);
     CHECK(options_bool(OPT_CONDITION_COLOURS) == 0);
     CHECK(options_bool(OPT_MATCH_COLUMNS) == 1);
+
+    /* 6. The database option: its values, a bad value, and the Setup Game choice that writes the file. */
+    put("database = 3.9.60\n");
+    options_load(path);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3960);
+    put("database = 3.9.99\n");
+    options_load(path);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3968);
+    const char *before = "# my notes\nDatabase = 3.9.65\r\nsound = off\n";
+    put(before);
+    options_load(path);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3965);
+    CHECK(options_set_enum(OPT_DATABASE, "3.9.60") == 1);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3960);
+    t = get();
+    const char *after = "# my notes\ndatabase = 3.9.60\r\nsound = off\n";
+    CHECK(!strncmp(t, after, strlen(after)));
+    CHECK(count(t, "database = ") == 1);
+    options_load(path);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3960 && options_bool(OPT_SOUND) == 0);
+    CHECK(options_set_enum(OPT_DATABASE, "3.9.99") == 0);
+    CHECK(options_set_enum(OPT_SOUND, "off") == 0);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3960);
+    put("display = classic");
+    options_load(path);
+    host_unlink(path);                          /* a file without the line gets it at the end */
+    put("display = classic");
+    CHECK(options_set_enum(OPT_DATABASE, "3.9.65") == 1);
+    t = get();
+    const char *added = "display = classic\n# database = ";
+    CHECK(!strncmp(t, added, strlen(added)) && strstr(t, "\ndatabase = 3.9.65\n") != NULL);
 
     host_unlink(path);
     rmdir(dir);

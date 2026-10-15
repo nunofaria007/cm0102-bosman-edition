@@ -43,12 +43,15 @@ static const OptionDef defs[OPT_COUNT] = {
         "save_backups = on keeps the last three copies of each save in the folder backups next to the saves."},
     [OPT_CONDITION_COLOURS] = {"condition_colours", KIND_SWITCH, "on", NULL,
         "condition_colours = on colours condition percentages and morale words: red, amber or green."},
+    [OPT_DATABASE] = {"database", KIND_ENUM, "3.9.68", "3.9.68|3.9.60|3.9.65",
+        "database = the data set of a new game: 3.9.68 (2002/03), 3.9.60 (2001/02) or 3.9.65 (2001/02, December update)."},
 };
 
 #define TEXT_MAX 1100
 static char text_value[OPT_COUNT][TEXT_MAX];   /* the current text of each option */
 static int present[OPT_COUNT];                 /* the file has a line for the option */
 static int loaded;
+static char file_path[TEXT_MAX];               /* the settings file of options_load */
 
 static void lower(char *s)
 {
@@ -141,6 +144,7 @@ static void read_line(const char *path, char *line)
 void options_load(const char *path)
 {
     reset();
+    snprintf(file_path, sizeof file_path, "%s", path);
     int missing_file = 0, ends_with_newline = 1;
     FILE *f = host_fopen(path, "r");
     if (!f) {
@@ -207,6 +211,57 @@ int options_enum(OptionId id)
     if (!loaded) reset();
     if (id >= OPT_COUNT || defs[id].kind != KIND_ENUM) return 0;
     return parse_enum(defs[id].values, text_value[id]);
+}
+
+/* The option name of a line, in lower case, or "" for a comment or another line. */
+static void option_key(const char *line, char *key, size_t room)
+{
+    const char *p = line;
+    size_t n = 0;
+    while (isspace((unsigned char)*p)) p++;
+    while (isalnum((unsigned char)*p) || *p == '_') {
+        if (n < room - 1) key[n++] = (char)tolower((unsigned char)*p);
+        p++;
+    }
+    while (*p == ' ' || *p == '\t') p++;
+    key[*p == '=' ? n : 0] = 0;
+}
+
+int options_set_enum(OptionId id, const char *value)
+{
+    if (!loaded) reset();
+    if (id >= OPT_COUNT || defs[id].kind != KIND_ENUM || parse_enum(defs[id].values, value) < 0) return 0;
+    snprintf(text_value[id], TEXT_MAX, "%s", value);
+    if (!file_path[0]) return 1;
+    /* Read the whole file, then write it again with the new value on the option's lines. */
+    FILE *f = host_fopen(file_path, "r");
+    if (!f) return 1;
+    static char text[65536];
+    size_t n = fread(text, 1, sizeof text - 1, f);
+    int whole = feof(f);
+    fclose(f);
+    if (!whole) return 1;     /* a file this big is not ours to rewrite */
+    text[n] = 0;
+    f = host_fopen(file_path, "w");
+    if (!f) return 1;
+    int found = 0;
+    for (char *line = text; *line;) {
+        char *end = strchr(line, '\n');
+        size_t len = end ? (size_t)(end - line) + 1 : strlen(line);
+        char key[64];
+        option_key(line, key, sizeof key);
+        if (!strcmp(key, defs[id].name)) {
+            fprintf(f, "%s = %s%s", defs[id].name, value, end ? (len > 1 && end[-1] == '\r' ? "\r\n" : "\n") : "");
+            found = 1;
+        } else {
+            fwrite(line, 1, len, f);
+        }
+        line += len;
+    }
+    if (!found) fprintf(f, "%s# %s\n%s = %s\n", n && text[n - 1] != '\n' ? "\n" : "", defs[id].comment,
+                        defs[id].name, value);
+    fclose(f);
+    return 1;
 }
 
 const char *options_name(OptionId id)

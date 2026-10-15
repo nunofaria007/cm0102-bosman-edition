@@ -64,6 +64,8 @@ int win_fixed_clock(void);
 
 /* The settings file of the user folder: the display mode sets rt_screen_w and rt_screen_h (display.c). */
 void win_read_settings(void);
+/* The option database changed: the next file open finds the data set folder again (files.c). */
+void win_data_set_changed(void);
 
 /* Sound (dsound.c): 0 mutes every sound while the window lacks focus, 1 makes them heard again. */
 void win_sound_focus(int focused);

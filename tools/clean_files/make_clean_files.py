@@ -6,6 +6,7 @@ Usage:
     python3 tools/clean_files/make_clean_files.py --check OUT_DIR [--manifest FILE]
     python3 tools/clean_files/make_clean_files.py --data-3960 ISO DATA_DIR [--update-manifest]
     python3 tools/clean_files/make_clean_files.py --check DATA_DIR --manifest tools/clean_files/manifest-3960.tsv
+    python3 tools/clean_files/make_clean_files.py --data-3965 PATCH_3965_EXE DATA_DIR [--update-manifest]
 
 ISO is the free release (CM0102.iso). PATCH_EXE is the official patch (cm0102_3968.exe).
 OUT_DIR must not exist. The tool stops if a hash of an input is wrong.
@@ -20,6 +21,16 @@ free release (group "CM3 Data" of data1.cab) that the 3.9.68 patch replaces, tha
 of PATCH_FILES. DATA_DIR must not exist. The clean files and their manifest do not change. The
 folder holds no other file, because the game reads every other Data file from the clean files. Its
 manifest is tools/clean_files/manifest-3960.tsv. The runtime reads it with RECOMP_DATA_DIR=DATA_DIR.
+
+With --data-3965, the tool makes only the 3.9.65 data set (2001/02 data, December update): the same
+20 database files from the official 3.9.65 patch (cm0102v3965.exe, archived at
+web.archive.org/web/20030430004731id_/http://www3.sigames.com/download/official/CM%2001-02/cm0102v3965.exe).
+Its update.dat holds 47 sizes, then the files. Entries 14 to 33 are the database files in the order of
+DATA_SET_FILES. Entry 45 has a size but no bytes in update.dat. Its manifest is
+tools/clean_files/manifest-3965.tsv. docs/research/2026-10-15-data-set-inventory.md has the facts.
+
+A download holds each extra data set in the game folder as DATA_SET_FOLDERS names it. The option
+"database" in the settings file chooses the data set for a new game.
 
 Manifest format (tools/clean_files/manifest.tsv): lines starting with # are comments; each other
 line is "sha256<TAB>size<TAB>path", with the path relative to OUT_DIR and "/" between folders.
@@ -167,6 +178,15 @@ def apply_patch(work, out):
 # from the free release.
 DATA_SET_FILES = [name for folder, name in PATCH_FILES if folder == "Data" and name.endswith(".dat")]
 DEFAULT_MANIFEST_3960 = os.path.join(HERE, "manifest-3960.tsv")
+DEFAULT_MANIFEST_3965 = os.path.join(HERE, "manifest-3965.tsv")
+# The folder of each extra data set in the game folder of a download (src/recomp_rt/win/files.c).
+DATA_SET_FOLDERS = {"3.9.60": "Data-3.9.60", "3.9.65": "Data-3.9.65"}
+
+PATCH_3965_SIZE = 19395072
+PATCH_3965_SHA256 = "3e6c1a248eaf7602abfa2e397fb0571a00ec8ac27ca03d8b91db840c2fcfcbe4"
+UPDATE_3965_COUNT = 47
+UPDATE_3965_FIRST_DATA = 14
+UPDATE_3965_EMPTY = 45      # a size with no bytes in update.dat
 
 
 def make_data_3960(out, manifest):
@@ -190,9 +210,13 @@ def make_data_3960(out, manifest):
                 fail(f"group CM3 Data of data1.cab has no {name}")
             os.replace(found[name.lower()], os.path.join(stage, name))
         os.replace(stage, out)
+    title = "3.9.60 data set: the database files of CM0102.iso. Made by make_clean_files.py --data-3960."
+    return finish_data_set(out, manifest, title)
+
+
+def finish_data_set(out, manifest, title):
     rows = listing(out)
     own = out + ".manifest.tsv"
-    title = "3.9.60 data set: the database files of CM0102.iso. Made by make_clean_files.py --data-3960."
     write_manifest(rows, own, title)
     print(f"{len(rows)} files, {sum(r[1] for r in rows)} bytes in {out}; manifest of these files: {own}")
     if ARGS.update_manifest:
@@ -200,6 +224,27 @@ def make_data_3960(out, manifest):
         print(f"replaced the committed manifest {manifest}")
         return 0
     return check(out, manifest)
+
+
+def make_data_3965(patch, out, manifest):
+    """Extract the database files of the official 3.9.65 patch into the new folder out."""
+    parent = os.path.dirname(out)
+    os.makedirs(parent, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=parent, prefix=".data-3965-") as work:
+        run(["bsdtar", "-xf", os.path.abspath(patch), "update.dat"], work)
+        with open(os.path.join(work, "update.dat"), "rb") as f:
+            sizes = struct.unpack(f"<{UPDATE_3965_COUNT}I", f.read(UPDATE_3965_COUNT * 4))
+            if UPDATE_3965_COUNT * 4 + sum(sizes) - sizes[UPDATE_3965_EMPTY] != os.path.getsize(f.name):
+                fail("update.dat of the 3.9.65 patch does not have the expected format")
+            stage = os.path.join(work, "out")
+            os.mkdir(stage)
+            f.seek(UPDATE_3965_COUNT * 4 + sum(sizes[:UPDATE_3965_FIRST_DATA]))
+            for i, name in enumerate(DATA_SET_FILES):
+                with open(os.path.join(stage, name), "wb") as g:
+                    g.write(f.read(sizes[UPDATE_3965_FIRST_DATA + i]))
+        os.replace(stage, out)
+    title = "3.9.65 data set: the database files of cm0102v3965.exe. Made by make_clean_files.py --data-3965."
+    return finish_data_set(out, manifest, title)
 
 
 def exe_version(path):
@@ -256,6 +301,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", metavar="OUT_DIR")
     ap.add_argument("--data-3960", action="store_true", help="make only the 3.9.60 data set: ISO DATA_DIR")
+    ap.add_argument("--data-3965", action="store_true", help="make only the 3.9.65 data set: PATCH_3965_EXE DATA_DIR")
     ap.add_argument("--manifest", help="the committed manifest to compare with")
     ap.add_argument("--update-manifest", action="store_true", help="replace the committed manifest")
     ap.add_argument("iso", nargs="?")
@@ -275,6 +321,16 @@ def main():
             fail(f"{out} exists; give a new folder")
         check_input(ARGS.iso, ISO_SIZE, ISO_SHA256, "free release")
         return make_data_3960(out, ARGS.manifest or DEFAULT_MANIFEST_3960)
+    if ARGS.data_3965:
+        if not ARGS.iso or not ARGS.patch or ARGS.out:
+            ap.error("give PATCH_3965_EXE and DATA_DIR with --data-3965")
+        if not shutil.which("bsdtar"):
+            fail("bsdtar not found")
+        out = os.path.abspath(ARGS.patch)
+        if os.path.exists(out):
+            fail(f"{out} exists; give a new folder")
+        check_input(ARGS.iso, PATCH_3965_SIZE, PATCH_3965_SHA256, "3.9.65 patch")
+        return make_data_3965(ARGS.iso, out, ARGS.manifest or DEFAULT_MANIFEST_3965)
     ARGS.manifest = ARGS.manifest or DEFAULT_MANIFEST
     if not (ARGS.iso and ARGS.patch and ARGS.out):
         ap.error("give ISO, PATCH_EXE and OUT_DIR, or --check OUT_DIR")
