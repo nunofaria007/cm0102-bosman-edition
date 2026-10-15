@@ -22,6 +22,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import smoke_run  # noqa: E402
 
 LEFT_BAR = (0, 0, 90, 600)
+# Save Game suggests "Arsenal 2001-07-14" (#34, savename.c). Backspace deletes its 18 characters.
+CLEAR_NAME = [f"{98000 + 50 * i} key 8" for i in range(18)]
 # Steps of smoke_run.py up to the first news screen (95000 ms), without its dumps.
 NEW_GAME = [s for s in smoke_run.scaled_steps("classic", "") if int(s.split()[0]) < 95000 and " dump " not in s]
 
@@ -60,6 +62,7 @@ def main(argv):
         save_steps = NEW_GAME + [f"95000 dump {saved}",
                                  "95500 click 45 342",          # Game Options
                                  "97500 click 140 334",         # Save Game
+                                 *CLEAR_NAME,
                                  "99000 type Test1",
                                  "101000 click 705 572",        # Ok
                                  "108000 quit"]
@@ -87,7 +90,7 @@ def main(argv):
         open(bad, "w").close()                                          # a file: the folder cannot be created
         user3 = os.path.join(work, "user3")
         r = run(program, game, user3, os.path.join(bad, "Saves"), NEW_GAME + [
-            "95500 click 45 342", "97500 click 140 334", "99000 type Test2", "101000 click 705 572", "108000 quit"], home)
+            "95500 click 45 342", "97500 click 140 334", *CLEAR_NAME, "99000 type Test2", "101000 click 705 572", "108000 quit"], home)
         check("cannot create the folder" in r.stderr, "a save folder that cannot be created gives a message on stderr")
         check(sav_files(user3) == ["Test2.sav"], f"the save fell back to the user folder: {sav_files(user3)}")
     print("PASS" if not failed else "FAIL")
