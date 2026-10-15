@@ -171,6 +171,46 @@ static int copy_file(const char *from, const char *to)
     return ok;
 }
 
+/* Save backups (option save_backups). Before the game deletes a save or writes a new file over it, the old
+ * file goes to backups/<name>.1.sav in its folder. backups/<name>.2.sav and .3.sav are the older copies,
+ * and the copy older than .3 is deleted. The file temp_save_file.sav, which the game writes first and then
+ * renames, gets no backups. Only a file in backups/ is ever deleted here: when a step fails, a message goes
+ * to stderr and the game goes on as without the option. h is the host form of the file in the game folder,
+ * u its user form (the save folder or the user folder). copy = 1 copies the save and keeps it in place.
+ * The result is 1 when the backup is made. */
+#define SAVE_BACKUPS 3
+static int save_backup(const char *h, const char *u, int copy)
+{
+    size_t gl = strlen(win_game_dir);
+    if (!options_bool(OPT_SAVE_BACKUPS) || !in_game_dir(h, gl)) return 0;
+    const char *rel = h + gl;
+    if (rel[0] != '/' || strchr(rel + 1, '/') || !has_sav_ending(rel + 1)) return 0;
+    if (!strcasecmp(rel + 1, "temp_save_file.sav") || !exists(u) || is_dir(u)) return 0;
+    const char *slash = strrchr(u, '/');
+    char dir[2048], stem[512], from[2048], to[2048];
+    snprintf(dir, sizeof dir, "%.*s/backups", (int)(slash - u), u);
+    snprintf(stem, sizeof stem, "%.*s", (int)strlen(slash + 1) - 4, slash + 1);
+    if (!is_dir(dir)) host_mkdir(dir);
+    if (!is_dir(dir)) {
+        fprintf(stderr, "cm0102_recomp: option save_backups: cannot create the folder %s.\n", dir);
+        return 0;
+    }
+    snprintf(to, sizeof to, "%s/%s.%d.sav", dir, stem, SAVE_BACKUPS);
+    if (exists(to) && host_unlink(to)) goto fail;
+    for (int i = SAVE_BACKUPS - 1; i >= 1; i--) {
+        snprintf(from, sizeof from, "%s/%s.%d.sav", dir, stem, i);
+        snprintf(to, sizeof to, "%s/%s.%d.sav", dir, stem, i + 1);
+        if (exists(from) && host_rename(from, to)) goto fail;
+    }
+    snprintf(to, sizeof to, "%s/%s.1.sav", dir, stem);
+    if (copy ? copy_file(u, to) : host_rename(u, to)) goto fail;
+    WIN_TRACE("save backup %s -> %s\n", u, to);
+    return 1;
+fail:
+    fprintf(stderr, "cm0102_recomp: option save_backups: cannot make a backup of %s (%s).\n", u, strerror(errno));
+    return 0;
+}
+
 void win_error_from_errno(void)
 {
     switch (errno) {
@@ -381,6 +421,7 @@ RT_IMPORT(CreateFileA)
         }
         if (!in_u && in_h && (disposition == 2 || disposition == 5)) make_parents(u);
         if (disposition == 5 && !in_u) flags |= O_CREAT;
+        if (in_u && (disposition == 2 || disposition == 5)) save_backup(h, u, 1);
     }
     int fd = host_open(target, flags, 0644);
     WIN_TRACE("CreateFileA(%s -> %s, %#x, %u) = %d\n", name, target, access, disposition, fd);
@@ -515,7 +556,8 @@ RT_IMPORT(DeleteFileA)
     char h[2048], u[2048];
     int ok = 0;
     if (win_paths(name, h, u, sizeof h)) {
-        if (exists(u)) ok = host_unlink(u) == 0;
+        if (save_backup(h, u, 0)) ok = 1;       /* the save moved to backups/ */
+        else if (exists(u)) ok = host_unlink(u) == 0;
         else if (exists(h)) { errno = EACCES; }
         else errno = ENOENT;
     }

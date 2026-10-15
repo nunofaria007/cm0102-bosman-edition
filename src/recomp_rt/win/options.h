@@ -23,6 +23,7 @@ typedef enum {
     OPT_FASTER_DAYS,           /* switch, on */
     OPT_MATCH_COLUMNS,         /* switch, on */
     OPT_REMEMBER_WINDOW,       /* switch, on */
+    OPT_SAVE_BACKUPS,          /* switch, on */
     OPT_COUNT
 } OptionId;
 

@@ -39,6 +39,8 @@ static const OptionDef defs[OPT_COUNT] = {
         "match_columns = on shows position, condition and match rating together on the match screens (widescreen only)."},
     [OPT_REMEMBER_WINDOW] = {"remember_window", KIND_SWITCH, "on", NULL,
         "remember_window = on opens the window with the size, place and full screen state that it had at the last quit."},
+    [OPT_SAVE_BACKUPS] = {"save_backups", KIND_SWITCH, "on", NULL,
+        "save_backups = on keeps the last three copies of each save in the folder backups next to the saves."},
 };
 
 #define TEXT_MAX 1100

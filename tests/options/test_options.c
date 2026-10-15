@@ -67,6 +67,7 @@ static void check_defaults(void)
     CHECK(options_bool(OPT_FASTER_DAYS) == 1);
     CHECK(options_bool(OPT_MATCH_COLUMNS) == 1);
     CHECK(options_bool(OPT_REMEMBER_WINDOW) == 1);
+    CHECK(options_bool(OPT_SAVE_BACKUPS) == 1);
 }
 
 int main(void)
@@ -85,6 +86,7 @@ int main(void)
     CHECK(strstr(get(), "\nfaster_days = on\n") != NULL);
     CHECK(strstr(get(), "\ndisplay = widescreen\n") != NULL);
     CHECK(strstr(get(), "\nsave_folder = \n") != NULL);
+    CHECK(strstr(get(), "\nsave_backups = on\n") != NULL);
     static char first[16384];
     snprintf(first, sizeof first, "%s", get());
     options_load(path);                         /* a second start changes nothing */
