@@ -213,7 +213,7 @@ MATCH_STEPS = [
     "1000 click 705 573",                   # Proceed to the match? Yes
     "wait match",
     "1000 click 45 254",                    # Commentary Speed
-    "2500 click 120 255 | 192 344",         # Very Fast (widescreen; the classic position is not checked)
+    "2500 click 120 255 | 192 344 | 260 451",  # Very Fast (widescreen and HD; the classic position is not checked)
     "4000 click 45 120",                    # Kick Off Match
     "wait label:Re-start 600000",           # half time
     "1000 click 45 120",                    # Re-start Match
@@ -338,7 +338,8 @@ def same_save(program, game, mode, days):
 
 
 # --speed fastest: the Fastest item (#31, commentary.c), one row above Very Fast.
-SPEED_CLICKS = {"very-fast": "2500 click 120 255 | 192 344", "fastest": "2500 click 120 242 | 192 323"}
+SPEED_CLICKS = {"very-fast": "2500 click 120 255 | 192 344 | 260 451",
+                "fastest": "2500 click 120 242 | 192 323 | 260 430"}
 
 
 def match(program, game, days, speed="very-fast"):
