@@ -1,0 +1,23 @@
+name: Ask for a feature
+description: An idea for the Bosman Edition.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Features must not change match results or the game's decisions, and each one gets a setting to switch it off.
+  - type: textarea
+    id: idea
+    attributes:
+      label: The feature
+      description: What it does, and on which screen.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why you want it
+  - type: input
+    id: credit
+    attributes:
+      label: Name for the credits
+      description: Optional. The release notes credit the player who asked, for example a Reddit name.

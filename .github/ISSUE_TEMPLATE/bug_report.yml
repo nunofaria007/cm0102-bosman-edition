@@ -1,0 +1,44 @@
+name: Report a problem
+description: Something in the game does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report. The more exact the steps, the faster the fix.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Computer
+      options: [Mac (Apple silicon), Mac (Intel), Windows, Linux, Steam Deck]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version of the game
+      description: The version you downloaded, for example 0.3.1. It is in the name of the file you downloaded.
+    validations:
+      required: true
+  - type: dropdown
+    id: display
+    attributes:
+      label: Display setting
+      options: [widescreen (default), classic, hd (0.4.0 and later), not sure]
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: The screens and buttons you clicked, in order, before the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshot or save
+      description: A screenshot helps. If the problem is in a saved game, say so and we will ask for it.
