@@ -175,6 +175,27 @@ int main(void)
     CHECK(options_set_enum(OPT_DATABASE, "3.9.99") == 0);
     CHECK(options_set_enum(OPT_SOUND, "off") == 0);
     CHECK(options_enum(OPT_DATABASE) == DATABASE_3960);
+    /* A custom data set is "folder:<name>" (Q143). The name keeps its case, spaces and letters. */
+    put("database = folder:May 2026\n");
+    options_load(path);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_CUSTOM);
+    CHECK(!strcmp(options_string(OPT_DATABASE), "folder:May 2026"));
+    put("database = folder:Zo\xc3\xab Update\nsound = off\n");
+    options_load(path);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_CUSTOM && !strcmp(options_string(OPT_DATABASE), "folder:Zo\xc3\xab Update"));
+    put("database = folder:\n");
+    options_load(path);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_3968);
+    put("# x\ndatabase = 3.9.60\r\nsound = off\n");
+    options_load(path);
+    CHECK(options_set_enum(OPT_DATABASE, "folder:Upper Case") == 1);
+    CHECK(options_enum(OPT_DATABASE) == DATABASE_CUSTOM);
+    t = get();
+    CHECK(!strncmp(t, "# x\ndatabase = folder:Upper Case\r\nsound = off\n", 44));
+    options_load(path);
+    CHECK(!strcmp(options_string(OPT_DATABASE), "folder:Upper Case"));
+    CHECK(options_set_enum(OPT_DATABASE, "folder:") == 0);
+    CHECK(options_set_enum(OPT_DATABASE, "3.9.60") == 1 && options_enum(OPT_DATABASE) == DATABASE_3960);
     put("display = classic");
     options_load(path);
     host_unlink(path);                          /* a file without the line gets it at the end */

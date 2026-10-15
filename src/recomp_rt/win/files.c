@@ -24,6 +24,7 @@
 #include "win.h"
 #include "host.h"
 #include "options.h"
+#include "dbfolders.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -101,6 +102,13 @@ static const char *save_dir(void)
     }
     snprintf(dir, sizeof dir, "%s", path);
     return dir;
+}
+
+/* The folder that holds Databases (custom data sets, dbfolders.h): the save folder. */
+const char *win_databases_root(void)
+{
+    const char *sd = save_dir();
+    return sd ? sd : win_user_dir;
 }
 
 static int has_sav_ending(const char *name)
@@ -329,6 +337,7 @@ void win_windows_path(const char *host, char *out, size_t room)
  * - The option database chooses the folder: 3.9.68 is the clean files' own Data, 3.9.60 and 3.9.65 are
  *   the folders Data-3.9.60 and Data-3.9.65 of the game folder (tools/clean_files/make_clean_files.py,
  *   DATA_SET_FOLDERS). The Setup Game screen sets the option (database.c).
+ * - The value folder:<name> is a folder of Databases in the save folder (dbfolders.h).
  * - The test switch RECOMP_DATA_DIR names any folder, for example a 3.9.60 data set that
  *   make_clean_files.py --data-3960 made. It wins over the option.
  * A missing folder gets a message, and the game reads its own Data. */
@@ -351,6 +360,17 @@ static void data_dir_find(void)
     }
     int set = options_enum(OPT_DATABASE);
     if (set == DATABASE_3968) return;
+    if (set == DATABASE_CUSTOM) {
+        const char *folder = options_string(OPT_DATABASE) + 7;
+        char found_path[1100];
+        if (!dbfolders_path(win_databases_root(), folder, found_path, sizeof found_path) ||
+            !host_realpath(found_path, data_dir, sizeof data_dir)) {
+            fprintf(stderr, "cm0102_recomp: database = folder:%s: no usable folder in %s/Databases, "
+                            "so the game reads its own Data\n", folder, win_databases_root());
+            data_dir[0] = 0;
+        }
+        return;
+    }
     char name[64], found[256], path[2048];
     snprintf(name, sizeof name, "Data-%s", options_string(OPT_DATABASE));
     ci_lookup(win_game_dir, name, found, sizeof found);

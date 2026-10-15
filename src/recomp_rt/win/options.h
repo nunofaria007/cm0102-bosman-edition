@@ -25,7 +25,7 @@ typedef enum {
     OPT_REMEMBER_WINDOW,       /* switch, on */
     OPT_SAVE_BACKUPS,          /* switch, on */
     OPT_CONDITION_COLOURS,     /* switch, on */
-    OPT_DATABASE,              /* enum: 3.9.68 (default), 3.9.60, 3.9.65: the data set of a new game */
+    OPT_DATABASE,              /* enum: 3.9.68 (default), 3.9.60, 3.9.65, or folder:<name>: the data set of a new game */
     OPT_COUNT
 } OptionId;
 
@@ -33,7 +33,7 @@ typedef enum {
 enum { DISPLAY_WIDESCREEN = 0, DISPLAY_CLASSIC = 1 };
 
 /* Values of OPT_DATABASE for options_enum. */
-enum { DATABASE_3968 = 0, DATABASE_3960 = 1, DATABASE_3965 = 2 };
+enum { DATABASE_3968 = 0, DATABASE_3960 = 1, DATABASE_3965 = 2, DATABASE_CUSTOM = 3 };   /* custom: the value "folder:<name>", a folder in Databases */
 
 /* Reads the settings file at path, or writes it when it is missing, and adds the lines that it lacks.
  * Call it once, at start. Before it, and when the file cannot be read, every getter gives the default. */
