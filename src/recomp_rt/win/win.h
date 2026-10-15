@@ -91,6 +91,9 @@ int keys_left_bar_label(const char *prefix);   /* a left bar button with this te
 void keys_left_bar_labels(char *out, size_t size); /* the texts of the left bar buttons, for the log */
 extern uint32_t win_hwnd;
 
+/* Faster commentary (commentary.c): at each widget create, before the rect is scaled. */
+void commentary_widget_before(void);
+
 /* The wait step of the script (waits.c). */
 int waits_parse(const char *name, int *kind, uint32_t *value);   /* 0: no such state */
 int waits_reached(int kind, uint32_t value, uint32_t since);    /* since: waits_poll_count() at the start */
