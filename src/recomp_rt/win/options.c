@@ -4,6 +4,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef enum { KIND_SWITCH, KIND_TEXT, KIND_ENUM } Kind;
@@ -233,17 +234,37 @@ int options_set_enum(OptionId id, const char *value)
     if (id >= OPT_COUNT || defs[id].kind != KIND_ENUM || parse_enum(defs[id].values, value) < 0) return 0;
     snprintf(text_value[id], TEXT_MAX, "%s", value);
     if (!file_path[0]) return 1;
-    /* Read the whole file, then write it again with the new value on the option's lines. */
+    /* Read the whole file, write it again with the new value on the option's lines to a temporary file
+     * next to it, then move that over the file. A failed write leaves the player's file as it was. */
     FILE *f = host_fopen(file_path, "r");
     if (!f) return 1;
-    static char text[65536];
-    size_t n = fread(text, 1, sizeof text - 1, f);
-    int whole = feof(f);
+    size_t cap = 65536, n = 0;
+    char *text = malloc(cap + 1);
+    while (text) {
+        size_t got = fread(text + n, 1, cap - n, f);
+        n += got;
+        if (n < cap) break;
+        char *bigger = realloc(text, cap * 2 + 1);
+        if (!bigger) { free(text); text = NULL; break; }
+        text = bigger;
+        cap *= 2;
+    }
+    int read_ok = text && !ferror(f);
     fclose(f);
-    if (!whole) return 1;     /* a file this big is not ours to rewrite */
+    if (!read_ok) {
+        free(text);
+        fprintf(stderr, "cm0102_recomp: cannot read %s, so %s is not saved\n", file_path, defs[id].name);
+        return 1;
+    }
     text[n] = 0;
-    f = host_fopen(file_path, "w");
-    if (!f) return 1;
+    char tmp_path[sizeof file_path + 8];
+    snprintf(tmp_path, sizeof tmp_path, "%s.tmp", file_path);
+    f = host_fopen(tmp_path, "w");
+    if (!f) {
+        free(text);
+        fprintf(stderr, "cm0102_recomp: cannot write %s, so %s is not saved\n", tmp_path, defs[id].name);
+        return 1;
+    }
     int found = 0;
     for (char *line = text; *line;) {
         char *end = strchr(line, '\n');
@@ -260,7 +281,16 @@ int options_set_enum(OptionId id, const char *value)
     }
     if (!found) fprintf(f, "%s# %s\n%s = %s\n", n && text[n - 1] != '\n' ? "\n" : "", defs[id].comment,
                         defs[id].name, value);
-    fclose(f);
+    free(text);
+    int write_ok = !ferror(f);
+    if (fclose(f) != 0) write_ok = 0;
+    /* Windows does not rename over a file: remove the old one when the first try fails. */
+    if (write_ok && host_rename(tmp_path, file_path) != 0 && (host_unlink(file_path) != 0 || host_rename(tmp_path, file_path) != 0))
+        write_ok = 0;
+    if (!write_ok) {
+        host_unlink(tmp_path);
+        fprintf(stderr, "cm0102_recomp: cannot write %s, so %s is not saved\n", file_path, defs[id].name);
+    }
     return 1;
 }
 

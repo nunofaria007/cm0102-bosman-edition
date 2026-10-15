@@ -184,6 +184,29 @@ int main(void)
     const char *added = "display = classic\n# database = ";
     CHECK(!strncmp(t, added, strlen(added)) && strstr(t, "\ndatabase = 3.9.65\n") != NULL);
 
+    /* A file above 64 KB is rewritten whole, and no temporary file stays. */
+    size_t big_size = 200000;
+    char *big = malloc(big_size + 64);
+    memset(big, 'x', big_size);
+    big[0] = '#';
+    big[big_size - 1] = '\n';
+    strcpy(big + big_size, "database = 3.9.65\nsound = off\n");
+    put(big);
+    options_load(path);
+    CHECK(options_set_enum(OPT_DATABASE, "3.9.60") == 1);
+    FILE *bf = fopen(path, "rb");
+    char *bt = calloc(big_size + 4096, 1);
+    size_t bn = bf ? fread(bt, 1, big_size + 4095, bf) : 0;   /* options_load added the missing options to the end */
+    if (bf) fclose(bf);
+    CHECK(bn >= big_size + strlen("database = 3.9.60\nsound = off\n") && bt[0] == '#' && bt[big_size - 2] == 'x');
+    CHECK(strstr(bt, "\ndatabase = 3.9.60\nsound = off\n") != NULL && !strstr(bt, "3.9.65"));
+    free(bt);
+    char tmp[1100];
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    HostStat st;
+    CHECK(host_stat(tmp, &st) != 0);
+    free(big);
+
     host_unlink(path);
     rmdir(dir);
     if (failures) printf("options_test: %d failures\n", failures);
