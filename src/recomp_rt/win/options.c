@@ -37,6 +37,8 @@ static const OptionDef defs[OPT_COUNT] = {
         "faster_days = on makes days pass faster while you are on holiday."},
     [OPT_MATCH_COLUMNS] = {"match_columns", KIND_SWITCH, "on", NULL,
         "match_columns = on shows position, condition and match rating together on the match screens (widescreen only)."},
+    [OPT_CONDITION_COLOURS] = {"condition_colours", KIND_SWITCH, "on", NULL,
+        "condition_colours = on colours condition percentages and morale words: red, amber or green."},
 };
 
 #define TEXT_MAX 1100

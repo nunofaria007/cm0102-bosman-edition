@@ -142,7 +142,7 @@ SAME_SAVE_RUNS = [
     ("silent", {"faster_days": "off", "sound": "off"}),
     ("off", {"space_to_continue": "off", "shortcuts": "off", "sharp_picture": "off", "sound": "off",
              "clickable_names": "off", "attribute_colours": "off", "faster_days": "off",
-             "match_columns": "off"}),
+             "match_columns": "off", "condition_colours": "off"}),
 ]
 SAVE_NAME = "samesave.sav"
 INTRO_CLICK = "1000 click 400 300"

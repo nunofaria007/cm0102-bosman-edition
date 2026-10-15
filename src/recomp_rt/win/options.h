@@ -22,6 +22,7 @@ typedef enum {
     OPT_ATTRIBUTE_COLOURS,     /* switch, on */
     OPT_FASTER_DAYS,           /* switch, on */
     OPT_MATCH_COLUMNS,         /* switch, on */
+    OPT_CONDITION_COLOURS,     /* switch, on */
     OPT_COUNT
 } OptionId;
 

@@ -1,10 +1,19 @@
-/* Attribute colours (#19) and match columns (#23).
+/* Attribute colours (#19), match columns (#23) and condition and morale colours (#29).
  *
  * Attribute colours: the label create 0x804100 makes every attribute number. The runtime knows the two
  * call sites by their return address (tools/recomp/callsites.py): the value cells of the player profile
  * and the Attributes view of the squad list. For a text of 1 to 20 it changes the text colour argument to
  * the colour of the value band. All other labels, and every label with the option off, keep the colours
  * of the original.
+ *
+ * Condition and morale colours (#29): the runtime wraps the game's condition getters (0x62c590 outside a
+ * match, 0x8aafd0 in a match) and its morale word function 0x4cc2e0, and keeps the last value of each.
+ * When the next label is that condition as "N%" or that morale word, the label gets the colour of the
+ * band: condition below 75% red, 75 to 89% amber, 90% or more green. The morale words have the same
+ * three bands, two words each, in the game's order (0x4cc2e0, morale byte +0x45 of the player): Very Low
+ * (below 4) and Low (below 8) red, Ok (below 12) and Good (below 15) amber, Very Good (below 18) and Superb
+ * green. So every screen that draws these values with the game's own code gets the colours, with no list
+ * of call sites. Option condition_colours, separate from attribute_colours.
  *
  * Match columns, in widescreen mode only (the classic screen has no room; RECOMP_COLUMNS_CLASSIC=1 makes
  * a test run show them in classic mode too):
@@ -39,6 +48,12 @@ extern const uint32_t rt_site_ratings_area;
 #define COLOUR_MID 0xFD84u       /* 6 to 10: amber (255, 176, 32) */
 #define COLOUR_GOOD 0xA70Cu      /* 11 to 15: light green (160, 224, 96) */
 #define COLOUR_TOP 0x37E6u       /* 16 to 20: bright green (48, 255, 48) */
+
+/* The condition and morale bands use red, amber and bright green. */
+static uint32_t condition_colour(int percent)
+{
+    return percent < 75 ? COLOUR_LOW : percent < 90 ? COLOUR_MID : COLOUR_TOP;
+}
 
 #define SCREENS 0xb74450u        /* the screen stack, this of 0x804100, 0x801c70, 0x7ff010 */
 #define LABEL_CREATE 0x804100u   /* thiscall (area, column, row, style, colour, text_flags, font, text_colour,
@@ -305,6 +320,8 @@ static void ratings_refresh(void)
             int c = ratings_condition(team, row);
             char text[16] = "";
             if (c >= 0) snprintf(text, sizeof text, "%d%%", c);
+            if (c >= 0 && options_bool(OPT_CONDITION_COLOURS))
+                wr16(g_mem, WIDGETS + WIDGET_SIZE * (uint32_t)w + 0x78, (uint16_t)condition_colour(c));
             win_put_str(SCRATCH, text, SCRATCH_SIZE);
             uint32_t a[2] = {(uint32_t)w, SCRATCH};
             call_this(SET_TEXT, SCREENS, 2, a);
@@ -349,6 +366,56 @@ RT_WRAP(00723350, ratings_update)
     if (!rt_unwinding) ratings_refresh();
 }
 
+/* --- Condition and morale colours. --- */
+
+static struct {
+    int condition;           /* the last condition from a getter, or -1 */
+    uint32_t morale_colour;  /* the colour of the last morale word, or 0 */
+    char morale[32];         /* the last morale word */
+} last = {-1, 0, ""};
+
+void o_0062c590(void);
+void o_008aafd0(void);
+void o_004cc2e0(void);
+
+/* The condition of a player outside a match, thiscall (player, kind): kind 1 gives the percentage, as the
+ * profile and the squad list print it. */
+RT_WRAP(0062c590, condition_get)
+{
+    uint32_t kind = rt_arg(1);
+    o_0062c590();
+    if (!rt_unwinding && kind == 1) last.condition = (int16_t)cpu.eax;
+}
+
+/* The condition of a player in a match, thiscall on the tactics object (index, live): the percentage. */
+RT_WRAP(008aafd0, match_condition_get)
+{
+    o_008aafd0();
+    if (!rt_unwinding) last.condition = (int8_t)cpu.eax;
+}
+
+/* The morale word of a player, thiscall (player, text, size). */
+RT_WRAP(004cc2e0, morale_word)
+{
+    uint32_t player = rt_arg(0), text = rt_arg(1);
+    o_004cc2e0();
+    if (rt_unwinding || !player || !text) return;
+    uint32_t p = rd32(g_mem, player + 0x61);
+    int morale = p ? (int8_t)rd8(g_mem, p + 0x45) : 0;
+    last.morale_colour = morale < 8 ? COLOUR_LOW : morale < 15 ? COLOUR_MID : COLOUR_TOP;
+    snprintf(last.morale, sizeof last.morale, "%s", win_str(text));
+}
+
+/* The band colour for a label text that is the last condition or morale word, or 0. */
+static uint32_t condition_label_colour(const char *s)
+{
+    if (last.morale_colour && *s && !strcmp(s, last.morale)) return last.morale_colour;
+    if (last.condition < 0) return 0;
+    int v = 0, n = 0;
+    for (; *s >= '0' && *s <= '9' && n < 4; s++, n++) v = v * 10 + (*s - '0');
+    return n && !strcmp(s, "%") && v == last.condition ? condition_colour(v) : 0;
+}
+
 void o_00804100(void);
 
 /* The label create 0x804100. */
@@ -360,5 +427,12 @@ RT_WRAP(00804100, label_create)
         uint32_t colour = text ? attribute_colour(win_str(text)) : 0;
         if (colour) wr32(g_mem, cpu.esp + 4 + 4 * 7, colour);
     }
+    if ((last.condition >= 0 || last.morale_colour) && options_bool(OPT_CONDITION_COLOURS)) {
+        uint32_t text = rt_arg(8);
+        uint32_t colour = text ? condition_label_colour(win_str(text)) : 0;
+        if (colour) wr32(g_mem, cpu.esp + 4 + 4 * 7, colour);
+    }
+    last.condition = -1;   /* a value colours only the next label */
+    last.morale_colour = 0;
     o_00804100();
 }
