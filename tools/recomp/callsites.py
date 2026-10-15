@@ -4,7 +4,8 @@ Each entry names a call instruction and the function it calls. The translation c
 instruction at the address is that call, and the build stops if it is not. table.c gets a constant
 `rt_site_<name>` with the return address (the address of the call plus 5), for the runtime to compare
 with the return address on the stack. The evidence for each address is in
-docs/research/2026-10-14-columns-and-colours-inventory.md, and for setup_menu in
+docs/research/2026-10-14-columns-and-colours-inventory.md and
+docs/research/2026-10-15-squad-dropdown-inventory.md, and for setup_menu in
 docs/research/2026-10-13-screen-stack-inventory.md section 6a.
 """
 
@@ -22,6 +23,8 @@ CALL_SITES = {
     "ratings_area": (0x722FA3, 0x55FBA0),
     # Data set choice (#39): the menu builder call of the Setup Game build 0x81bab0, with 9 items.
     "setup_menu": (0x81BCC5, 0x5ED300),
+    # Assistant drop-down (#12): the Clear Squad button of the squad list 0x456900.
+    "squad_clear": (0x458AD0, 0x8040A0),
 }
 
 SITES = {addr: (name, target) for name, (addr, target) in CALL_SITES.items()}
