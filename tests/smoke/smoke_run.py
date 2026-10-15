@@ -48,34 +48,47 @@ import sys
 import tempfile
 import time
 
-# Positions for classic mode, 800x600. Times in ms from the window opening. The database load after
-# Select League(s) takes about 20 s, so the steps after it wait with a margin.
+# Positions for classic mode, 800x600. A "wait <state>" step holds the later steps until the game
+# reaches the state (src/recomp_rt/win/waits.c). The times count in ms from the window opening, and
+# after a wait from the moment the state was reached. A wait that does not end in 120 s ends the run
+# with code 3 and names the state the game was in.
 STEPS = [
     "1000 click 400 300",                   # the intro: a click ends the logos and their sounds (INTRO_CLICK)
     "8000 dump {d}/1-settings.bmp",
     "8200 click 522 272",                   # settings: Background Changes Off
     "8500 click 662 524",                   # settings: Ok
-    "11000 dump {d}/2-setup.bmp",
-    "11500 click 277 177",                  # Start New Game
-    "14000 dump {d}/3-leagues.bmp",
-    "14500 click 705 572",                  # Next (England is selected)
-    "34000 move 399 330 | 638 328",
-    "35000 click 399 330 | 638 328",        # "CD Not Required": Ok (the box is not scaled in widescreen)
-    "46000 type Test",
-    "48000 click 560 310",
-    "49000 type Smoke",
-    "52000 click 705 572",                  # Enter Name: Next
-    "56000 click 705 572",                  # Select Nationality: Next
-    "60000 click 155 163",                  # Select Team: Arsenal
-    "63000 click 722 14",                   # Take Control
-    "67000 click 705 572",                  # Please Confirm: Yes
-    "72000 click 705 572",                  # Manager Status: Finish
-    "95000 dump {d}/4-news.bmp",
-    "95500 click 45 165",                   # manager menu (the manager's name)
-    "97500 click 150 427 | 199 474",        # Go on Holiday (popup items keep their size in widescreen)
-    "100000 click 705 572",                 # Please Confirm: Yes
-    "130000 dump {d}/5-holiday.bmp",
-    "131000 quit",
+    "wait setup",
+    "2000 dump {d}/2-setup.bmp",
+    "2500 click 277 177",                   # Start New Game
+    "wait leagues",
+    "2000 dump {d}/3-leagues.bmp",
+    "2500 click 705 572",                   # Next (England is selected)
+    "wait loaded",
+    "wait popup",
+    "1000 move 399 330 | 638 328",
+    "2000 click 399 330 | 638 328",         # "CD Not Required": Ok (the box is not scaled in widescreen)
+    "wait typing",
+    "1000 type Test",
+    "3000 click 560 310",
+    "4000 type Smoke",
+    "7000 click 705 572",                   # Enter Name: Next
+    "wait screen:0x821900",
+    "1000 click 705 572",                   # Select Nationality: Next
+    "wait screen:0x822260",
+    "1000 click 155 163",                   # Select Team: Arsenal
+    "wait screen:0x454900",
+    "1000 click 722 14",                    # Take Control
+    "wait screen:0x822aa0",
+    "1000 click 705 572",                   # Please Confirm: Yes
+    "wait screen:0x81ff10",
+    "1000 click 705 572",                   # Manager Status: Finish
+    "wait first-news",
+    "2000 dump {d}/4-news.bmp",
+    "2500 click 45 165",                    # manager menu (the manager's name)
+    "4500 click 150 427 | 199 474",         # Go on Holiday (popup items keep their size in widescreen)
+    "7000 click 705 572",                   # Please Confirm: Yes
+    "37000 dump {d}/5-holiday.bmp",
+    "38000 quit",
 ]
 DATE_BOX = (0, 15, 90, 55)  # x0, y0, x1, y1 of the day and date in the left bar
 SCREENS = [("1-settings", 0.20), ("2-setup", 0.0), ("3-leagues", 0.0), ("4-news", 0.0), ("5-holiday", None)]
@@ -93,7 +106,7 @@ def scaled_steps(mode, shots, steps=STEPS):
         parts = step.format(d=shots).split()
         if wide and mode == "widescreen":
             parts[2:4] = wide.split()
-        elif parts[1] in ("click", "move", "down", "up", "rclick"):
+        elif parts[0] != "wait" and parts[1] in ("click", "move", "down", "up", "rclick"):
             parts[2] = str(int(parts[2]) * w // 800)
             parts[3] = str(int(parts[3]) * h // 600)
         out.append(" ".join(parts))
@@ -168,9 +181,12 @@ def save_parts(path):
 def same_save(program, game, mode, days):
     # No click ends the intro: with sound the intro takes about 19 s, without it 5.5 s, but both runs
     # load and free the same sounds. A click would skip the second sound in one run only, and the
-    # memory of the two games would differ. So every step waits 20 s longer.
+    # memory of the two games would differ. So the steps before the first wait come 20 s later.
+    # The steps before the first wait count from the window opening, so only they move.
     steps = [s for s in STEPS if "5-holiday" not in s and "quit" not in s and s != INTRO_CLICK]
-    steps = [f"{int(s.split(' ', 1)[0]) + INTRO_WAIT} {s.split(' ', 1)[1]}" for s in steps] + ["400000 quit"]
+    first_wait = next(i for i, s in enumerate(steps) if s.startswith("wait "))
+    steps = [f"{int(s.split(' ', 1)[0]) + INTRO_WAIT} {s.split(' ', 1)[1]}" for s in steps[:first_wait]] + \
+        steps[first_wait:] + ["400000 quit"]
     saves = {}
     with tempfile.TemporaryDirectory(prefix="cm0102-same-save-") as work:
         for name, options in SAME_SAVE_RUNS:
