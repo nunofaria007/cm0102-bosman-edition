@@ -18,8 +18,8 @@ typedef struct {
 } OptionDef;
 
 static const OptionDef defs[OPT_COUNT] = {
-    [OPT_DISPLAY] = {"display", KIND_ENUM, "widescreen", "widescreen|classic",
-        "display = widescreen draws the game at 1280x800. display = classic draws it at 800x600."},
+    [OPT_DISPLAY] = {"display", KIND_ENUM, "widescreen", "widescreen|classic|hd",
+        "display = widescreen draws the game at 1280x800. display = classic draws it at 800x600. display = hd draws it at 1920x1080."},
     [OPT_SPACE_TO_CONTINUE] = {"space_to_continue", KIND_SWITCH, "on", NULL,
         "space_to_continue = on lets the space bar press Continue Game."},
     [OPT_SHORTCUTS] = {"shortcuts", KIND_SWITCH, "on", NULL,
