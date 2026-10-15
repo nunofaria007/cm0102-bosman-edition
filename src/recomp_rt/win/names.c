@@ -181,6 +181,74 @@ static int line_row(uint32_t w, int x1, int x2, uint16_t colour)
     return low + 2 < y2 ? low + 2 : y2;
 }
 
+/* The x extent of a link over a name in running text. The news text can put more than one empty link on
+ * one name, for example one on the whole name and one on the surname. The extent joins every empty link
+ * on the same row with the same action and the same record, so that the whole name gets one line. */
+static void link_extent(int link, int *x1, int *x2)
+{
+    uint32_t w = widget(link);
+    *x1 = s32at(w + 0x10);
+    *x2 = s32at(w + 0x18);
+    int count = s16at(DISPLAY + 0x12e9a0);
+    for (int i = 0; i < count && i < MAX_WIDGETS; i++) {
+        uint32_t o = widget(i);
+        if (i == link || !(rd32(g_mem, o + 0xc) & 2) || g_mem[o + 0x80]) continue;
+        if (rd32(g_mem, o + 8) != rd32(g_mem, w + 8) || rd32(g_mem, o + 0x48) != rd32(g_mem, w + 0x48)) continue;
+        if (s16at(o + 0x7a) != s16at(w + 0x7a) || s32at(o + 0x14) != s32at(w + 0x14)) continue;
+        if (s32at(o + 0x18) < *x1 - 1 || s32at(o + 0x10) > *x2 + 1) continue;   /* not touching */
+        if (s32at(o + 0x10) < *x1) *x1 = s32at(o + 0x10);
+        if (s32at(o + 0x18) > *x2) *x2 = s32at(o + 0x18);
+    }
+}
+
+/* Moves x1 and x2 in to the first and last columns that hold a pixel of the text colour inside the
+ * widget, so that the line does not start under the space before a name. No change without such a pixel. */
+static void trim_to_text(uint32_t w, int *x1, int *x2, uint16_t colour)
+{
+    int y1 = s32at(w + 0x14), y2 = s32at(w + 0x1c), first = -1, last = -1;
+    uint32_t px = win_primary_pixels();
+    if (!px || *x1 < 0 || *x2 >= (int)rt_screen_w || y1 < 0 || y2 >= (int)rt_screen_h) return;
+    for (int x = *x1; x <= *x2; x++)
+        for (int y = y1; y <= y2; y++)
+            if (rd16(g_mem, px + 2 * ((uint32_t)y * rt_screen_w + (uint32_t)x)) == colour) {
+                if (first < 0) first = x;
+                last = x;
+                break;
+            }
+    if (first < 0) return;
+    /* A full stop or comma after the name: a last run of columns whose pixels all sit in the bottom
+     * third of the text. Letters reach higher, so they stay. */
+    int top = y2, bottom = y1;
+    for (int x = first; x <= last; x++)
+        for (int y = y1; y <= y2; y++)
+            if (rd16(g_mem, px + 2 * ((uint32_t)y * rt_screen_w + (uint32_t)x)) == colour) {
+                if (y < top) top = y;
+                if (y > bottom) bottom = y;
+            }
+    int low = bottom - (bottom - top) / 3, x = last, high = 0;
+    for (; x >= first; x--) {
+        int any = 0;
+        for (int y = y1; y <= y2; y++)
+            if (rd16(g_mem, px + 2 * ((uint32_t)y * rt_screen_w + (uint32_t)x)) == colour) {
+                any = 1;
+                if (y < low) high = 1;
+            }
+        if (!any) break;                           /* the gap before the last run */
+    }
+    if (!high && x > first) {                      /* drop the low run and the gap before it */
+        while (x > first) {
+            int any = 0;
+            for (int y = y1; y <= y2 && !any; y++)
+                any = rd16(g_mem, px + 2 * ((uint32_t)y * rt_screen_w + (uint32_t)x)) == colour;
+            if (any) break;
+            x--;
+        }
+        last = x;
+    }
+    *x1 = first;
+    *x2 = last;
+}
+
 /* Called after each input poll. Finds the name under the mouse and the line under it. A change marks the
  * frame for the next present. */
 void names_after_poll(void)
@@ -193,9 +261,9 @@ void names_after_poll(void)
         if (w && name_action(rd32(g_mem, w + 8)) && rd32(g_mem, w + 0x38) == 1 && rd32(g_mem, w + 0x48)) {
             const char *text = win_str(w + 0x80);
             if (!*text) {                                  /* a link over a name in running text */
-                x1 = s32at(w + 0x10);
-                x2 = s32at(w + 0x18);
+                link_extent(i, &x1, &x2);
                 colour = label_colour(i);
+                trim_to_text(w, &x1, &x2, colour);
                 on = 1;
             } else if (places[i].set && !strncmp(places[i].text, text, sizeof places[i].text - 1)) {
                 x1 = places[i].x1;                         /* a row: under the text only */
