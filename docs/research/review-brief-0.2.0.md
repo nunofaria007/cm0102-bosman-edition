@@ -4,7 +4,7 @@ Two Opus review agents read this brief. Each gets one angle. Both read the same 
 
 ## What to review
 
-- Worktree: `/Users/max/Downloads/Game/cm0102-mac/.claude/worktrees/agent-a069b80021b6499a7`, branch `worktree-agent-a069b80021b6499a7`.
+- Worktree: `/Users/max/Projects/cm0102/cm0102-mac/.claude/worktrees/agent-a069b80021b6499a7`, branch `worktree-agent-a069b80021b6499a7`.
 - The diff: `git diff v0.1.0..HEAD` in that worktree (38 files). Leave out `docs/` except where the code names a doc as its evidence.
 - Spec: `docs/specs/2026-10-14-quality-of-life-0.2.0-spec.md`. Terms: `GLOSSARY.md`. Repo rules: `CLAUDE.md`, `docs/HANDOVER.md` ("Rules").
 - Not in 0.2.0: the assistant A key and the test speed-ups (wait steps, `tests/fixtures/`). Do not report them missing.

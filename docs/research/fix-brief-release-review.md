@@ -11,7 +11,7 @@ Fix each item as decided here. Do not redesign. If a decision proves impossible,
    - Folder safety: if `$INSTDIR\game` exists and `$INSTDIR\${PROGRAM}` does not, stop with a message box that the folder already holds a folder called "game" and the player must choose another folder. Only remove `$INSTDIR\game` when it is ours.
    - Saves on uninstall: the uninstaller never deletes saves and never asks. It keeps `%APPDATA%\cm0102` and its last page says where the saves are.
    - Finish page "Start the game": start it through `explorer.exe` (`MUI_FINISHPAGE_RUN_FUNCTION` with `Exec '"$WINDIR\explorer.exe" "$INSTDIR\${PROGRAM}"'`) so the game runs as the logged-in user, not the elevated installer.
-   - Rebuild the installer and test install, upgrade over a custom folder and uninstall under CrossOver as the earlier slice did (scratch bottle, fan pack or `/Users/max/Downloads/Game/clean-3968` as game files).
+   - Rebuild the installer and test install, upgrade over a custom folder and uninstall under CrossOver as the earlier slice did (scratch bottle, fan pack or `/Users/max/Projects/cm0102/clean-3968` as game files).
 4. **Release script** (`tools/release/make_release.sh`):
    - Refuse to run when `git status --porcelain` shows anything, untracked files included.
    - Write `site-assets.zip` to a new temporary file and move it over the old one, so removed pictures do not stay. No `rm`.
@@ -21,6 +21,6 @@ Fix each item as decided here. Do not redesign. If a decision proves impossible,
 7. **check_package.py:102**: strip a leading `./` only, not every leading dot.
 8. **files.c:511**: shorten the long comment.
 
-Run `tests/recomp/test_load.py` if you touch the runtime, and `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Downloads/Game/clean-3968 /Users/max/Downloads/Game/smoke-ref --mode classic` once at the end.
+Run `tests/recomp/test_load.py` if you touch the runtime, and `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Projects/cm0102/clean-3968 /Users/max/Projects/cm0102/smoke-ref --mode classic` once at the end.
 
 Final reply: at most 300 words, the branch name, the files you touched, what passed, what did not.

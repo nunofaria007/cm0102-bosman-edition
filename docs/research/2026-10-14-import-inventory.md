@@ -1,7 +1,7 @@
 # Import inventory: what the original takes from Windows
 
 Date: 2026-10-14. Task: slice 2 of `docs/specs/2026-10-14-recompile-spec.md`.
-Source: `/Users/max/Downloads/Game/cm0102.exe` (SHA256 `0c78e7da…bff86`), read only.
+Source: `/Users/max/Projects/cm0102/clean-3968/cm0102.exe` (SHA256 `0c78e7da…bff86`), read only.
 
 Method:
 

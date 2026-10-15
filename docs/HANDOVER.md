@@ -2,15 +2,17 @@
 
 Read this first, then `GLOSSARY.md`. v0.2.0 is released. The next work is 0.3.0.
 
+The project lives in `/Users/max/Projects/cm0102` (moved from `~/Downloads/Game` on 2026-10-15): the repo `cm0102-mac/`, `clean-3968/`, `sdl2/`, `smoke-ref/`, `test-fixtures/`, `site-release-assets/`, `builds/` and `shots/`. Start sessions in `/Users/max/Projects/cm0102`. `~/Downloads/Game` now holds only the 2021 fan pack, which is never a build input. `build/` was configured fresh with `-DCM0102_EXE=/Users/max/Projects/cm0102/clean-3968/cm0102.exe -DRECOMP_PYTHON=/Users/max/.venvs/cm0102/bin/python`. `build-win/` is made again by the release script.
+
 ## Next session: 0.3.0 features
 
-1. **Test speed-ups first.** Branch `worktree-agent-a74c7c18d9652aee1` (commit 7d14701 lists what is left). Find the match screen build address for `MATCH_BUILD` in `waits.c` with `RECOMP_SCREEN_LOG=1`, run both smoke modes and `--same-save` with the wait steps, then check the load steps of `tests/fixtures/fixtures.py` and make `start.sav`. A pre-match save (Arsenal, the Basel friendly on 20.7.01 is next) is in `/Users/max/Downloads/Game/test-fixtures/prematch.sav`.
+1. **Test speed-ups first.** Branch `worktree-agent-a74c7c18d9652aee1` (commit 7d14701 lists what is left). Find the match screen build address for `MATCH_BUILD` in `waits.c` with `RECOMP_SCREEN_LOG=1`, run both smoke modes and `--same-save` with the wait steps, then check the load steps of `tests/fixtures/fixtures.py` and make `start.sav`. A pre-match save (Arsenal, the Basel friendly on 20.7.01 is next) is in `/Users/max/Projects/cm0102/test-fixtures/prematch.sav`.
 2. **Make the match same-save check work.** #30 and #31 need it. What failed on 2026-10-15:
    - The left-bar button at (72, 161) in widescreen is Pause or Resume during a match and Continue Game outside it, so a run of Continue clicks pauses the match.
    - The tactics screen pauses the match, and a click on Ok while paused does nothing.
    - After the match, Continue stops at the squad screen before the next friendly (Baden), so `RECOMP_SAVE_AFTER_DAYS` 7 or 8 never fired. The game date at that point is unknown. A wait step (`wait day:...`, `wait screen:...`) fixes this kind of guess.
 3. **Grilling, then one spec for the 0.3.0 features**, then the build in slices with parallel agents and one review per spec (`feedback-cm0102-speed` in memory). Issues: #12, #22, #26 to #35 in the 0.3.0 milestone. #26 is a small bug fix and can go first.
-4. Site pictures: add new ones to `/Users/max/Downloads/Game/site-release-assets/` (now with `s2@2x.png`, the coloured profile). The release script zips that folder.
+4. Site pictures: add new ones to `/Users/max/Projects/cm0102/site-release-assets/` (now with `s2@2x.png`, the coloured profile). The release script zips that folder.
 
 ## The product
 
@@ -45,18 +47,18 @@ Decided against: a "more frequent" violent conduct option (Q61), a screenshot ke
 ## How to make a release
 
 1. Bump `project(... VERSION x.y.z)` and add the `CHANGELOG.md` section. Commit.
-2. Dry run: `tools/release/make_release.sh --game /Users/max/Downloads/Game/clean-3968 --sdl2-mac /Users/max/Downloads/Game/sdl2 --sdl2-mingw /Users/max/Downloads/Game/sdl2/mingw-2.32.10 --site-assets /Users/max/Downloads/Game/site-release-assets`. Then the same with `--publish` after Max says yes.
+2. Dry run: `tools/release/make_release.sh --game /Users/max/Projects/cm0102/clean-3968 --sdl2-mac /Users/max/Projects/cm0102/sdl2 --sdl2-mingw /Users/max/Projects/cm0102/sdl2/mingw-2.32.10 --site-assets /Users/max/Projects/cm0102/site-release-assets`. Then the same with `--publish` after Max says yes.
 3. The site workflow runs on the release (the Pages environment allows `main` and tags `v*`). If not: `gh workflow run pages.yml --ref main`.
 
 ## Tests
 
-- `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Downloads/Game/clean-3968 /Users/max/Downloads/Game/smoke-ref --mode classic`, then `--mode widescreen`, then `--same-save` alone. Never run two test games in parallel.
+- `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Projects/cm0102/clean-3968 /Users/max/Projects/cm0102/smoke-ref --mode classic`, then `--mode widescreen`, then `--same-save` alone. Never run two test games in parallel.
 - `tests/recomp/test_load.py` (see its docstring), `ctest -R options` in `build/`, `tests/smoke/save_folder_run.py`.
 - While building, run only the touched test; the full set once per slice.
 
 ## Rules
 
-- Never commit the original's code or data, saves, screenshots or the logo. Downloads use the clean files only (`/Users/max/Downloads/Game/clean-3968`, made by `tools/clean_files/`); the fan pack in `/Users/max/Downloads/Game` is never a build input.
+- Never commit the original's code or data, saves, screenshots or the logo. Downloads use the clean files only (`/Users/max/Projects/cm0102/clean-3968`, made by `tools/clean_files/`); the fan pack in `/Users/max/Downloads/Game` is never a build input.
 - No feature may change match results or the game's decisions, except picking a team (Max: selection is selection).
 - Every option is a line in `settings.txt`. Feature issues labelled `enhancement` show on the site's "Coming next" list live, so their titles are written for players. Bugs use `bug` and never show.
 - Grilling before a new feature, then the spec. One shared brief for parallel agents; Opus for research, review and anything a player sees, Sonnet for routine builds.

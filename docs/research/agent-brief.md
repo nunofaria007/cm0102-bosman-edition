@@ -3,9 +3,9 @@
 ## The project
 A native macOS port of Championship Manager 01/02, rebuilt in C and SDL2 from the original Windows program. The port is not an emulation wrapper.
 
-- Repo: `/Users/max/Downloads/Game/cm0102-mac`
-- Original: `/Users/max/Downloads/Game/cm0102.exe` (x86 PE32, MSVC, thiscall, 9,384 procedures)
-- Game data of the original: `/Users/max/Downloads/Game/Data` and `/Users/max/Downloads/Game/Pictures`
+- Repo: `/Users/max/Projects/cm0102/cm0102-mac`
+- Original: `/Users/max/Projects/cm0102/clean-3968/cm0102.exe` (x86 PE32, MSVC, thiscall, 9,384 procedures)
+- Game data of the original: `/Users/max/Projects/cm0102/clean-3968/Data` and `/Users/max/Projects/cm0102/clean-3968/Pictures`
 - Never copy the original or its data into the repo.
 
 Read `GLOSSARY.md` and use its terms. Read the specs in `docs/specs/` for what the port has. `docs/research/2026-10-13-display-and-scrman-inventory.md` lists 82 functions of display.cpp and scrman.cpp with their signatures.

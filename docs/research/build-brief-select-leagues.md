@@ -15,7 +15,7 @@ Build the slice of `docs/specs/2026-10-14-select-leagues-spec.md` that your task
 - Port what "Select League(s)" reaches. Record what you leave out, with the address, in the Decisions of the spec.
 - Engine code from `si\code\` goes in `src/si/`, game code from `cm3\code\` in `src/cm3/`. Use the assert strings to tell which. Add every new file to both targets in `CMakeLists.txt`.
 - Match the code and comment style of `src/si/scrman.c` and `src/cm3/setup.c`: each ported function names its FUN_ address. Use the glossary terms.
-- Run the suites you touch while you build, and the full suite (`~/.venvs/cm0102/bin/python tests/diff/run.py /Users/max/Downloads/Game/cm0102.exe build/port_driver`) once at the end. Every line must start with "ok".
+- Run the suites you touch while you build, and the full suite (`~/.venvs/cm0102/bin/python tests/diff/run.py /Users/max/Projects/cm0102/clean-3968/cm0102.exe build/port_driver`) once at the end. Every line must start with "ok".
 - Commit in your worktree with messages in the style of `git log`, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Do not push.
 - Tick the checks of your slice in the spec when they pass.
 - Never copy the original's executable or data files into the repo. A small fixed table that the code needs may go into the source, as the glyph tables did.

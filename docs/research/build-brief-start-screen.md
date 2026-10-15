@@ -24,7 +24,7 @@ Build slices 2 and 3 of `docs/specs/2026-10-14-start-screen-spec.md`: the helper
 - Read the assembly before you trust a signature. Ghidra drops the thiscall ECX.
 - Port what the start screen and the confirm screen reach. Record what you leave out in the Decisions of the spec, with the address.
 - Match the code and comment style of `src/si/area.c` and `src/si/scrman.c`: each ported function names its FUN_ address. Use the glossary terms.
-- Run the suites you touch while you build, and the full suite (`~/.venvs/cm0102/bin/python tests/diff/run.py /Users/max/Downloads/Game/cm0102.exe build/port_driver`) once at the end. All lines must start with "ok".
+- Run the suites you touch while you build, and the full suite (`~/.venvs/cm0102/bin/python tests/diff/run.py /Users/max/Projects/cm0102/clean-3968/cm0102.exe build/port_driver`) once at the end. All lines must start with "ok".
 - Commit each slice in your worktree with a message in the style of `git log`, ending with the line `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Do not push. Do not touch `src/main.c`, `src/si/input.c` or `src/si/display.c`: another agent changes them.
 - Tick the slice checks in the spec when they pass.
 - Never copy the original or its data into the repo.

@@ -1,6 +1,6 @@
 # Fix brief, 0.2.0 review (2026-10-15)
 
-One Sonnet fixer works from this brief. Worktree: `/Users/max/Downloads/Game/cm0102-mac/.claude/worktrees/agent-a069b80021b6499a7`.
+One Sonnet fixer works from this brief. Worktree: `/Users/max/Projects/cm0102/cm0102-mac/.claude/worktrees/agent-a069b80021b6499a7`.
 
 ## Rules
 
