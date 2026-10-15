@@ -1,18 +1,26 @@
 # Handover, 2026-10-15
 
-Read this first, then `GLOSSARY.md`. v0.2.0 is released. The next work is 0.3.0.
+Read this first, then `GLOSSARY.md`. v0.3.0 is released (2026-10-15). The next work is 0.4.0.
 
-The project lives in `/Users/max/Projects/cm0102` (moved from `~/Downloads/Game` on 2026-10-15): the repo `cm0102-mac/`, `clean-3968/`, `sdl2/`, `smoke-ref/`, `test-fixtures/`, `site-release-assets/`, `builds/` and `shots/`. Start sessions in `/Users/max/Projects/cm0102`. `~/Downloads/Game` now holds only the 2021 fan pack, which is never a build input. `build/` was configured fresh with `-DCM0102_EXE=/Users/max/Projects/cm0102/clean-3968/cm0102.exe -DRECOMP_PYTHON=/Users/max/.venvs/cm0102/bin/python`. `build-win/` is made again by the release script.
+The project lives in `/Users/max/Projects/cm0102` (moved from `~/Downloads/Game` on 2026-10-15): the repo `cm0102-mac/`, `clean-3968/`, `data-3960/`, `data-3965/`, `sdl2/`, `smoke-ref/`, `test-fixtures/`, `site-release-assets/`, `builds/` and `shots/`. Start sessions in `/Users/max/Projects/cm0102`. `~/Downloads/Game` now holds only the 2021 fan pack, which is never a build input. `build/` was configured fresh with `-DCM0102_EXE=/Users/max/Projects/cm0102/clean-3968/cm0102.exe -DRECOMP_PYTHON=/Users/max/.venvs/cm0102/bin/python`. `build-win/` is made again by the release script.
 
-## Next session: build 0.3.0
+## Next session: 0.4.0
 
-The 0.3.0 grilling is done (Q68 to Q97) and the spec is `docs/specs/2026-10-15-features-0.3.0-spec.md`. Build it slice by slice: slice 1 (match same-save check, merge of the test-speed branch) and slice 10 (data set check) first, then the rest in parallel with one shared brief and one review for the spec.
+v0.3.0 is out as a pre-release with Mac, Windows and Linux downloads. The 0.3.0 issues and milestone are closed. Spec `docs/specs/2026-10-15-features-0.3.0-spec.md` (all slices built).
 
-- Test-speed branch `worktree-agent-a74c7c18d9652aee1` (commit 43d4dcb): wait steps work. New `box` state for the "CD Not Required" box. `MATCH_BUILD` is 0x718e90. `--same-save` runs its five games at the same time (81 s, PASS). Both smoke modes PASS. Not yet merged into main. `fixtures.py make` has not run yet.
-- From `prematch.sav` (Monday 16.7.01, not 20.7.01) the script to the match goes like this. Space steps through the news. The Henry bid blocks Continue: Space to show it, Respond (172, 230), Reject (502, 573), Yes (705, 573), then Space until "Proceed to the match?" (screen 0x7260f0), Yes (705, 573), then the match screen 0x718e90. Kick Off Match is the left-bar button at (45, 120) in classic mode. The match reached half time (1-2) after about 6 minutes at the default speed and waits there on Re-start Match, the same button.
-- Other screens: news 0x7881e0, bid negotiation 0x8e9760, reject confirm 0x8efda0, 0x717db0 (18.7.01), squad 0x454900.
-- The worktrees' `build/` folders were made in `~/Downloads/Game`. The test-speed one is rebuilt (old one in `build.stale`, safe to delete). The `agent-a8d8677cceced7e8f` one still needs a fresh configure.
-- Player requests and who asked: `docs/requests.md`. Credit them in the release post.
+1. **Grilling, then one spec for 0.4.0.** Issues in the milestone: #22 player comparison with the polygon analyser, squad depth and best XI (Max's mockup in this session: a 4-4-2 on a pitch and a depth table), #32 HD layout at 1920x1080 (`display = hd`), #33 print to PDF, #43 attribute groups (physical, technical, mental).
+2. **Manual checks Max has not done:** the Windows keys (Ctrl+[, F11) on a Windows PC, `remember_window` on two screens and in full screen, the AppImage on a Steam Deck. u/gundenaf says the Windows build runs on the Deck through Proton.
+3. **Open spec checks:** #30 "no match in 60 days" message has no test (no such club in the test saves), and the same-save comparison against a manual Return from holiday is not done.
+4. Player requests and credits: `docs/requests.md`. Credit each requester in the release post when their feature ships. Draft posts for 0.3.0: `/Users/max/Projects/cm0102/release-0.3.0-reddit-post.md`.
+
+Facts from 0.3.0:
+- Saved test games in `/Users/max/Projects/cm0102/test-fixtures`: `start.sav` (Arsenal 14.7.01, first friendly 18.7.01) and `prematch.sav` (16.7.01, Basel friendly 20.7.01; another game, other fixtures).
+- Wait steps in scripts (`src/recomp_rt/win/waits.c`), `--match` and `--match --speed fastest` in `tests/smoke/smoke_run.py`.
+- In the original the commentary speed already changes match results (background matches step while a line waits). So a speed is checked for repeatability, not against another speed (Q99).
+- Game addresses that the runtime calls go through `tools/recomp/callbacks.py` (checked bytes) or `tools/recomp/callsites.py`.
+- Docker for the Linux build: Colima with `--vm-type vz --vz-rosetta` (`colima start --arch aarch64 --cpu 6 --memory 8 --vm-type vz --vz-rosetta`).
+- Contract clauses in memory and how to edit a save through the game: `docs/research/2026-10-15-contract-clauses.md`. Max's Yeovil save had Moukoko's release clause removed on 2026-10-15 (backup in `/Users/max/Projects/cm0102/save-backups`).
+- The old preview server on port 8765 serves the old folder. Use the `site-8766` entry in `/Users/max/Projects/cm0102/.claude/launch.json`.
 
 ## The product
 
