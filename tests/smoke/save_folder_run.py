@@ -26,11 +26,14 @@ LEFT_BAR = (0, 0, 90, 600)
 # count from the moment the first news screen shows (the wait step).
 _steps = smoke_run.scaled_steps("classic", "")
 NEW_GAME = [s for s in _steps[:_steps.index("wait first-news") + 1] if " dump " not in s]
+# Save Game suggests "Arsenal 2001-07-14" (#34, savename.c). Backspace deletes its 18 characters.
+CLEAR_NAME = [f"{5000 + 50 * i} key 8" for i in range(18)]
 SAVE_AS = ["2500 click 45 342",                  # Game Options
            "4500 click 140 334",                 # Save Game
-           "6000 type {name}",
-           "8000 click 705 572",                 # Ok
-           "15000 quit"]
+           *CLEAR_NAME,
+           "6500 type {name}",
+           "8500 click 705 572",                 # Ok
+           "15500 quit"]
 
 
 def run(program, game, user, save_folder, steps, home):
