@@ -135,7 +135,7 @@ void win_save_window(void)
     note_windowed();
     char path[1100];
     window_file(path, sizeof path);
-    FILE *f = fopen(path, "w");
+    FILE *f = host_fopen(path, "w");
     if (!f) return;
     fprintf(f, "%d %d %d %d %d\n", win_x, win_y, win_w, win_h, full);
     fclose(f);
@@ -166,7 +166,7 @@ void win_video_init(void)
     if (options_bool(OPT_REMEMBER_WINDOW)) {
         char path[1100];
         window_file(path, sizeof path);
-        FILE *f = fopen(path, "r");
+        FILE *f = host_fopen(path, "r");
         int sx, sy, sw, sh, sf;
         int ok = f && fscanf(f, "%d %d %d %d %d", &sx, &sy, &sw, &sh, &sf) == 5;
         if (f) fclose(f);
