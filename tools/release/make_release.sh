@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds both downloads of one release, checks them and, with --publish, uploads a GitHub release.
+# Builds the three downloads (Mac, Windows, Linux) of one release, checks them and, with --publish, uploads a GitHub release.
 #
 # Usage:
 #   tools/release/make_release.sh --game <clean files> --sdl2-mac <folder> --sdl2-mingw <folder> --site-assets <folder> [--publish]
@@ -64,13 +64,20 @@ SETUP="$REPO/build-win/CM0102-Bosman-Edition-$VERSION-Setup.exe"
 python3 -I "$REPO/tools/windows/check_installer.py" "$REPO/build-win/cm0102_recomp.exe" "$SETUP" --version "$VERSION"
 cp "$SETUP" "$OUT/"
 
+echo "== Linux"
+# One x86-64 AppImage, built and checked in a linux/amd64 container (Docker, Colima or OrbStack).
+"$REPO/tools/linux/make_appimage.sh" --game "$GAME" --out "$REPO/build/linux"
+APPIMAGE="$REPO/build/linux/CM-01-02-Bosman-Edition-$VERSION-linux-x86_64.AppImage"
+[ -f "$APPIMAGE" ] || { echo "make_release.sh: the Linux build made no AppImage." >&2; exit 1; }
+cp "$APPIMAGE" "$OUT/"
+
 echo "== Site pictures"
 # Write to a new file and move it over the old one, so that a removed picture does not stay.
 SITE_TMP="$(mktemp "$OUT/site-assets.XXXXXX")"
 ( cd "$SITE" && zip -q -r -X - . -x '.*' ) > "$SITE_TMP"
 mv -f "$SITE_TMP" "$OUT/site-assets.zip"
 
-( cd "$OUT" && shasum -a 256 "$(basename "$DMG")" "$(basename "$SETUP")" site-assets.zip > SHA256SUMS )
+( cd "$OUT" && shasum -a 256 "$(basename "$DMG")" "$(basename "$SETUP")" "$(basename "$APPIMAGE")" site-assets.zip > SHA256SUMS )
 printf '%s\n' "$NOTES" > "$OUT/notes.md"
 echo "== Built in $OUT"
 ls -la "$OUT"
@@ -85,5 +92,5 @@ case "$VERSION" in 0.*) PRE=(--prerelease) ;; esac
 git -C "$REPO" tag -a "$TAG" -m "CM 01/02 Bosman Edition $VERSION"
 git -C "$REPO" push origin "$TAG"
 gh release create "$TAG" --repo "$GH_REPO" ${PRE[@]+"${PRE[@]}"} --title "CM 01/02 Bosman Edition $VERSION" \
-    --notes-file "$OUT/notes.md" "$OUT/$(basename "$DMG")" "$OUT/$(basename "$SETUP")" "$OUT/site-assets.zip" "$OUT/SHA256SUMS"
+    --notes-file "$OUT/notes.md" "$OUT/$(basename "$DMG")" "$OUT/$(basename "$SETUP")" "$OUT/$(basename "$APPIMAGE")" "$OUT/site-assets.zip" "$OUT/SHA256SUMS"
 echo "Published $TAG."

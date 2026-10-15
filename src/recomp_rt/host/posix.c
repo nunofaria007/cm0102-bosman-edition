@@ -1,12 +1,17 @@
-/* The host functions of host.h on macOS (POSIX). */
+/* The host functions of host.h on macOS and Linux (POSIX). */
 #include "../host.h"
 
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
+#ifdef __APPLE__
 #include <mach-o/dyld.h>
+#else
+#include <sys/resource.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -59,8 +64,14 @@ int host_realpath(const char *path, char *out, size_t room)
 int host_program_path(char *out, size_t room)
 {
     char exe[PATH_MAX];
+#ifdef __APPLE__
     uint32_t n = sizeof exe;
     if (_NSGetExecutablePath(exe, &n)) return 0;
+#else
+    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    if (n <= 0) return 0;
+    exe[n] = 0;
+#endif
     return host_realpath(exe, out, room);
 }
 
@@ -73,7 +84,13 @@ int host_user_dir(char *out, size_t room)
         fprintf(stderr, "cm0102_recomp: HOME is not set, so the user folder is unknown.\n");
         return 0;
     }
+#ifdef __APPLE__
     return (size_t)snprintf(out, room, "%s/Library/Application Support/cm0102", home) < room;
+#else
+    const char *xdg = getenv("XDG_DATA_HOME");
+    if (xdg && *xdg) return (size_t)snprintf(out, room, "%s/cm0102", xdg) < room;
+    return (size_t)snprintf(out, room, "%s/.local/share/cm0102", home) < room;
+#endif
 }
 
 int host_home_dir(char *out, size_t room)
@@ -107,3 +124,34 @@ FILE *host_fopen(const char *utf8_path, const char *mode)
 {
     return fopen(utf8_path, mode);
 }
+
+#ifdef __linux__
+/* The game makes a host call for every call of the original, so it needs a deep stack (the Mac build
+ * asks the linker for 256 MB). On Linux the stack limit is set before the program starts: raise it,
+ * then start the program again. RECOMP_STACK_SET stops a second start. */
+__attribute__((constructor)) static void raise_stack(void)
+{
+    const rlim_t want = 0x10000000;
+    struct rlimit r;
+    if (getenv("RECOMP_STACK_SET") || getrlimit(RLIMIT_STACK, &r)) return;
+    if (r.rlim_cur == RLIM_INFINITY || r.rlim_cur >= want) return;
+    if (r.rlim_max != RLIM_INFINITY && r.rlim_max < want) r.rlim_cur = r.rlim_max;
+    else r.rlim_cur = want;
+    if (setrlimit(RLIMIT_STACK, &r)) return;
+    setenv("RECOMP_STACK_SET", "1", 1);
+    extern char **environ;
+    /* Keep the arguments: read them from /proc/self/cmdline. */
+    static char buf[16384];
+    int fd = open("/proc/self/cmdline", O_RDONLY);
+    if (fd < 0) return;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return;
+    buf[n] = 0;
+    char *args[256];
+    int k = 0;
+    for (char *p = buf; p < buf + n && k < 255; p += strlen(p) + 1) args[k++] = p;
+    args[k] = NULL;
+    execve("/proc/self/exe", args, environ);
+}
+#endif
