@@ -30,6 +30,18 @@
 
 static int leap(int y) { return (y % 4 == 0 && y % 100 != 0) || y % 400 == 0; }
 
+/* The game date: day of the year from 0 and year at GAME_DATE, as year, month and day of the month
+ * from 1. */
+int win_game_date(int *year, int *month, int *day)
+{
+    int d = (int16_t)rd16(g_mem, GAME_DATE), y = (int16_t)rd16(g_mem, GAME_DATE + 2);
+    static const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int m = 0;
+    while (m < 11 && d >= days[m] + (m == 1 && leap(y))) d -= days[m] + (m == 1 && leap(y)), m++;
+    *year = y, *month = m + 1, *day = d + 1;
+    return 1;
+}
+
 /* The suggested name in out, or 0 when the player has no club. */
 static int suggest(char *out, size_t size)
 {
@@ -42,11 +54,9 @@ static int suggest(char *out, size_t size)
     if (!name[0]) cp1252_file_name(name, sizeof name, (const char *)(g_mem + club + 4), CLUB_MAX);
     if (!name[0]) return 0;
 
-    int day = (int16_t)rd16(g_mem, GAME_DATE), year = (int16_t)rd16(g_mem, GAME_DATE + 2);
-    static const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    int month = 0;
-    while (month < 11 && day >= days[month] + (month == 1 && leap(year))) day -= days[month] + (month == 1 && leap(year)), month++;
-    snprintf(out, size, "%s %04d-%02d-%02d", name, year, month + 1, day + 1);
+    int year, month, day;
+    win_game_date(&year, &month, &day);
+    snprintf(out, size, "%s %04d-%02d-%02d", name, year, month, day);
     return 1;
 }
 

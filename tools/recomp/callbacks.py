@@ -11,7 +11,7 @@ such check, so a wrong address would only fail at run time. This list closes the
 import os
 import re
 
-CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c")      # in src/recomp_rt/win
+CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c", "print_pdf.c")      # in src/recomp_rt/win
 
 # address: (bytes of the first eight, name)
 CALLBACKS = {
