@@ -215,7 +215,38 @@ static void trim_to_text(uint32_t w, int *x1, int *x2, uint16_t colour)
                 last = x;
                 break;
             }
-    if (first >= 0) { *x1 = first; *x2 = last; }
+    if (first < 0) return;
+    /* A full stop or comma after the name: a last run of columns whose pixels all sit in the bottom
+     * third of the text. Letters reach higher, so they stay. */
+    int top = y2, bottom = y1;
+    for (int x = first; x <= last; x++)
+        for (int y = y1; y <= y2; y++)
+            if (rd16(g_mem, px + 2 * ((uint32_t)y * rt_screen_w + (uint32_t)x)) == colour) {
+                if (y < top) top = y;
+                if (y > bottom) bottom = y;
+            }
+    int low = bottom - (bottom - top) / 3, x = last, high = 0;
+    for (; x >= first; x--) {
+        int any = 0;
+        for (int y = y1; y <= y2; y++)
+            if (rd16(g_mem, px + 2 * ((uint32_t)y * rt_screen_w + (uint32_t)x)) == colour) {
+                any = 1;
+                if (y < low) high = 1;
+            }
+        if (!any) break;                           /* the gap before the last run */
+    }
+    if (!high && x > first) {                      /* drop the low run and the gap before it */
+        while (x > first) {
+            int any = 0;
+            for (int y = y1; y <= y2 && !any; y++)
+                any = rd16(g_mem, px + 2 * ((uint32_t)y * rt_screen_w + (uint32_t)x)) == colour;
+            if (any) break;
+            x--;
+        }
+        last = x;
+    }
+    *x1 = first;
+    *x2 = last;
 }
 
 /* Called after each input poll. Finds the name under the mouse and the line under it. A change marks the
