@@ -5,7 +5,8 @@ instruction at the address is that call, and the build stops if it is not. table
 `rt_site_<name>` with the return address (the address of the call plus 5), for the runtime to compare
 with the return address on the stack. The evidence for each address is in
 docs/research/2026-10-14-columns-and-colours-inventory.md and
-docs/research/2026-10-15-squad-dropdown-inventory.md, and for setup_menu in
+docs/research/2026-10-15-squad-dropdown-inventory.md, docs/research/2026-10-15-commentary-speed-inventory.md,
+and for setup_menu in
 docs/research/2026-10-13-screen-stack-inventory.md section 6a.
 """
 
@@ -28,6 +29,10 @@ CALL_SITES = {
     # Holiday until next match (#30): the Go on Holiday item create of the left bar build 0x75db00
     # (docs/research/2026-10-15-holiday-next-match-inventory.md, 4a).
     "holiday_item": (0x75F1D4, 0x55F990),
+    # Faster commentary (#31): the Very Fast item create of the speed popup on the match screen 0x718e90,
+    # and the speed getter call whose result the build copies into the match (esi) at 0x719c4e.
+    "speed_very_fast": (0x719861, 0x55F990),
+    "speed_copy": (0x719C49, 0x5FCFF0),
 }
 
 SITES = {addr: (name, target) for name, (addr, target) in CALL_SITES.items()}

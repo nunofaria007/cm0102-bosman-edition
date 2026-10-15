@@ -95,6 +95,8 @@ extern uint32_t win_hwnd;
 int holiday_widget_before(void);               /* at each widget create: 1 for the Go on Holiday item */
 void holiday_widget_after(void);               /* after that create: adds the new item */
 void holiday_next_turn(void);                  /* at each human turn, before the original */
+/* Faster commentary (commentary.c): at each widget create, before the rect is scaled. */
+void commentary_widget_before(void);
 
 /* The wait step of the script (waits.c). */
 int waits_parse(const char *name, int *kind, uint32_t *value);   /* 0: no such state */

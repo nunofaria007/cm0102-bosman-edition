@@ -5,7 +5,7 @@ Usage:
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen]
         [--database 3.9.60|3.9.65|3.9.68] [--record] [--tolerance n]
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen] [--days n]
-    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --match [--days n]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --match [--days n] [--speed very-fast|fastest]
 
 --tolerance n: a colour channel that differs by n or less counts as equal. The Linux build differs from the
 Mac reference pictures by 1 in some channels (the compilers round floating point differently), so its
@@ -26,7 +26,7 @@ that must not change the game adds a run to SAME_SAVE_RUNS.
 Match check (--match): the same as the same-save check, but each run loads the saved test game
 prematch.sav (tests/fixtures/fixtures.py) and plays the friendly at Basel on Friday 20.7.01 to the end.
 The steps answer the Henry bid (Reject), go to the match, set the commentary speed to Very Fast and
-kick off. At half time they restart the match. After the match, Continue Game and one
+kick off (--speed fastest: the Fastest step of #31 instead). At half time they restart the match. After the match, Continue Game and one
 Space go on to Saturday 21.7.01 AM, where the runtime saves the game, 5 game days (default) after
 the load. Later days are not reached: the Bergkamp rumour of 21.7.01 needs an answer. The runs are
 in MATCH_RUNS and play at the same time, each in about two minutes. The mode is widescreen only,
@@ -209,7 +209,7 @@ MATCH_STEPS = [
     "1000 click 705 573",                   # Proceed to the match? Yes
     "wait match",
     "1000 click 45 254",                    # Commentary Speed
-    "2500 click 120 242 | 192 323",         # Very Fast (widescreen; the classic position is not checked)
+    "2500 click 120 255 | 192 344",         # Very Fast (widescreen; the classic position is not checked)
     "4000 click 45 120",                    # Kick Off Match
     "wait label:Re-start 600000",           # half time
     "1000 click 45 120",                    # Re-start Match
@@ -333,7 +333,11 @@ def same_save(program, game, mode, days):
     return compare_runs(program, game, mode, SAME_SAVE_RUNS, steps, days)
 
 
-def match(program, game, days):
+# --speed fastest: the Fastest item (#31, commentary.c), one row above Very Fast.
+SPEED_CLICKS = {"very-fast": "2500 click 120 255 | 192 344", "fastest": "2500 click 120 242 | 192 323"}
+
+
+def match(program, game, days, speed="very-fast"):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures"))
     import fixtures  # noqa: E402  (fixtures.py imports this file)
     save = os.path.join(fixtures.DEFAULT_DIR, MATCH_SAVE)
@@ -342,7 +346,8 @@ def match(program, game, days):
         return 1
     # No click ends the intro (without_intro_click): with the click, the runs on a busy machine played
     # different matches.
-    steps = without_intro_click(fixtures.LOAD_STEPS) + MATCH_STEPS
+    steps = without_intro_click(fixtures.LOAD_STEPS) + [
+        SPEED_CLICKS[speed] if s.startswith("2500 click 120 255") else s for s in MATCH_STEPS]
     return compare_runs(program, game, "widescreen", MATCH_RUNS, steps, days, save, timeout=900)
 
 
@@ -358,7 +363,11 @@ def main(argv):
         return 2
     if "--match" in argv[3:]:
         days = int(argv[argv.index("--days") + 1]) if "--days" in argv[3:] else MATCH_DAYS
-        return match(os.path.abspath(argv[1]), os.path.abspath(argv[2]), days)
+        speed = argv[argv.index("--speed") + 1] if "--speed" in argv[3:] else "very-fast"
+        if speed not in SPEED_CLICKS:
+            print(f"unknown speed {speed}: use very-fast or fastest")
+            return 2
+        return match(os.path.abspath(argv[1]), os.path.abspath(argv[2]), days, speed)
     if "--same-save" in argv[3:]:
         days = int(argv[argv.index("--days") + 1]) if "--days" in argv[3:] else 14
         return same_save(os.path.abspath(argv[1]), os.path.abspath(argv[2]), mode, days)

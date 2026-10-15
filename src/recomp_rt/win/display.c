@@ -110,6 +110,7 @@ RT_WRAP(0055f990, widget_create)
 {
     columns_widget_before();
     int holiday = holiday_widget_before();
+    commentary_widget_before();
     if (rt_screen_w != CLASSIC_W && from_comp_text()) {
         uint32_t a = cpu.esp + 8;
         wr32(g_mem, a + 4, scale(rd32(g_mem, a + 4), rt_screen_h, CLASSIC_H, 0));
