@@ -4,15 +4,15 @@ Read this first, then `GLOSSARY.md`. v0.2.0 is released. The next work is 0.3.0.
 
 The project lives in `/Users/max/Projects/cm0102` (moved from `~/Downloads/Game` on 2026-10-15): the repo `cm0102-mac/`, `clean-3968/`, `sdl2/`, `smoke-ref/`, `test-fixtures/`, `site-release-assets/`, `builds/` and `shots/`. Start sessions in `/Users/max/Projects/cm0102`. `~/Downloads/Game` now holds only the 2021 fan pack, which is never a build input. `build/` was configured fresh with `-DCM0102_EXE=/Users/max/Projects/cm0102/clean-3968/cm0102.exe -DRECOMP_PYTHON=/Users/max/.venvs/cm0102/bin/python`. `build-win/` is made again by the release script.
 
-## Next session: 0.3.0 features
+## Next session: build 0.3.0
 
-1. **Test speed-ups first.** Branch `worktree-agent-a74c7c18d9652aee1` (commit 7d14701 lists what is left). Find the match screen build address for `MATCH_BUILD` in `waits.c` with `RECOMP_SCREEN_LOG=1`, run both smoke modes and `--same-save` with the wait steps, then check the load steps of `tests/fixtures/fixtures.py` and make `start.sav`. A pre-match save (Arsenal, the Basel friendly on 20.7.01 is next) is in `/Users/max/Projects/cm0102/test-fixtures/prematch.sav`.
-2. **Make the match same-save check work.** #30 and #31 need it. What failed on 2026-10-15:
-   - The left-bar button at (72, 161) in widescreen is Pause or Resume during a match and Continue Game outside it, so a run of Continue clicks pauses the match.
-   - The tactics screen pauses the match, and a click on Ok while paused does nothing.
-   - After the match, Continue stops at the squad screen before the next friendly (Baden), so `RECOMP_SAVE_AFTER_DAYS` 7 or 8 never fired. The game date at that point is unknown. A wait step (`wait day:...`, `wait screen:...`) fixes this kind of guess.
-3. **Grilling, then one spec for the 0.3.0 features**, then the build in slices with parallel agents and one review per spec (`feedback-cm0102-speed` in memory). Issues: #12, #22, #26 to #35 in the 0.3.0 milestone. #26 is a small bug fix and can go first.
-4. Site pictures: add new ones to `/Users/max/Projects/cm0102/site-release-assets/` (now with `s2@2x.png`, the coloured profile). The release script zips that folder.
+The 0.3.0 grilling is done (Q68 to Q97) and the spec is `docs/specs/2026-10-15-features-0.3.0-spec.md`. Build it slice by slice: slice 1 (match same-save check, merge of the test-speed branch) and slice 10 (data set check) first, then the rest in parallel with one shared brief and one review for the spec.
+
+- Test-speed branch `worktree-agent-a74c7c18d9652aee1` (commit 43d4dcb): wait steps work. New `box` state for the "CD Not Required" box. `MATCH_BUILD` is 0x718e90. `--same-save` runs its five games at the same time (81 s, PASS). Both smoke modes PASS. Not yet merged into main. `fixtures.py make` has not run yet.
+- From `prematch.sav` (Monday 16.7.01, not 20.7.01) the script to the match is in the spec's slice 1 notes below. Space steps through the news. The Henry bid blocks Continue: Space to show it, Respond (172, 230), Reject (502, 573), Yes (705, 573), then Space until "Proceed to the match?" (screen 0x7260f0), Yes (705, 573), then the match screen 0x718e90. Kick Off Match is the left-bar button at (45, 120) in classic mode. The match reached half time (1-2) after about 6 minutes at the default speed and waits there on Re-start Match, the same button.
+- Other screens: news 0x7881e0, bid negotiation 0x8e9760, reject confirm 0x8efda0, 0x717db0 (18.7.01), squad 0x454900.
+- The worktrees' `build/` folders were made in `~/Downloads/Game`. The test-speed one is rebuilt (old one in `build.stale`, safe to delete). The `agent-a8d8677cceced7e8f` one still needs a fresh configure.
+- Player requests and who asked: `docs/requests.md`. Credit them in the release post.
 
 ## The product
 
@@ -52,7 +52,7 @@ Decided against: a "more frequent" violent conduct option (Q61), a screenshot ke
 
 ## Tests
 
-- `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Projects/cm0102/clean-3968 /Users/max/Projects/cm0102/smoke-ref --mode classic`, then `--mode widescreen`, then `--same-save` alone. Never run two test games in parallel.
+- `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Projects/cm0102/clean-3968 /Users/max/Projects/cm0102/smoke-ref --mode classic`, `--mode widescreen` and `--same-save`. Run test games in parallel (Max, 2026-10-15). If a parallel run fails on timing, rerun it alone first.
 - `tests/recomp/test_load.py` (see its docstring), `ctest -R options` in `build/`, `tests/smoke/save_folder_run.py`.
 - While building, run only the touched test; the full set once per slice.
 

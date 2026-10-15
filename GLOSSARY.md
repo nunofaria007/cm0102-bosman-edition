@@ -33,7 +33,7 @@ The 3.9.68 update from Sports Interactive, the last official update. It changes 
 _Avoid_: latest patch, update
 
 **Clean files**:
-The free release with the official patch applied, and nothing else. They are the only input to a release.
+The free release with the official patch applied, and nothing else. They are the only input to a release. The 3.9.60 data set comes from the same free release.
 _Avoid_: vanilla, original files
 
 **Fan pack**:
@@ -52,7 +52,11 @@ _Avoid_: package, installer, bundle
 
 **Widescreen mode**:
 The game drawn at 1280x800. It is the default.
-_Avoid_: HD mode, wide mode
+_Avoid_: wide mode
+
+**HD mode**:
+The game drawn at 1920x1080 for big screens, made the same way as widescreen mode. Planned for 0.4.0 (#32).
+_Avoid_: larger text, 4K mode
 
 **Classic mode**:
 The game drawn at 800x600, as the original draws it.
@@ -126,6 +130,10 @@ _Avoid_: competition list, division table
 A nation that the original finds by name after the load, such as England for the default league.
 _Avoid_: main nation
 
+**Data set**:
+The season's data that a new game loads: the 2001/02 data of the free release (3.9.60) or the 2002/03 data of the official patch (3.9.68, the default). The option `database` names it.
+_Avoid_: database version, data pack, DB
+
 **Progress bar**:
 The box that shows how far a long step has gone, such as "Loading database".
 _Avoid_: loading screen
@@ -141,8 +149,12 @@ One line of the settings file that switches a feature on or off or sets its valu
 _Avoid_: preference, flag, toggle
 
 **Assistant selection**:
-The option that lets the assistant manager pick the player's starting team and substitutes before each match, with the same judgement the game uses for computer-run clubs, keeping the player's tactic.
+The assistant manager picks the player's team, from the Assistant drop-down on the squad screen (0.3.0, #12): best team, most match-fit team or under-21 team.
 _Avoid_: auto pick, auto team, AI selection
+
+**Save backup**:
+An older copy of a save, kept in `backups/` in the save folder. The game keeps three for each save.
+_Avoid_: autosave, snapshot
 
 **Clickable name**:
 A person's or club's name drawn on a screen that opens their profile when the player clicks it. It shows an underline only while the mouse is over it.
