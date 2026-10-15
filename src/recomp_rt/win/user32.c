@@ -413,6 +413,8 @@ static void handle_event(SDL_Event *e)
     case SDL_WINDOWEVENT:
         if (e->window.event == SDL_WINDOWEVENT_EXPOSED) win_screen_dirty = 1;
         if (e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) update_scaling();
+        if (e->window.event == SDL_WINDOWEVENT_FOCUS_LOST) win_sound_focus(0);
+        if (e->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) win_sound_focus(1);
         break;
     }
 }

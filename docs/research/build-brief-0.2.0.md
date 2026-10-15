@@ -7,6 +7,7 @@ Spec: `docs/specs/2026-10-14-quality-of-life-0.2.0-spec.md`. Read it first, then
 - The original: `/Users/max/Downloads/Game/clean-3968/cm0102.exe` (3.9.68). Game files: `/Users/max/Downloads/Game/clean-3968`. Never use the fan pack in `/Users/max/Downloads/Game` for tests.
 - Build: `cmake --build build -j --target cm0102_recomp`. Runtime: `src/recomp_rt/`. Game code changes go through the recompiler's checked mechanisms (`RT_WRAP`, `tools/recomp/widescreen.py` style address lists): the build must stop if an address no longer matches.
 - Unattended runs: `SDL_VIDEODRIVER=dummy RECOMP_NO_BOX=1 RECOMP_USER_DIR=<new temp folder> RECOMP_SCRIPT=<steps>`; `tests/smoke/smoke_run.py` shows how to reach a new game. Never write to Max's save folder.
+- Test speed (Max, 2026-10-15): while you build, run only the test that your change touches, once. Run the full set (test_load.py, both smoke modes, --same-save) once, at the end of the slice. Run test games one at a time, never in parallel. When `tests/fixtures/` exists, start from its saved games instead of a new game.
 - Tests: `python3 tests/smoke/smoke_run.py build/cm0102_recomp /Users/max/Downloads/Game/clean-3968 /Users/max/Downloads/Game/smoke-ref --mode classic` and `--mode widescreen`; both must pass at the end of every slice.
 
 ## Rules

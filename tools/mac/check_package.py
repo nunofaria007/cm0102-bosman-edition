@@ -5,7 +5,8 @@ Usage:
                                           [--manifest <manifest file>]
 
 Checks:
-  1. The bundle has Info.plist, the program, Frameworks and Resources/game with cm0102.exe and Data.
+  1. The bundle has Info.plist, the program, Frameworks and Resources/game with cm0102.exe, Data and
+     Sounds (the game opens its sounds there, for example intro1.wav).
   2. Info.plist and the window title in the program hold the version. Without --version the check
      reads it from project() in CMakeLists.txt.
   3. The program and every library hold exactly the expected architectures (default arm64 and x86_64).
@@ -179,6 +180,9 @@ def check_app(app, version, want_archs, manifest):
     game = os.path.join(contents, "Resources", "game")
     check(os.path.isfile(os.path.join(game, "cm0102.exe")) and os.path.isdir(os.path.join(game, "Data")),
           "Resources/game holds cm0102.exe and Data", "Resources/game lacks cm0102.exe or Data")
+    sounds = [n for n in os.listdir(game) if n.lower() == "sounds"] if os.path.isdir(game) else []
+    check(bool(sounds) and any(n.lower() == "intro1.wav" for n in os.listdir(os.path.join(game, sounds[0]))),
+          "Resources/game holds Sounds", "Resources/game lacks Sounds/intro1.wav, so the game is silent")
     if manifest:
         want = parse_manifest(manifest)
         check(bool(want), "manifest has %d entries" % len(want), "manifest %s has no entries" % manifest)
