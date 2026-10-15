@@ -3,11 +3,11 @@
 Spec: `docs/specs/2026-10-14-re-signed-edition-release-spec.md`. Read it first, then `GLOSSARY.md` and `docs/HANDOVER.md` ("The recompiled game"). Use the glossary's words.
 
 ## Shared facts
-- Repo: `/Users/max/Downloads/Game/cm0102-mac`. You work in your own git worktree on your own branch. Commit there. Do not push. Do not merge.
+- Repo: `/Users/max/Projects/cm0102/cm0102-mac`. You work in your own git worktree on your own branch. Commit there. Do not push. Do not merge.
 - Build: `cmake -B build -DCMAKE_PREFIX_PATH=/opt/homebrew -DCM0102_EXE=<exe> && cmake --build build -j --target cm0102_recomp`.
 - Unattended run: `SDL_VIDEODRIVER=dummy RECOMP_NO_BOX=1 RECOMP_SCRIPT=<steps> RECOMP_DUMP=<png>`. Step syntax: `src/recomp_rt/win/user32.c` and `main.c`.
 - Free release: `/Users/max/Downloads/Archive/CM0102.iso`. Official patch: `/Users/max/Downloads/Archive/cm0102_3968/cm0102_3968.exe`. Treat both as read only.
-- Clean files output folder (slice 2 makes it): `/Users/max/Downloads/Game/clean-3968/`. Until it exists, use the fan pack `/Users/max/Downloads/Game` for local runs only, never in a download.
+- Clean files output folder (slice 2 makes it): `/Users/max/Projects/cm0102/clean-3968/`. Until it exists, use the fan pack `/Users/max/Downloads/Game` for local runs only, never in a download.
 - Tools installed by Homebrew: `x86_64-w64-mingw32-gcc`, `makensis`, `unshield`, `dylibbundler`. CrossOver is in `/Applications/CrossOver.app`.
 
 ## Decisions per slice

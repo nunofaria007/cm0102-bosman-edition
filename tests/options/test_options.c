@@ -62,7 +62,6 @@ static void check_defaults(void)
     CHECK(options_bool(OPT_SHARP_PICTURE) == 1);
     CHECK(!strcmp(options_string(OPT_SAVE_FOLDER), ""));
     CHECK(options_bool(OPT_SOUND) == 1);
-    CHECK(options_bool(OPT_ASSISTANT_SELECTION) == 1);
     CHECK(options_bool(OPT_CLICKABLE_NAMES) == 1);
     CHECK(options_bool(OPT_ATTRIBUTE_COLOURS) == 1);
     CHECK(options_bool(OPT_FASTER_DAYS) == 1);
@@ -82,7 +81,7 @@ int main(void)
         CHECK(has_one_line(get(), (OptionId)id));
         CHECK(has_one_comment(get(), (OptionId)id));
     }
-    CHECK(strstr(get(), "\nassistant_selection = on\n") != NULL);
+    CHECK(strstr(get(), "\nfaster_days = on\n") != NULL);
     CHECK(strstr(get(), "\ndisplay = widescreen\n") != NULL);
     CHECK(strstr(get(), "\nsave_folder = \n") != NULL);
     static char first[16384];
@@ -114,7 +113,7 @@ int main(void)
     options_load(path);
     t = get();
     CHECK(options_enum(OPT_DISPLAY) == DISPLAY_CLASSIC);
-    CHECK(options_bool(OPT_FASTER_DAYS) == 1 && options_bool(OPT_ASSISTANT_SELECTION) == 1);
+    CHECK(options_bool(OPT_FASTER_DAYS) == 1 && options_bool(OPT_MATCH_COLUMNS) == 1);
     CHECK(!strncmp(t, old, strlen(old)));
     CHECK(count(t, "\ndisplay = classic\n") == 1 && count(t, "\ndisplay = ") == 1);
     for (int id = 0; id < OPT_COUNT; id++) {
@@ -134,7 +133,7 @@ int main(void)
 
     /* 5. Words for the switches, and a bad value keeps the default. */
     put("space_to_continue = FALSE\nshortcuts = yes\nsharp_picture = off\nsound = true\n"
-        "clickable_names = maybe\ndisplay = tiny\nassistant_selection = off\r\nfaster_days = off\r\n");
+        "clickable_names = maybe\ndisplay = tiny\nattribute_colours = off\r\nfaster_days = off\r\n");
     options_load(path);
     CHECK(options_bool(OPT_SPACE_TO_CONTINUE) == 0);
     CHECK(options_bool(OPT_SHORTCUTS) == 1);
@@ -142,7 +141,7 @@ int main(void)
     CHECK(options_bool(OPT_SOUND) == 1);
     CHECK(options_bool(OPT_CLICKABLE_NAMES) == 1);
     CHECK(options_enum(OPT_DISPLAY) == DISPLAY_WIDESCREEN);
-    CHECK(options_bool(OPT_ASSISTANT_SELECTION) == 0);
+    CHECK(options_bool(OPT_ATTRIBUTE_COLOURS) == 0);
     CHECK(options_bool(OPT_FASTER_DAYS) == 0);
 
     host_unlink(path);

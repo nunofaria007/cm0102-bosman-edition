@@ -435,10 +435,10 @@ static void handle_event(SDL_Event *e)
             if (down) shortcut_key(SDLK_AC_BACK, 0);
             break;
         }
-        if (key_click.on) break;               /* the click of a key runs */
         uint32_t bit = e->button.button == SDL_BUTTON_LEFT ? 1u : e->button.button == SDL_BUTTON_RIGHT ? 2u : 0u;
         if (!bit) break;
         if (down) buttons |= (int)bit; else buttons &= ~(int)bit;
+        if (key_click.on) break;               /* the click of a key runs: drop the event, keep the button state */
         uint32_t msg = bit == 1 ? (down ? WM_LBUTTONDOWN : WM_LBUTTONUP) : (down ? WM_RBUTTONDOWN : WM_RBUTTONUP);
         post_mouse(msg, e->button.x, e->button.y);
         break;

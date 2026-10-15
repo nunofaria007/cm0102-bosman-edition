@@ -20,6 +20,8 @@
 
 static uint32_t stamps[16];
 
+/* Evidence for both: docs/research/2026-10-14-game-creation-inventory.md (cur_player and the manager
+ * test at 0xb74c26) and 2026-10-14-assistant-and-days-inventory.md (the manager is 0 for no manager). */
 #define PLAYER_MANAGER 0xb74c26u           /* per player slot, 0x300 bytes apart: the manager */
 #define PLAYER_SLOT 0xb77c7au              /* s16: the player slot that has the turn */
 

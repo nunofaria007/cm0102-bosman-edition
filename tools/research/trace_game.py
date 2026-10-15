@@ -15,7 +15,7 @@ import struct
 import sys
 import time
 
-sys.path.insert(0, "/Users/max/Downloads/Game/cm0102-mac/tests/diff")
+sys.path.insert(0, "/Users/max/Projects/cm0102/cm0102-mac/tests/diff")
 import original as O  # noqa: E402
 
 O.HEAP_BASE = 0x70000000

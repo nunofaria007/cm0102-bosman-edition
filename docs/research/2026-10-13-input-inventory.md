@@ -1,6 +1,6 @@
 # Input inventory: mouse and keyboard handling of the original
 
-Date: 2026-10-13. Source: `/Users/max/Downloads/Game/cm0102.exe`, read with REA (Ghidra 12.1.4). Assembly was read for `FUN_0055f620`, `FUN_0068d520` (with the window procedure), `FUN_005eec20`, `FUN_005eecb0`, `FUN_005e8170`, `FUN_00402d10` and `FUN_00402d80`. The other functions were read as pseudocode only. Where the pseudocode hides a thiscall ECX, the text says "inference".
+Date: 2026-10-13. Source: `/Users/max/Projects/cm0102/clean-3968/cm0102.exe`, read with REA (Ghidra 12.1.4). Assembly was read for `FUN_0055f620`, `FUN_0068d520` (with the window procedure), `FUN_005eec20`, `FUN_005eecb0`, `FUN_005e8170`, `FUN_00402d10` and `FUN_00402d80`. The other functions were read as pseudocode only. Where the pseudocode hides a thiscall ECX, the text says "inference".
 
 ## 0. Conventions
 

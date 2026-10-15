@@ -18,7 +18,6 @@ typedef enum {
     OPT_SHARP_PICTURE,         /* switch, on */
     OPT_SAVE_FOLDER,           /* text, empty: the normal save folder */
     OPT_SOUND,                 /* switch, on (the game's own Sound setting applies as well) */
-    OPT_ASSISTANT_SELECTION,   /* switch, off */
     OPT_CLICKABLE_NAMES,       /* switch, on */
     OPT_ATTRIBUTE_COLOURS,     /* switch, on */
     OPT_FASTER_DAYS,           /* switch, on */
