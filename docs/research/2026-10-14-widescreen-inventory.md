@@ -112,3 +112,11 @@ Other fix: the tactics drop search `0x89f710` (`0x8a20f8`, `0x8a21e2`, `0x8a260f
 Direct users of widget rects outside the display code: only `0x89f710` (tactics input), which works in screen pixels from the pitch widget. Checked on screen: a player dragged on the pitch lands on the position under the mouse, and the With Ball view draws its zones on the scaled pitch.
 
 Not checked on screen: the match screens (a scripted run does not reach a match; see section 8).
+
+## 10. Text with links centred in the classic box (2026-10-15)
+
+Fault (Max): the confirm "The file ... already exists. Replace this file ?" (string `0x9c7ac8`, shown by `0x5909f9` through `0x591840`, screen build `0x591b70`) was off centre in widescreen mode. Classic mode shows the text at the top left of the box, on two lines.
+
+Cause: the text box helper `0x5ed070` passes the box (110,145)-(780,535) to the text with links `0x4aeaf0` (comp_text.cpp), x1 + 5 and x2 - 5. `0x4aeaf0` wraps the text at x2 - x1 + 1 (`0x4aedf7`) and, with flag 1, centres each line at x1 + (x2 - x1 + 1 - width) / 2 (`0x4af17d`). The widths are screen pixels (TRUE_WIDTH), the box was classic, and then the widget create scaled the line x. So each line wrapped at 660 screen pixels and moved right of its centre. The same fault moved the news headline left of the centre.
+
+Fix: `RT_WRAP` of `0x4aeaf0` in `display.c` gives it x1 and x2 in screen pixels, and the widget create scales only the y of the widgets that `0x4aeaf0` makes (return address in `0x4aeaf0..0x4afa30`). This replaces the line shift of the link buttons (section 9). In widescreen mode the confirm is now one line centred in its box (centre x 712), and news text wraps at the width of its box. Checked: the link under "Thierry Henry" on the bid news lands on the name. Classic mode does not change.
