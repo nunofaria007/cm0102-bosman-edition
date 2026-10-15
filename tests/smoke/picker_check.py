@@ -22,13 +22,12 @@ Checks for each pick:
     - no player with a fit below 10 plays while a free player of the same group has 10 or more there
     - no player is picked twice, and the subs come from the players left over
     - --expect DR=Warner: a slot of that label holds the player (full name or surname); --never: no such
-      slot does
+      slot does. SAVE_CHECKS adds the checks of yeovil.sav and start.sav.
 --keep copies the dump to a file. It has one "cand" line per candidate: name, the position ratings, the 31
 shown attributes, current ability, age, condition, first group, then the fit and the value of each slot.
 
 Examples (the Yeovil save is a copy of Max's game; never use his own save):
-    picker_check.py build/cm0102_recomp ../clean-3968 yeovil.sav --expect "GK=Dean Williams" --expect AMC=Moukoko
-        --expect DR=Warner --expect DC=Sodje --never DMC=O'Brien
+    picker_check.py build/cm0102_recomp ../clean-3968 yeovil.sav
     picker_check.py build/cm0102_recomp ../clean-3968 start.sav
 """
 import os
@@ -48,7 +47,7 @@ ATTRS = ["Acceleration", "Aggression", "Agility", "Anticipation", "Balance", "Br
          "Crossing", "Decisions", "Determination", "Dribbling", "Finishing", "Flair", "Handling", "Heading",
          "Influence", "Jumping", "Long Shots", "Marking", "Off The Ball", "Pace", "Passing", "Positioning",
          "Reflexes", "Set Pieces", "Stamina", "Strength", "Tackling", "Teamwork", "Technique", "Work Rate"]
-# The key attributes of each position (spec 2026-10-15-features-0.4.0, Q138, Q139).
+# The key attributes of each position (spec 2026-10-15-features-0.4.0, Q138 to Q140).
 KEYS = {
     "GK": ["Handling", "Reflexes", "Agility", "Positioning", "Jumping"],
     "DC": ["Tackling", "Marking", "Heading", "Positioning", "Strength", "Jumping"],
@@ -57,9 +56,15 @@ KEYS = {
     "MC": ["Passing", "Decisions", "Teamwork", "Work Rate", "Technique"],
     "MLR": ["Crossing", "Dribbling", "Pace", "Passing", "Technique"],
     "AM": ["Passing", "Creativity", "Decisions", "Technique", "Flair"],
-    "FC": ["Finishing", "Off The Ball", "Pace", "Heading", "Dribbling"],
+    "FC": ["Finishing", "Off The Ball", "Anticipation", "Technique", "Pace"],
 }
 # Position bits of a slot mask and the index of their rating in the dumped ratings (player data +0x0f..).
+# The checks of the best pick for each test save (Q137, Q141), added to --expect and --never.
+SAVE_CHECKS = {
+    "yeovil.sav": (["GK=Dean Williams", "AMC=Moukoko", "DR=Warner", "DC=Sodje", "FC=Georcelin", "FC=Alford"],
+                   ["DMC=O'Brien"]),
+    "start.sav": (["FC=Henry", "FC=Bergkamp"], []),
+}
 POSITIONS = [(0x1, 0), (0x2, 1), (0x4, 2), (0x8, 3), (0x10, 4), (0x20, 5), (0x40, 6)]
 
 
@@ -250,6 +255,8 @@ def main(argv):
         print(__doc__)
         return 2
     program, game, name = os.path.abspath(rest[0]), os.path.abspath(rest[1]), rest[2]
+    expect += SAVE_CHECKS.get(name, ([], []))[0]
+    never += SAVE_CHECKS.get(name, ([], []))[1]
     save = os.path.join(folder, name)
     if not os.path.exists(save):
         print(f"no saved game {save}")

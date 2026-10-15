@@ -136,7 +136,7 @@ enum { ACCELERATION = 1, AGGRESSION, AGILITY, ANTICIPATION, BALANCE, BRAVERY, CR
        LONG_SHOTS, MARKING, OFF_THE_BALL, PACE, PASSING, POSITIONING, REFLEXES, SET_PIECES, STAMINA,
        STRENGTH, TACKLING, TEAMWORK, TECHNIQUE, WORK_RATE };
 
-/* The key attributes of each position (spec 2026-10-15-features-0.4.0, Q138, Q139), ended by 0. A
+/* The key attributes of each position (spec 2026-10-15-features-0.4.0, Q138 to Q140), ended by 0. A
  * sweeper uses the DC list, a slot without a side (a sub) the centre list, and AML, AMR and DM on a side
  * the AMC and DMC lists. */
 enum { ROLE_GK, ROLE_DC, ROLE_DLR, ROLE_DMC, ROLE_MC, ROLE_MLR, ROLE_AM, ROLE_FC };
@@ -148,7 +148,7 @@ static const uint8_t keys[][7] = {
     [ROLE_MC] = {PASSING, DECISIONS, TEAMWORK, WORK_RATE, TECHNIQUE},
     [ROLE_MLR] = {CROSSING, DRIBBLING, PACE, PASSING, TECHNIQUE},
     [ROLE_AM] = {PASSING, CREATIVITY, DECISIONS, TECHNIQUE, FLAIR},
-    [ROLE_FC] = {FINISHING, OFF_THE_BALL, PACE, HEADING, DRIBBLING},
+    [ROLE_FC] = {FINISHING, OFF_THE_BALL, ANTICIPATION, TECHNIQUE, PACE},   /* Q140 */
 };
 
 typedef struct { uint32_t staff, data; int condition, age, ability; uint8_t attr[ATTRIBUTES + 1]; } Candidate;
