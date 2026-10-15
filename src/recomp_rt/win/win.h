@@ -85,6 +85,13 @@ int keys_back(int *x, int *y);                 /* the Back arrow in the left bar
 int keys_outside_popup(int *x, int *y);        /* a place outside the open popup */
 extern uint32_t win_hwnd;
 
+/* The wait step of the script (waits.c). */
+int waits_parse(const char *name, int *kind, uint32_t *value);   /* 0: no such state */
+int waits_reached(int kind, uint32_t value, uint32_t since);    /* since: waits_poll_count() at the start */
+uint32_t waits_poll_count(void);
+void waits_describe(char *out, size_t size);
+void waits_poll(void);                         /* at each input poll */
+
 /* COM (com.c). An object starts with its vtable and a reference count at +4. The list of methods ends
  * with a NULL function. */
 typedef struct { uint32_t offset; const char *name; RtFn fn; } WinMethod;

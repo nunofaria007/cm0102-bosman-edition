@@ -1,0 +1,167 @@
+/* The wait step of RECOMP_SCRIPT (user32.c): "wait <state> [timeout ms]" holds the later steps until the
+ * game reaches a named state. The runtime reads the state from the memory of the game, not from the
+ * picture. Only test runs with a script use this file. Play is unchanged without a script.
+ *
+ * A state of a screen counts only after an input poll 0x55f620 has run on that screen after the wait
+ * started. The screen is then built and drawn and takes input (main loop 0x7fc7e0: build, draw, pump,
+ * input poll; docs/research/2026-10-13-screen-stack-inventory.md, item 3).
+ *
+ * The screen stack S is at 0xb74450. The record of the local player is at S + 0x7d4. Its current node
+ * (the screen on top) is at record + 0x0e. The build function of a node is at node + 0, its input
+ * function at node + 8 (inventory, items 1b and 1c). The titles of the nodes are all "\", so the build
+ * function names the screen.
+ *
+ * States:
+ *   setup       the start screen (Setup Game), build 0x81bab0
+ *   leagues     Select League(s), build 0x81d010
+ *   loaded      the game is made: the database load and the days before the start are done
+ *               (0xdd711c = 1, set at the end of game creation 0x828110). The "CD Not Required" box
+ *               shows after this.
+ *   first-news  the first news screen (build 0x7881e0) of this run: a news screen on the date and part
+ *               of the day of the first news screen that took input
+ *   news        any news screen
+ *   popup       a popup is open (input mode, the dword at the screen manager + 0, is 1; keys.c)
+ *   box         a message box of 0x5e8290 is open, for example "CD Not Required" after a new game or
+ *               a load. The box runs its own loop without the input poll, so this state needs no poll.
+ *   typing      a text entry takes keys (keys.c)
+ *   match       the match screen of the player's club, build MATCH_BUILD
+ *   continue    Continue Game can take a click (keys.c)
+ *   day:D.M.YY  the game date is D.M.YY or later (s16 day of the year from 0, s16 year at 0xae2c90)
+ *   screen:ADDR the screen with this build function on top, for example screen:0x6b2d80
+ *
+ * RECOMP_SCREEN_LOG=1 prints each change of the state, with the build function of the top screen.
+ * Use it to find the address for screen:ADDR. */
+#include "win.h"
+
+#include <SDL.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define STACK 0xb74450u
+#define TOP_NODE (STACK + 0x7d4u + 0x0eu)
+#define GAME_MADE 0xdd711cu
+#define GAME_DATE 0xae2c90u
+
+#define START_BUILD 0x81bab0u
+#define LEAGUES_BUILD 0x81d010u
+#define NEWS_BUILD 0x7881e0u
+#define MATCH_BUILD 0x718e90u   /* the match screen of the player's club, before and during the match */
+
+enum { W_SETUP, W_LEAGUES, W_LOADED, W_FIRST_NEWS, W_NEWS, W_POPUP, W_TYPING, W_MATCH, W_CONTINUE, W_BOX, W_DAY,
+       W_SCREEN };
+
+static const char *const names[] = {"setup", "leagues", "loaded", "first-news", "news", "popup", "typing", "match",
+                                    "continue", "box"};
+
+static uint32_t polls;            /* input polls so far */
+static uint32_t polled_node;      /* the top node at the last input poll */
+static uint32_t first_news_date;  /* date and slice of the first news screen of this run, 0: none yet */
+static int in_box;                /* 1 while the message box 0x5e8290 runs */
+
+static uint32_t top_node(void) { return rd32(g_mem, TOP_NODE); }
+static uint32_t top_build(void) { uint32_t n = top_node(); return n ? rd32(g_mem, n) : 0; }
+
+/* The game date and the part of the day (0xae2c88: 0 morning, 1 afternoon, 2 evening), never 0. */
+static uint32_t date_slice(void) { return (rd32(g_mem, GAME_DATE) ^ rd32(g_mem, 0xae2c88u) << 24) | 0x80000000u; }
+
+/* The day of the year from 0, as the game keeps it. */
+static int day_of_year(int d, int m, int y)
+{
+    static const int before[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    int leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    return before[m - 1] + (m > 2 && leap) + d - 1;
+}
+
+int waits_parse(const char *name, int *kind, uint32_t *value)
+{
+    for (int i = 0; i < (int)(sizeof names / sizeof *names); i++)
+        if (!strcmp(name, names[i])) { *kind = i; *value = 0; return 1; }
+    int d, m, y;
+    if (sscanf(name, "day:%d.%d.%d", &d, &m, &y) == 3 && d >= 1 && d <= 31 && m >= 1 && m <= 12) {
+        if (y < 100) y += 2000;
+        *kind = W_DAY;
+        *value = (uint32_t)(y * 366 + day_of_year(d, m, y));
+        return 1;
+    }
+    unsigned long a;
+    if (sscanf(name, "screen:%lx", &a) == 1 && a) { *kind = W_SCREEN; *value = (uint32_t)a; return 1; }
+    return 0;
+}
+
+uint32_t waits_poll_count(void) { return polls; }
+
+/* After the input poll ran on the screen of the top node: the screen is built and takes input. */
+static int screen_up(uint32_t build)
+{
+    return build && polled_node && polled_node == top_node() && top_build() == build;
+}
+
+/* 1 when the state is reached. since: the poll count when the wait started. */
+int waits_reached(int kind, uint32_t value, uint32_t since)
+{
+    if (kind == W_BOX) return in_box;
+    if (polls == since) return 0;                 /* no input poll since the wait started */
+    uint32_t d = keys_display;
+    int x, y;
+    switch (kind) {
+    case W_SETUP: return screen_up(START_BUILD);
+    case W_LEAGUES: return screen_up(LEAGUES_BUILD);
+    case W_LOADED: return rd32(g_mem, GAME_MADE) != 0;
+    case W_FIRST_NEWS: return screen_up(NEWS_BUILD) && date_slice() == first_news_date;
+    case W_NEWS: return screen_up(NEWS_BUILD);
+    case W_POPUP: return d && rd32(g_mem, d) == 1;
+    case W_TYPING: return keys_typing();
+    case W_MATCH: return screen_up(MATCH_BUILD);
+    case W_CONTINUE: return keys_continue_game(&x, &y);
+    case W_DAY: {
+        int day = (int16_t)rd16(g_mem, GAME_DATE), year = (int16_t)rd16(g_mem, GAME_DATE + 2);
+        return rd32(g_mem, GAME_MADE) && (uint32_t)(year * 366 + day) >= value;
+    }
+    case W_SCREEN: return screen_up(value);
+    }
+    return 0;
+}
+
+/* The state now, in words, for the log and for the message of a wait that timed out. */
+void waits_describe(char *out, size_t size)
+{
+    uint32_t d = keys_display, node = top_node();
+    int x, y;
+    snprintf(out, size, "screen %#x, date %d/%d, made %u, popup %d, box %d, typing %d, continue %d, back %d",
+             node ? rd32(g_mem, node) : 0, (int16_t)rd16(g_mem, GAME_DATE), (int16_t)rd16(g_mem, GAME_DATE + 2),
+             rd32(g_mem, GAME_MADE), d ? (int)rd32(g_mem, d) : -1, in_box, keys_typing(),
+             keys_continue_game(&x, &y), keys_back(&x, &y));
+}
+
+/* At each input poll (user32.c), before the original runs. */
+void waits_poll(void)
+{
+    static int log = -1;
+    static char last[256];
+    polls++;
+    polled_node = top_node();
+    if (top_build() == NEWS_BUILD && !first_news_date) first_news_date = date_slice();
+    if (log < 0) log = getenv("RECOMP_SCREEN_LOG") != NULL;
+    if (!log) return;
+    char now[256];
+    uint32_t d = keys_display;
+    int x, y;
+    snprintf(now, sizeof now, "screen %#x, popup %d, typing %d, continue %d, made %u", top_build(),
+             d ? (int)rd32(g_mem, d) : -1, keys_typing(), keys_continue_game(&x, &y), rd32(g_mem, GAME_MADE));
+    if (strcmp(now, last)) {
+        fprintf(stderr, "recomp: state at %llu ms, date %d/%d: %s\n", (unsigned long long)SDL_GetTicks64(),
+                (int16_t)rd16(g_mem, GAME_DATE), (int16_t)rd16(g_mem, GAME_DATE + 2), now);
+        snprintf(last, sizeof last, "%s", now);
+    }
+}
+
+void o_005e8290(void);
+
+/* The message box of the game: its own loop draws it and waits for Ok. */
+RT_WRAP(005e8290, message_box)
+{
+    in_box++;
+    o_005e8290();
+    in_box--;
+}
