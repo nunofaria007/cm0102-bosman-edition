@@ -8,10 +8,11 @@
  *
  * The slots are those of the player's active tactic (tactic +0x12d, a position mask per slot), so the
  * formation stays. A player's fit for a slot is the lower of his rating for the position and his
- * rating for the side, from the position ratings of the player data (1 to 20). The game calls a
- * rating of 15 or more natural (0x5b7d20). The picker fills the slots in this order: natural players
- * first, then players with a fit of 10 or more, then any player. Within each step the player with the
- * higher current ability (player data +0x05) goes first. A swap pass then improves the total.
+ * rating for the side, from the position ratings of the player data (1 to 20). A player's value in a
+ * slot is his current ability (player data +0x05, 1 to 200) times that fit, divided by 20 (Max, Q98,
+ * 2026-10-15): positional fit and skill together, so a natural player of low ability does not beat a
+ * much better player who is able in the position. The picker fills the slot and player pair of the
+ * highest value first. A swap pass then improves the total.
  *
  * Candidates: the players of the squad (club +0xd7) whom the squad screen shows as able to play the next
  * match. 0x45cbe0 is the screen's own test (0x459b3d): not injured, not loaned out, not banned, not away
@@ -139,13 +140,13 @@ static int fit(const Candidate *c, uint16_t mask)
     return pos < side ? pos : side;
 }
 
-/* The value of a player in a slot: the step (natural, able, other) first, then the ability. -1 when the
- * player cannot take the slot: a goalkeeper slot needs a goalkeeper rating of 10 or more. */
+/* The value of a player in a slot: current ability times fit / 20, in twentieths so that no rounding
+ * hides a difference. -1 when the player cannot take the slot: a goalkeeper slot needs a goalkeeper
+ * rating of 10 or more. */
 static int value(const Candidate *c, uint16_t mask)
 {
     if ((mask & 1) && rd8(g_mem, c->data + 0x0f) < ABLE) return -1;
-    int f = fit(c, mask);
-    return (f >= NATURAL ? 2 : f >= ABLE ? 1 : 0) * 1000 + c->ability;
+    return (c->ability > 0 ? c->ability : 1) * fit(c, mask);
 }
 
 /* Fills the empty slots of team (an index into c, -1 for empty) with the candidates whose use[] is set. */
