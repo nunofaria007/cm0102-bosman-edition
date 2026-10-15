@@ -55,7 +55,7 @@ The game drawn at 1280x800. It is the default.
 _Avoid_: wide mode
 
 **HD mode**:
-The game drawn at 1920x1080 for big screens, made the same way as widescreen mode. Planned for 0.4.0 (#32).
+The game drawn at 1920x1080 for big screens, made the same way as widescreen mode, with text at its pixel size. Opt-in with `display = hd`. Planned for 0.4.0 (#32).
 _Avoid_: larger text, 4K mode
 
 **Classic mode**:
@@ -149,7 +149,7 @@ One line of the settings file that switches a feature on or off or sets its valu
 _Avoid_: preference, flag, toggle
 
 **Assistant selection**:
-The assistant manager picks the player's team, from the Assistant drop-down on the squad screen (0.3.0, #12): best team, most match-fit team or under-21 team.
+The assistant manager picks the player's team, from the Assistant drop-down on the squad screen (0.3.0, #12): best team, most match-fit team or under-21 team. It scores each player by current ability times positional fit and finds the eleven with the highest total (0.3.1).
 _Avoid_: auto pick, auto team, AI selection
 
 **Save backup**:
@@ -163,3 +163,31 @@ _Avoid_: link, hyperlink
 **Attribute colour**:
 The colour of an attribute number by its value on the 1 to 20 scale, as in modern Football Manager.
 _Avoid_: attribute highlighting, heatmap
+
+**Team views screen**:
+The screen with the Best XI, Squad depth and Compare players tabs, opened from the Assistant drop-down on any club's squad screen (0.4.0, #22). It only shows players and never changes the team.
+_Avoid_: team screen, squad analysis
+
+**Best XI**:
+The eleven that the assistant selection would pick for a formation, drawn on a pitch.
+_Avoid_: best eleven, ideal team, first XI
+
+**Squad depth**:
+The table of the top three players for each position of a formation.
+_Avoid_: depth chart, cover
+
+**Polygon analyser**:
+The eight-axis shape of a player's shown attributes on the comparison screen, with the two players' shapes overlapped.
+_Avoid_: radar, spider chart
+
+**Attribute groups**:
+The player profile's attributes in Technical, Mental and Physical columns with headings, and a Goalkeeping group for goalkeepers (option `attribute_groups`).
+_Avoid_: attribute categories, sections
+
+**Hidden value**:
+A player value in the data that no screen of the original shows, such as current ability or potential ability. No feature shows it or feeds it into a shown number, except the assistant selection's score.
+_Avoid_: secret attribute, intrinsic (for the whole set)
+
+**Printout**:
+The text lines that the original makes from a print button, on the squad and competition screens. The PDF choice of Print To writes it to a PDF in the `Prints` folder.
+_Avoid_: report, export, screenshot
