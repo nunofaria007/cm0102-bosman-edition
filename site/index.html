@@ -120,6 +120,7 @@ a { color: inherit; }
 .release .later { margin-top: 28px; color: var(--muted); }
 .shot { position: relative; aspect-ratio: 4 / 3; min-width: 0; width: 100%; }
 .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; border: 2px solid #2433b8; }
+.shot.wide { aspect-ratio: 1600 / 993; }
 .shot figcaption { font-size: var(--step-small); color: var(--muted); margin-top: 10px; }
 .downloads { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 32px; }
 .dl {
@@ -225,6 +226,7 @@ a { color: inherit; }
     <a class="mark" href="#top">CM 01/02<span class="long"> Bosman Edition</span></a>
     <ul>
       <li><a href="#release">Release</a></li>
+      <li><a href="#new">New</a></li>
       <li><a href="#next">Coming next</a></li>
       <li><a href="#install">Install</a></li>
       <li><a href="#questions">Questions</a></li>
@@ -248,7 +250,7 @@ a { color: inherit; }
 <main>
 <section class="screen" id="release" aria-labelledby="release-title">
   <div class="inner">
-    <h2 class="bar" id="release-title">What's in <em>this release</em></h2>
+    <h2 class="bar" id="release-title">What's in the <em>download</em></h2>
     <div class="downloads" data-in>
       <a class="dl" data-link="mac" href="https://github.com/maxevans60/cm0102-bosman-edition/releases"><svg aria-hidden="true"><use href="#apple"/></svg><span>Download for Mac<small data-note="mac">Coming soon</small></span></a>
       <a class="dl" data-link="win" href="https://github.com/maxevans60/cm0102-bosman-edition/releases"><svg aria-hidden="true"><use href="#win"/></svg><span>Download for Windows<small data-note="win">Coming soon</small></span></a>
@@ -257,17 +259,11 @@ a { color: inherit; }
       <div class="panel" data-in>
         <h3 class="sub">You get</h3>
         <ul>
-          <li>The whole game at version 3.9.68.</li>
+          <li>The whole game from the 2008 free release, with the last official patch, 3.9.68.</li>
           <li>The original 2001/02 database, with no fan updates.</li>
-          <li>Widescreen, in a window you can resize. The old 800 × 600 layout is one setting away.</li>
-          <li>Drag-and-drop install for Mac.</li>
-          <li>A normal installer for 64-bit Windows.</li>
-          <li>The game's sounds, muted when the window is in the background.</li>
-          <li>Attribute numbers coloured by value.</li>
-          <li>Position, condition and match rating side by side during a match.</li>
-          <li>Click a player's or club's name to open their profile.</li>
-          <li>Space to continue, a Back shortcut, the mouse back button and full screen.</li>
-          <li>Sharper text, faster days on holiday, and saves in any folder you choose.</li>
+          <li>Widescreen at 1280 × 800, in a window you can resize. The old 800 × 600 layout is one setting away.</li>
+          <li>One Mac app for Apple silicon and Intel, macOS 11 or later.</li>
+          <li>An installer for 64-bit Windows 10 and 11.</li>
         </ul>
         <ul class="later">
           <li>Not in this version yet: network play.</li>
@@ -275,6 +271,31 @@ a { color: inherit; }
       </div>
       <figure class="shot" data-in style="margin:0">
         <img src="assets/s1@2x.png" width="1600" height="1200" alt="The Setup Game screen: Start New Game, Quick Start Game, Restore Saved Game and the other options." loading="lazy">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="screen" id="new" aria-labelledby="new-title">
+  <div class="inner">
+    <h2 class="bar" id="new-title">New in <em>0.2.0</em></h2>
+    <div class="release">
+      <div class="panel" data-in>
+        <h3 class="sub">Added</h3>
+        <ul>
+          <li>The game's own sounds. They stop when the window is in the background.</li>
+          <li>Attribute numbers coloured by value: red for 1 to 5, amber for 6 to 10, light green for 11 to 15 and bright green for 16 to 20.</li>
+          <li>During a match, positions and condition next to the match rating on the tactics screen, and condition for both teams in Player Ratings. Widescreen only.</li>
+          <li>Click a player's or club's name to open their profile.</li>
+          <li>Space to continue, Escape to close a popup, and the mouse back button for Back. On a Mac, Cmd+[ is Back and Cmd+F is full screen.</li>
+          <li>Sharper text, faster days on holiday, and saves in any folder you choose, for example iCloud Drive.</li>
+        </ul>
+        <ul class="later">
+          <li>Each one can be switched off in settings.txt, and none of them change match results.</li>
+        </ul>
+      </div>
+      <figure class="shot wide" data-in style="margin:0">
+        <img src="assets/s2@2x.png" width="1600" height="993" alt="A player profile during a match: Abdoulai Demba of Yeovil, with each attribute number coloured from red to green by value." loading="lazy">
       </figure>
     </div>
   </div>
