@@ -28,6 +28,10 @@
  *   continue    Continue Game can take a click (keys.c)
  *   day:D.M.YY  the game date is D.M.YY or later (s16 day of the year from 0, s16 year at 0xae2c90)
  *   screen:ADDR the screen with this build function on top, for example screen:0x6b2d80
+ *   label:TEXT  a clickable button of the left bar with a text that starts with TEXT (keys.c), for
+ *               example label:Re-start for the button of the match screen at half time. The match
+ *               screen changes the text of one button: Kick Off, Pause, Re-start. The log names the
+ *               texts of the left bar buttons.
  *
  * RECOMP_SCREEN_LOG=1 prints each change of the state, with the build function of the top screen.
  * Use it to find the address for screen:ADDR. */
@@ -49,7 +53,7 @@
 #define MATCH_BUILD 0x718e90u   /* the match screen of the player's club, before and during the match */
 
 enum { W_SETUP, W_LEAGUES, W_LOADED, W_FIRST_NEWS, W_NEWS, W_POPUP, W_TYPING, W_MATCH, W_CONTINUE, W_BOX, W_DAY,
-       W_SCREEN };
+       W_SCREEN, W_LABEL };
 
 static const char *const names[] = {"setup", "leagues", "loaded", "first-news", "news", "popup", "typing", "match",
                                     "continue", "box"};
@@ -58,6 +62,8 @@ static uint32_t polls;            /* input polls so far */
 static uint32_t polled_node;      /* the top node at the last input poll */
 static uint32_t first_news_date;  /* date and slice of the first news screen of this run, 0: none yet */
 static int in_box;                /* 1 while the message box 0x5e8290 runs */
+static char labels[32][32];       /* the texts of the label waits; the value of a label wait is its index */
+static int label_count;
 
 static uint32_t top_node(void) { return rd32(g_mem, TOP_NODE); }
 static uint32_t top_build(void) { uint32_t n = top_node(); return n ? rd32(g_mem, n) : 0; }
@@ -86,6 +92,13 @@ int waits_parse(const char *name, int *kind, uint32_t *value)
     }
     unsigned long a;
     if (sscanf(name, "screen:%lx", &a) == 1 && a) { *kind = W_SCREEN; *value = (uint32_t)a; return 1; }
+    if (!strncmp(name, "label:", 6) && name[6] && strlen(name + 6) < sizeof labels[0] &&
+        label_count < (int)(sizeof labels / sizeof *labels)) {
+        snprintf(labels[label_count], sizeof labels[0], "%s", name + 6);
+        *kind = W_LABEL;
+        *value = (uint32_t)label_count++;
+        return 1;
+    }
     return 0;
 }
 
@@ -119,6 +132,7 @@ int waits_reached(int kind, uint32_t value, uint32_t since)
         return rd32(g_mem, GAME_MADE) && (uint32_t)(year * 366 + day) >= value;
     }
     case W_SCREEN: return screen_up(value);
+    case W_LABEL: return polled_node == top_node() && keys_left_bar_label(labels[value]);
     }
     return 0;
 }
@@ -128,10 +142,12 @@ void waits_describe(char *out, size_t size)
 {
     uint32_t d = keys_display, node = top_node();
     int x, y;
-    snprintf(out, size, "screen %#x, date %d/%d, made %u, popup %d, box %d, typing %d, continue %d, back %d",
-             node ? rd32(g_mem, node) : 0, (int16_t)rd16(g_mem, GAME_DATE), (int16_t)rd16(g_mem, GAME_DATE + 2),
-             rd32(g_mem, GAME_MADE), d ? (int)rd32(g_mem, d) : -1, in_box, keys_typing(),
-             keys_continue_game(&x, &y), keys_back(&x, &y));
+    char texts[96];
+    keys_left_bar_labels(texts, sizeof texts);
+    snprintf(out, size, "screen %#x, date %d/%d, made %u, popup %d, box %d, typing %d, continue %d, back %d, "
+             "left bar %s", node ? rd32(g_mem, node) : 0, (int16_t)rd16(g_mem, GAME_DATE),
+             (int16_t)rd16(g_mem, GAME_DATE + 2), rd32(g_mem, GAME_MADE), d ? (int)rd32(g_mem, d) : -1, in_box,
+             keys_typing(), keys_continue_game(&x, &y), keys_back(&x, &y), texts);
 }
 
 /* At each input poll (user32.c), before the original runs. */
@@ -144,11 +160,12 @@ void waits_poll(void)
     if (top_build() == NEWS_BUILD && !first_news_date) first_news_date = date_slice();
     if (log < 0) log = getenv("RECOMP_SCREEN_LOG") != NULL;
     if (!log) return;
-    char now[256];
+    char now[256], texts[96];
     uint32_t d = keys_display;
     int x, y;
-    snprintf(now, sizeof now, "screen %#x, popup %d, typing %d, continue %d, made %u", top_build(),
-             d ? (int)rd32(g_mem, d) : -1, keys_typing(), keys_continue_game(&x, &y), rd32(g_mem, GAME_MADE));
+    keys_left_bar_labels(texts, sizeof texts);
+    snprintf(now, sizeof now, "screen %#x, popup %d, typing %d, continue %d, made %u, left bar %s", top_build(),
+             d ? (int)rd32(g_mem, d) : -1, keys_typing(), keys_continue_game(&x, &y), rd32(g_mem, GAME_MADE), texts);
     if (strcmp(now, last)) {
         fprintf(stderr, "recomp: state at %llu ms, date %d/%d: %s\n", (unsigned long long)SDL_GetTicks64(),
                 (int16_t)rd16(g_mem, GAME_DATE), (int16_t)rd16(g_mem, GAME_DATE + 2), now);

@@ -83,6 +83,8 @@ int keys_typing(void);                         /* 1 while a text entry takes key
 int keys_continue_game(int *x, int *y);        /* Continue Game in the left bar */
 int keys_back(int *x, int *y);                 /* the Back arrow in the left bar */
 int keys_outside_popup(int *x, int *y);        /* a place outside the open popup */
+int keys_left_bar_label(const char *prefix);   /* a left bar button with this text (waits.c) */
+void keys_left_bar_labels(char *out, size_t size); /* the texts of the left bar buttons, for the log */
 extern uint32_t win_hwnd;
 
 /* The wait step of the script (waits.c). */

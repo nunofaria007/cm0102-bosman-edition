@@ -17,7 +17,7 @@ Saves in the folder:
     start.sav     made by "make"
     prematch.sav  Arsenal before the friendly at Basel on Friday 20.7.01, with a bid to answer. It was
                   made by hand in a test session on 2026-10-15 (no script makes it yet). Put it in the
-                  folder by hand.
+                  folder by hand. The match check (tests/smoke/smoke_run.py --match) plays from it.
 
 play: copies the save into a new empty user folder, writes settings.txt (the mode and each --set line),
 loads the save with wait steps and then runs the steps of the file. Each line of the file is a script
