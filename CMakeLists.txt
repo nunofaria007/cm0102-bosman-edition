@@ -118,6 +118,11 @@ if(NOT WIN32)
     add_executable(groups_test tests/groups/test_groups.c src/recomp_rt/win/groups_layout.c)
     target_include_directories(groups_test PRIVATE src/recomp_rt/win)
     add_test(NAME groups COMMAND groups_test)
+    add_executable(compare_test tests/compare/test_compare.c src/recomp_rt/win/compare_layout.c
+        src/recomp_rt/win/groups_layout.c)
+    target_include_directories(compare_test PRIVATE src/recomp_rt/win)
+    target_link_libraries(compare_test PRIVATE m)
+    add_test(NAME compare COMMAND compare_test)
 endif()
 
 # The recompiled original (docs/specs/2026-10-14-recompile-spec.md). tools/recomp translates the

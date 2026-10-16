@@ -60,6 +60,8 @@ static uint32_t scratch;            /* a block of the game's heap for the calls 
 #define TEXT_AT (TABS * TAB_ENTRY + 0x200u)   /* the text buffer of the Best XI tab */
 #define SCRATCH_SIZE (TEXT_AT + VIEWS_TEXT_SIZE)
 
+#define COMPARE_SLOT 8               /* node slots 8 and 9: the players of the Compare tab, 10 and 11 their pages */
+
 static int pitch_widget = -1;       /* the panel that the pitch covers, on the screen built last */
 
 static uint32_t call_this(uint32_t fn, uint32_t self, int n, const uint32_t *args)
@@ -182,6 +184,15 @@ static void views_build(void)
         panel(450, top, 790, bottom);
         best_xi_build(club, team, scratch + TEXT_AT, x1, y1, x2, y2, 460, top + 6, 780, bottom - 6, node_slot(6),
                       node_slot(5));
+    } else if (tab == 3) {
+        uint32_t a = node_slot(COMPARE_SLOT), b = node_slot(COMPARE_SLOT + 1);
+        if (!a || !b) {
+            compare_first_two(club, &a, &b);
+            set_slot(COMPARE_SLOT, a);
+            set_slot(COMPARE_SLOT + 1, b);
+        }
+        compare_build(scratch + TEXT_AT, a, b, 100, top, 790, bottom, club, (int)node_slot(COMPARE_SLOT + 2),
+                      (int)node_slot(COMPARE_SLOT + 3));
     } else {
         panel(100, top, 790, bottom);
     }
@@ -203,6 +214,13 @@ static void views_input(void)
     if (w >= 0) {
         uint32_t at = display() + WIDGETS + 8 + (uint32_t)w * WIDGET_SIZE;
         if (best_xi_input(rd32(g_mem, at), rd32(g_mem, at + 0x40))) {
+            rt_ret_cdecl(REBUILD);
+            return;
+        }
+        uint32_t value;
+        int side = compare_input(node_slot(0), rd32(g_mem, at), rd32(g_mem, at + 0x40), &value);
+        if (side) {
+            set_slot(COMPARE_SLOT + side - 1, value);   /* 3 and 4: the pages in slots 10 and 11 */
             rt_ret_cdecl(REBUILD);
             return;
         }
@@ -264,6 +282,7 @@ void views_pitch_rect(int *x1, int *y1, int *x2, int *y2)
  * on the game's draw surface inside the panel's box, so the screen dumps hold it too. */
 void views_widget_drawn(uint32_t w)
 {
+    compare_widget_drawn(w);
     if (pitch_widget < 0 || !on_top() || rd32(g_mem, NO_DRAW)) return;
     if (w != display() + WIDGETS + (uint32_t)pitch_widget * WIDGET_SIZE) return;
     uint32_t surface = rd32(g_mem, DRAW_SURFACE);

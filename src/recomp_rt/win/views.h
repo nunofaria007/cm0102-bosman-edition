@@ -32,4 +32,17 @@ int best_xi_build(uint32_t club, uint32_t team, uint32_t buf, int x1, int y1, in
 /* A click on a widget of id and data: 1 when it was a Formation item (rebuild the screen). */
 int best_xi_input(uint32_t id, uint32_t data);
 
+/* The comparison of two players (compare.c): variant B in the box x1..y2 (classic numbers). club not 0
+ * makes each name box a drop-down with the club's squad (the Compare tab), at page page1 and page2. text: VIEWS_TEXT_SIZE bytes of
+ * the game's memory. */
+void compare_build(uint32_t text, uint32_t staff1, uint32_t staff2, int x1, int y1, int x2, int y2, uint32_t club,
+                   int page1, int page2);
+/* A click on a drop-down item: the side (1 or 2) with its new player in *value, or a page item of side 1
+ * or 2 (3 or 4) with the page in *value, or 0. Each drop-down shows its squad in pages that fit the screen. */
+int compare_input(uint32_t club, uint32_t id, uint32_t data, uint32_t *value);
+/* The first two players of the club's squad, 0 when there are none. */
+void compare_first_two(uint32_t club, uint32_t *a, uint32_t *b);
+/* After the game draws a widget: the polygon and the frames of the comparison built last. */
+void compare_widget_drawn(uint32_t widget);
+
 #endif
