@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Bosman Edition Options mockup</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #222; font-family: Tahoma, Verdana, Arial, sans-serif; color: #ddd; }
+  .switch { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: #111; font-size: 14px; }
+  .switch button { background: #333; color: #ddd; border: 1px solid #555; padding: 6px 14px; cursor: pointer; font: inherit; }
+  .switch button.on { background: #0b5d0b; color: #ffef3a; border-color: #ffef3a; }
+  .switch span { color: #999; margin-left: 12px; }
+  body.shot .switch { display: none; }
+
+  /* The game area, 1280x800 widescreen. */
+  .game { position: relative; width: 1280px; height: 800px; overflow: hidden; background: #3a3a3a; }
+  .sidebar { position: absolute; left: 0; top: 0; width: 145px; height: 800px; background: #0d1a6e; }
+  .sidebar div { color: #9bd; font-size: 13px; text-align: center; padding: 22px 6px; }
+  .sidebar .date { color: #ffef3a; background: #08105a; }
+  .heading { position: absolute; left: 160px; top: 16px; width: 1105px; height: 70px; background: #c00; color: #ddd;
+             font-size: 30px; text-align: center; line-height: 70px; border: 2px solid #900; }
+  .backnext { position: absolute; left: 160px; top: 738px; width: 1105px; height: 48px; display: flex; gap: 8px; }
+  .backnext div { flex: 1; background: #666; color: #888; text-align: center; line-height: 48px; font-size: 20px; }
+  .shade { position: absolute; inset: 0 0 0 145px; background: rgba(0,0,0,.35); }
+
+  /* The box, drawn like Game Settings. */
+  .box { position: absolute; left: 232px; width: 958px; background: #0b4a0b; border: 3px solid #063306;
+         box-shadow: 0 0 0 1px #000; padding: 14px 16px 12px; display: flex; flex-direction: column; }
+  .title { background: #000; color: #e8e8e8; text-align: center; font-size: 20px; height: 54px; line-height: 54px;
+           border-top: 3px solid #1a3a9a; }
+  .vline { display: flex; justify-content: space-between; align-items: center; height: 40px; padding: 0 12px;
+           font-size: 12px; color: #e8e8e8; }
+  .vline .help { color: #b8c8b8; }
+  .greybtn { background: #8a8a8a; color: #f2f2f2; border: 2px solid #b5b5b5; border-right-color: #555;
+             border-bottom-color: #555; text-align: center; font-size: 14px; cursor: pointer; user-select: none; }
+  .vline .greybtn { width: 204px; height: 28px; line-height: 24px; font-size: 12px; }
+  .list { background: #0a5a0a; border: 1px solid #2d7a2d; padding: 6px 0; }
+  .row { display: grid; grid-template-columns: 220px 124px 124px 124px 1fr; column-gap: 4px; align-items: center;
+         padding: 0 12px 0 14px; border-bottom: 1px solid #0d660d; }
+  .row:last-child { border-bottom: 0; }
+  .label { color: #dedede; font-size: 19px; white-space: nowrap; }
+  .cell { height: 26px; line-height: 22px; text-align: center; font-size: 12.5px; font-weight: bold; }
+  .cur { color: #ffef3a; border: 2px solid #e6d73a; background: #0a5a0a; }
+  .alt { color: #3ad23a; border: 2px solid transparent; cursor: pointer; }
+  .alt:hover { border-color: #2a8a2a; }
+  .path { grid-column: 2 / span 3; color: #ffef3a; font-size: 12.5px; font-weight: bold; white-space: nowrap;
+          overflow: hidden; text-overflow: ellipsis; padding-left: 8px; }
+  .note { color: #a9c9a9; font-size: 11px; line-height: 12px; padding-left: 10px; }
+  .closebar { display: flex; margin-top: 12px; }
+  .closebar .greybtn { flex: 1; height: 42px; line-height: 38px; font-size: 18px; }
+
+  .tabs { display: flex; gap: 6px; margin: 0 0 6px; }
+  .tab { flex: 1; height: 34px; line-height: 30px; text-align: center; font-size: 16px; cursor: pointer;
+         background: #063a06; color: #3ad23a; border: 2px solid #2d7a2d; }
+  .tab.on { background: #0a5a0a; color: #ffef3a; border-color: #e6d73a; }
+
+  .caption { padding: 10px 16px; font-size: 14px; color: #ccc; max-width: 1280px; line-height: 1.45; }
+  body.shot .caption { display: none; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="switch">
+  <button id="btnA" class="on">Variant A: one list</button>
+  <button id="btnB">Variant B: two tabs</button>
+  <span>Game area drawn at 1280x800 (widescreen). Click a green value to frame it.</span>
+</div>
+
+<div class="game" id="game">
+  <div class="sidebar">
+    <div class="date">Saturday<br>14.7.01 AM</div>
+    <div>Continue<br>Game</div><div>Test<br>Smoke</div><div>Competitions</div>
+    <div>Nations<br>&amp; Clubs</div><div>Find</div><div style="color:#ffef3a">Game<br>Options</div>
+  </div>
+  <div class="heading">Test Smoke News</div>
+  <div class="backnext"><div>Back</div><div>Next</div></div>
+  <div class="shade"></div>
+
+  <div class="box" id="boxA" style="top:32px">
+    <div class="title">Bosman Edition Options</div>
+    <div class="vline"><span>Bosman Edition 0.5.0</span><span class="help">Changes save at once to settings.txt</span></div>
+    <div class="list" id="listA"></div>
+    <div class="closebar"><div class="greybtn">Close</div></div>
+  </div>
+
+  <div class="box hidden" id="boxB" style="top:67px;height:661px">
+    <div class="title">Bosman Edition Options</div>
+    <div class="vline"><span>Bosman Edition 0.5.0</span><span class="help">Changes save at once to settings.txt</span></div>
+    <div class="tabs"><div class="tab on" data-tab="screen">Screen</div><div class="tab" data-tab="game">Game</div></div>
+    <div class="list" id="listB"></div>
+    <div class="closebar"><div class="greybtn">Close</div></div>
+  </div>
+</div>
+
+<div class="caption" id="capA">
+  Variant A: 18 rows of 30 px in a box 735 px high (the original's box is 661 px high with 15 rows).
+  In classic 800x600 the box scales by 0.625 like every area: 18 rows of about 19 px in a 460 px box, so the text gets
+  smaller than Game Settings (about 23 px per row there). A scroll area is the other choice, but the original's boxes have no scroll example.
+</div>
+<div class="caption hidden" id="capB">
+  Variant B: 9 rows per tab, in a box the size of Game Settings (661 px high). The same box fits classic 800x600 with no change in row size.
+</div>
+
+<script>
+const ON = ["On", "Off"];
+const OPTS = [
+  {id:"display", tab:"screen", label:"Display mode", values:["Widescreen","Classic","HD"], cur:"Widescreen", note:"Applies at the next start"},
+  {id:"sharp_picture", tab:"screen", label:"Sharp picture", values:ON, cur:"On"},
+  {id:"remember_window", tab:"screen", label:"Remember window", values:ON, cur:"On"},
+  {id:"sound", tab:"screen", label:"All sound", values:ON, cur:"On", note:"Applies at the next start"},
+  {id:"attribute_colours", tab:"screen", label:"Attribute colours", values:ON, cur:"On"},
+  {id:"condition_colours", tab:"screen", label:"Condition colours", values:ON, cur:"On"},
+  {id:"foreign_colours", tab:"screen", label:"Foreign colours", values:ON, cur:"On"},
+  {id:"match_columns", tab:"screen", label:"Match columns", values:ON, cur:"On", note:"Tactics and match screens"},
+  {id:"attribute_groups", tab:"screen", label:"Attribute groups", values:ON, cur:"On"},
+  {id:"space_to_continue", tab:"game", label:"Space to continue", values:ON, cur:"On"},
+  {id:"shortcuts", tab:"game", label:"Shortcut keys", values:ON, cur:"On"},
+  {id:"clickable_names", tab:"game", label:"Clickable names", values:ON, cur:"On"},
+  {id:"squad_views", tab:"game", label:"Team views", values:ON, cur:"On"},
+  {id:"full_player_search", tab:"game", label:"Full player search", values:ON, cur:"Off"},
+  {id:"faster_days", tab:"game", label:"Faster holidays", values:ON, cur:"On"},
+  {id:"save_backups", tab:"game", label:"Save backups", values:ON, cur:"On"},
+  {id:"database", tab:"game", label:"Database", values:["3.9.68","3.9.60","3.9.65"], cur:"3.9.68", note:"For the next new game"},
+  {id:"save_folder", tab:"game", label:"Save folder", path:"~/Library/Mobile Documents/com~apple~CloudDocs/CM 01-02 saves", note:"Applies at the next start. Change it in settings.txt"},
+];
+
+function rowHtml(o, h) {
+  let cells = "";
+  if (o.path) {
+    cells = `<div class="path" title="${o.path}">${o.path}</div>`;
+  } else {
+    for (let i = 0; i < 3; i++) {
+      const v = o.values[i];
+      if (!v) { cells += `<div></div>`; continue; }
+      cells += v === o.cur ? `<div class="cell cur">${v}</div>`
+                           : `<div class="cell alt" data-id="${o.id}" data-v="${v}">${v}</div>`;
+    }
+  }
+  return `<div class="row" style="height:${h}px"><div class="label">${o.label}</div>${cells}<div class="note">${o.note || ""}</div></div>`;
+}
+
+let tab = "screen";
+function render() {
+  document.getElementById("listA").innerHTML = OPTS.map(o => rowHtml(o, 30)).join("");
+  document.getElementById("listB").innerHTML = OPTS.filter(o => o.tab === tab).map(o => rowHtml(o, 46)).join("");
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest(".alt");
+  if (c) { OPTS.find(o => o.id === c.dataset.id).cur = c.dataset.v; render(); return; }
+  const t = e.target.closest(".tab");
+  if (t) { tab = t.dataset.tab; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t)); render(); }
+});
+function show(v) {
+  const a = v === "a";
+  document.getElementById("boxA").classList.toggle("hidden", !a);
+  document.getElementById("boxB").classList.toggle("hidden", a);
+  document.getElementById("capA").classList.toggle("hidden", !a);
+  document.getElementById("capB").classList.toggle("hidden", a);
+  document.getElementById("btnA").classList.toggle("on", a);
+  document.getElementById("btnB").classList.toggle("on", !a);
+}
+document.getElementById("btnA").onclick = () => show("a");
+document.getElementById("btnB").onclick = () => show("b");
+const q = new URLSearchParams(location.search);
+if (q.has("shot")) document.body.classList.add("shot");
+if (q.get("tab") === "game") { tab = "game"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.tab === "game")); }
+render();
+show(q.get("v") === "b" ? "b" : "a");
+</script>
+</body>
+</html>
