@@ -63,6 +63,7 @@ void o_0055fba0(void);
 /* Match columns (columns.c): new column counts and column numbers for two lists of the match screens. */
 void columns_area_before(void);
 void columns_area_after(int area, int unwound);
+void groups_area_before(void);
 void columns_widget_before(void);
 void o_0055f990(void);
 void o_005e40d0(void);
@@ -75,6 +76,7 @@ RT_WRAP(0055fba0, area_create)
 {
     columns_area_before();
     scale_rect_args(0);
+    groups_area_before();
     o_0055fba0();
     columns_area_after((int16_t)cpu.eax, rt_unwinding);
 }

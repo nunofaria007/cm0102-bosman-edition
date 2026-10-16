@@ -1,0 +1,22 @@
+# Attribute groups (#43): facts for the build
+
+Slice 7 of `docs/specs/2026-10-15-features-0.4.0-spec.md`. Code: `src/recomp_rt/win/groups.c`, `groups_layout.c`, `tools/recomp/attribute_groups.py`.
+
+## The profile build 0x87a510, Profile tab
+
+- Area: `0x55fba0(0x6e, y1, 0x30c, y2, 6 columns, weights, rows, 0, 1, 0, -1)`, call at 0x87a705. Rows = (y2 - y1) / `0x5e5cd0(2)` (0x87a6ae..0x87a6d7, kept in bl). Seen in a run: classic y 160..379, row height 18, 12 rows. Widescreen y 213..505 (scaled), row height 18, 16 rows would fit, the original still asks for 12.
+- Table: 36 cells of 0x65 bytes at 0xddf570, a name of 100 bytes and a value byte at +0x64. Cells 0..30: attributes 1..31, name from `0x5428a0(i, text, 100, 0)`, value from `0x543540` (or `0x543440`) (0x87a725..0x87a776). qsort 0x945333 of 31 cells by name, comparator 0x88bc50 (0x87a786). Cells 31..35: Preferred Foot (0xff), Form (0xfe), Morale (0xfd), Condition (0xfc), On Loan (0xfb) (0x87a78e..0x87a80d).
+- Columns: `mov edi, 0x24` at 0x87a81e shares the cells out round robin over three column counts at [esp+0x1c]; the most rows, or the area rows if more, go to [esp+0x28] for the blank padding.
+- Cell loop: from `[esp+0x14] = 0xddf5d4` (0x87a85b) to `cmp eax, 0x24` (0x87acb5). A column ends when its row count is reached (0x87ac.. `local_204 == count`), the loop also ends after the third column.
+- Name label: `sprintf("  %s")` (format 0x987ff0, two spaces) into 0xde1f64, label call at 0x87aa09 (returns 0x87aa0e), colour [0xae3184]. Value label: call at 0x87ac15 (returns 0x87ac1a), see the columns inventory.
+- On Loan (0xfb): no labels. A widget at x 0x22e..0x30c in the current row and the text "On loan from ..." through 0x4aeaf0 from x 0x238. So On Loan must stay the last cell of column 3 (x is fixed).
+
+## How the slice changes it
+
+- `attribute_groups.py` turns the three constants (0x87a81e, 0x87a85b, 0x87acb5) into calls of the runtime. With the option off they give 0x24, 0xddf5d4, 0x24.
+- With the option on, `rt_groups_cells` copies the game's own cells into a runtime table in group order, finds each attribute by the name that `0x5428a0` gives, and adds heading and blank cells (name starts with byte 1). A goalkeeper is a player whose positions text (`0x53ee50`, as the squad list shows it) starts with "GK".
+- The area create (call site profile_area) gets 13 rows when 13 rows of the font fit the scaled area: widescreen yes, classic no (12). In classic a column that does not fit with its heading rows keeps 12 cells and loses its heading row (Q125).
+
+## Same save and uninitialised stack in index.dat
+
+The save writer 0x52dad0 writes `local_1cc`, 0x1cc bytes of its stack frame that it never sets, into `index.dat` (pseudocode of 0x52dad0, the writes after the 22 index entries: `FUN_00932e10(local_1cc, 0x1cc, 1, file)` in the save path, `FUN_00945ce6` in the file path). So the save holds stack bytes left by earlier code. A run that draws a different screen can leave other bytes there.

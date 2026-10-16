@@ -8,12 +8,18 @@
  * The human turn is FUN_005cde40 (game.cpp). The day loop FUN_005cccd0 calls it once per slice, after
  * the day's processing (docs/research/2026-10-14-assistant-and-days-inventory.md, 2a). The save is
  * FUN_0082e430(path, 0x16), the call of the Auto Save at 0x7617d8. The folder is the save folder of
- * the game options, [0xae3138] + 0xf, as the Auto Save uses it at 0x7617bb. */
+ * the game options, [0xae3138] + 0xf, as the Auto Save uses it at 0x7617bb.
+ *
+ * In such a run the save writes zeros in place of the 0x1cc bytes that the save 0x52dad0 copies from its
+ * stack into index.dat without setting them (call site index_pad, 0x53142b). Those bytes are left over
+ * from earlier code, so two runs that draw different screens could save different bytes with the same
+ * game state (docs/research/2026-10-15-attribute-groups.md). */
 #include "win.h"
 
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define GAME_DATE 0xae2c90u        /* s16 day of the year, s16 year */
 #define GAME_OPTIONS 0xae3138u     /* pointer to the game options; +0xf is the save folder */
@@ -60,4 +66,15 @@ RT_WRAP(005cde40, human_turn)
         }
     }
     o_005cde40();
+}
+
+void o_00932e10(void);
+extern const uint32_t rt_site_index_pad;
+
+/* The write of a part of a save, cdecl (data, size, count, file). */
+RT_WRAP(00932e10, save_write)
+{
+    if (save_after >= 0 && rd32(g_mem, cpu.esp) == rt_site_index_pad && rt_arg(1) == 0x1cc)
+        memset(g_mem + rt_arg(0), 0, 0x1cc);
+    o_00932e10();
 }

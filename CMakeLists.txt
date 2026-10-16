@@ -109,6 +109,9 @@ if(NOT WIN32)
     add_executable(savename_test tests/savename/test_cp1252.c)
     target_include_directories(savename_test PRIVATE src/recomp_rt/win)
     add_test(NAME savename COMMAND savename_test)
+    add_executable(groups_test tests/groups/test_groups.c src/recomp_rt/win/groups_layout.c)
+    target_include_directories(groups_test PRIVATE src/recomp_rt/win)
+    add_test(NAME groups COMMAND groups_test)
 endif()
 
 # The recompiled original (docs/specs/2026-10-14-recompile-spec.md). tools/recomp translates the

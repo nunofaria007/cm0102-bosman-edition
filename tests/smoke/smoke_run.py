@@ -175,7 +175,8 @@ SAME_SAVE_RUNS = [
     ("silent", {"faster_days": "off", "sound": "off"}),
     ("off", {"space_to_continue": "off", "shortcuts": "off", "sharp_picture": "off", "sound": "off",
              "clickable_names": "off", "attribute_colours": "off", "faster_days": "off",
-             "match_columns": "off", "condition_colours": "off", "save_backups": "off", "remember_window": "off"}),
+             "match_columns": "off", "condition_colours": "off", "save_backups": "off", "remember_window": "off",
+             "attribute_groups": "off"}),
 ]
 
 # The match check (--match): the steps after the load of prematch.sav (fixtures.LOAD_STEPS), positions
