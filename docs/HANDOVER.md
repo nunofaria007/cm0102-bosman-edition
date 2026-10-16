@@ -1,20 +1,28 @@
-# Handover, 2026-10-15
+# Handover, 2026-10-16
 
-Read this first, then `GLOSSARY.md`. v0.3.0 is released (2026-10-15). The next work is 0.4.0.
+Read this first, then `GLOSSARY.md`. v0.4.0 was published on 2026-10-16 with Mac, Windows and Linux downloads, and the site shows it. The next work is 0.5.0.
 
-The project lives in `/Users/max/Projects/cm0102` (moved from `~/Downloads/Game` on 2026-10-15): the repo `cm0102-mac/`, `clean-3968/`, `data-3960/`, `data-3965/`, `sdl2/`, `smoke-ref/`, `test-fixtures/`, `site-release-assets/`, `builds/` and `shots/`. Start sessions in `/Users/max/Projects/cm0102`. `~/Downloads/Game` now holds only the 2021 fan pack, which is never a build input. `build/` was configured fresh with `-DCM0102_EXE=/Users/max/Projects/cm0102/clean-3968/cm0102.exe -DRECOMP_PYTHON=/Users/max/.venvs/cm0102/bin/python`. `build-win/` is made again by the release script.
+The project lives in `/Users/max/Projects/cm0102`: the repo `cm0102-mac/`, `clean-3968/`, `data-3960/`, `data-3965/`, `sdl2/`, `smoke-ref/` (now with `hd/`), `test-fixtures/` (with `yeovil.sav` and `databases/`: all 49 Update Team databases unpacked, zips in `databases/zips`), `site-release-assets/`, `save-backups/`, `builds/` and `shots/`. Start sessions in `/Users/max/Projects/cm0102`. `build/` is configured with `-DCM0102_EXE=/Users/max/Projects/cm0102/clean-3968/cm0102.exe -DRECOMP_PYTHON=/Users/max/.venvs/cm0102/bin/python`.
 
-## Next session: 0.4.0
+## Next session: 0.5.0
 
-v0.3.0 is out as a pre-release with Mac, Windows and Linux downloads. The 0.3.0 issues and milestone are closed. Spec `docs/specs/2026-10-15-features-0.3.0-spec.md` (all slices built).
+1. **0.4.0 is closed:** issues #22, #32, #33, #43 and #54 and the milestone are closed, and the spec is marked shipped. Posts: `/Users/max/Projects/cm0102/release-0.4.0-posts.md` (Reddit update and forum post; whether Max posted them: unknown).
+2. **0.5.0: grilling, then one spec.** Issues #46 (fixes for rare crashes: Null News Item, leap-year date of birth, player search), #47 (mark players with a foreign player restriction), #48 (positions on the tactics screen), #49 (faster transfer status and discipline screens). Nick's CM0102Patcher (github.com/nckstwrt/CM0102Patcher) is the research map; Max decided its public work may be used (Q168), but no public page names Nick or Dav.
+3. **0.6.0 seasons release** (#50 to #53): decisions Q143 to Q172 in `docs/research/2026-10-15-season-screen-decisions.md`, the 87 change points and five eras in `docs/research/2026-10-16-season-change-points.md`, the chosen layout in `docs/research/mockups/2026-10-15-season-picker.html` (third screen, "A3 + both"). Grill the rest, then spec.
+4. **0.7.0 easy online play (#45):** network games today need Tapani's patch and a VPN such as Tailscale; make it quick and easy. The original's network game uses WinSock TCP; `src/recomp_rt/win/net.c` answers every call with "no network". Grill before building.
+5. **Later: stadium expansion (#55, Max's request).** Research in `docs/research/2026-10-16-stadium-research.md`: the original already has "Expand the Stadium" in Meet with Board and a yearly expansion routine (0x59cfa0), but 7,269 stadiums have expansion capacity 0 (Highbury among them). Seven decisions are open in that file.
+6. **Manual checks Max has not done:** HD (`display = hd`) on a 1080p and a 4K screen; the covered-name underline on Match Overview during a goal; the Windows keys (Ctrl+[, F11) on a Windows PC; `remember_window` on two screens and in full screen; the AppImage on a Steam Deck.
+7. **Open checks:** #30 "no match in 60 days" has no test; the same-save comparison against a manual Return from holiday is not done.
+8. Player requests and credits: `docs/requests.md`. Releases are announced as an update at the end of the original Reddit post and as a forum post.
+9. Worktrees of the 0.4.0 build (`/Users/max/Projects/cm0102/wt-*` and `cm0102-mac/.claude/worktrees/agent-*`) can be removed with Max's permission. Their branches are merged into main.
 
-1. **Build the 0.4.0 spec** `docs/specs/2026-10-15-features-0.4.0-spec.md` (grilling Q100 to Q142 done 2026-10-15). Slice 1 (picker fix) ships first as 0.3.1. Slices 1, 3, 7, 8 and 9 can start in parallel. The picker check uses `/Users/max/Projects/cm0102/test-fixtures/yeovil.sav`, a copy of Max's Yeovil save at 20.8.02 (never edit his own save). The investigation scripts of 2026-10-15 lived in a session scratchpad and are not kept; the spec holds the findings.
-1a. **0.5.0 season screen:** decisions Q145 to Q149 and the Update Team's permission are in `docs/research/2026-10-15-season-screen-decisions.md`. Grill the rest, then spec, after 0.4.0.
-1b. **0.7.0 easy online play (#45, after the 0.6.0 seasons release):** Max, 2026-10-16: network games today need Tapani's patch and a VPN such as Tailscale; make it quick and easy. The original's network game uses WinSock TCP; `src/recomp_rt/win/net.c` answers every call with "no network". Grill before building.
-2. **Manual checks Max has not done:** the Windows keys (Ctrl+[, F11) on a Windows PC, `remember_window` on two screens and in full screen, the AppImage on a Steam Deck. u/gundenaf says the Windows build runs on the Deck through Proton.
-3. **Open spec checks:** #30 "no match in 60 days" message has no test (no such club in the test saves), and the same-save comparison against a manual Return from holiday is not done.
-4. Player requests and credits: `docs/requests.md`. Credit each requester by name, feature by feature, when their feature ships. Releases are announced as an update at the end of the original Reddit post (not a new post) and as a forum post. The 0.3.0 texts are in `/Users/max/Projects/cm0102/release-0.3.0-reddit-post.md`. Whether Max has posted them: unknown. The screenshots of the Reddit thread showed 16 of 17 comments; only u/gundenaf made suggestions in them.
-5. The worktrees of the 0.3.0 build were removed on 2026-10-15 (Max's permission). Their branches stay in git.
+Facts from 0.4.0:
+- **Same game rule (Q152):** a feature must not change the game's decisions while the player makes the same clicks. The original's results depend on where its memory blocks sit: opening any screen, a box or a different display mode changes later days. Same-save checks therefore compare the same steps with the option on and off.
+- Max's Yeovil save had Skalidis's release clause removed on 2026-10-16 through the game's own Save Game (backup `save-backups/Yeovil-2026-10-16-before-skalidis-edit.sav`). A direct call of the save function 0x82e430 failed on that screen with "human_manager..cpp 2710". A Python edit of `contract.dat` is not possible yet: the member has no fixed record size.
+- `tools/save/savfile.py` reads and writes the .sav container; `tools/save/edit_money.py` sets a club's bank balance.
+- The picker scores by the average of the key shown attributes for the position times fit / 20 (Q138 to Q140), with an exact assignment (Q130). Best XI, squad depth and the comparison share `picker_shown_attribute` for other clubs.
+- Update Team databases need their whole folder, euro.cfg included; a mismatched euro.cfg made the original loop forever until the skip guard at 0x905a4c.
+- Questions for Max go in full in the last message of a turn, never only above the wrap-up box (Max, 2026-10-16).
 
 Facts from 0.3.0:
 - Saved test games in `/Users/max/Projects/cm0102/test-fixtures`: `start.sav` (Arsenal 14.7.01, first friendly 18.7.01) and `prematch.sav` (16.7.01, Basel friendly 20.7.01; another game, other fixtures).

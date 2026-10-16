@@ -56,14 +56,7 @@ Saved games are in `~/Library/Application Support/cm0102` on a Mac, `%APPDATA%\c
 
 ## Roadmap
 
-Planned for 0.4.0 ([milestone](https://github.com/maxevans60/cm0102-bosman-edition/milestone/4)):
-
-- A Team views screen with your best XI on a pitch and a squad depth table.
-- A player comparison with a polygon of each player's strengths.
-- Attributes grouped into technical, mental and physical on the player profile.
-- Print to PDF.
-- An HD layout at 1920 × 1080.
-- Custom databases: play any of the CM 01/02 Update Team's databases from 2003 to 2026.
+0.4.0 (released 2026-10-16) added Team views with best XI and squad depth, a player comparison with a polygon, attribute groups, print to PDF, an HD layout and the CM 01/02 Update Team's databases.
 
 Planned for 0.5.0 ([milestone](https://github.com/maxevans60/cm0102-bosman-edition/milestone/6)): fixes for rare crashes in the original game, a mark for players with a foreign player restriction, positions on the tactics screen and faster transfer and discipline screens.
 
