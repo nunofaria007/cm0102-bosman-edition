@@ -4,16 +4,18 @@
 Usage: python3 tests/smoke/message_box_run.py <cm0102_recomp> <game folder> [--dir <fixtures folder>]
     [--mode classic|widescreen|hd]...
 
-Each mode (default: all three, at the same time) loads tests/fixtures start.sav. The load shows the
-"CD Not Required" box. The run dumps the screen, clicks Ok at the centred place and waits for the
-first news screen.
+Each mode (default: all three, at the same time) loads tests/fixtures start.sav and prints the squad from
+the squad screen's Print drop-down. Print To is PDF (the default), so the game shows the path of the PDF
+in its message box (print_pdf.c). The run dumps the screen, clicks Ok at the centred place, waits for the
+squad screen to take input again and dumps it once more.
 
 The box keeps its classic size in every mode (its text is not scaled). Classic draws it at y 242..357,
 with its blue title bar at y 244..264, so the box is centred on 600 rows. In widescreen and HD mode the
 whole box moves down by (screen height - 600) / 2 rows. The checks:
-    - the blue title bar is centred across the screen (as before)
-    - the title bar starts at y 244 + (screen height - 600) / 2
-    - a click on Ok at its centred place closes the box: the game reaches the first news screen
+    - the blue title bar is centred across the screen
+    - the title bar starts at y 244 + (screen height - 600) / 2 (classic: 244, the original's place)
+    - a click on Ok at its centred place closes the box: the squad screen takes input, and the second
+      dump has no title bar
 """
 import concurrent.futures
 import os
@@ -25,6 +27,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fixtures  # noqa: E402
 import smoke_run  # noqa: E402
+
+# Squad > Print > Squad, "classic x y | widescreen x y | hd x y". Popup and drop-down items keep their size.
+PRINT_SQUAD = [
+    "1000 click 45 165 | 72 220 | 108 297",         # manager menu
+    "3500 click 148 156 | 199 204 | 268 270",       # Squad
+    "wait screen:0x454900",
+    "1500 click 750 25 | 1200 33 | 1800 45",        # Print
+    "3500 click 700 49 | 1170 61 | 1790 78",        # Squad
+    "wait box",
+]
+SQUAD_SCREEN = "screen:0x454900"
 
 TITLE_BGR = (132, 0, 0)     # the blue of the title bar in a dump (0xaebe04)
 TITLE_Y = 244               # the first row of the title bar in classic mode
@@ -69,11 +82,11 @@ def play(program, game, fix_dir, mode, work):
     os.makedirs(user)
     shutil.copyfile(os.path.join(fix_dir, "start.sav"), os.path.join(user, "start.sav"))
     fixtures.write_settings(user, mode, [])
-    load = fixtures.LOAD_STEPS[:fixtures.LOAD_STEPS.index("wait box") + 1]
-    steps = smoke_run.scaled_steps(mode, out, load) + [
-        f"1500 dump {out}/box.bmp", f"2000 move {ok}", f"2500 click {ok}", "wait first-news", "1000 quit"]
+    steps = smoke_run.scaled_steps(mode, out, fixtures.LOAD_STEPS + PRINT_SQUAD) + [
+        f"1500 dump {out}/box.bmp", f"2000 move {ok}", f"2500 click {ok}", f"wait {SQUAD_SCREEN}",
+        f"1500 dump {out}/after.bmp", "2000 quit"]
     r, _ = fixtures.run(program, game, mode, user, steps, {}, 300)
-    return r, os.path.join(out, "box.bmp")
+    return r, os.path.join(out, "box.bmp"), os.path.join(out, "after.bmp")
 
 
 def main(argv):
@@ -88,7 +101,7 @@ def main(argv):
         with concurrent.futures.ThreadPoolExecutor(len(modes)) as pool:
             jobs = {m: pool.submit(play, program, game, fix_dir, m, work) for m in modes}
             for mode in modes:
-                r, dump = jobs[mode].result()
+                r, dump, after = jobs[mode].result()
                 w, h = smoke_run.SIZES[mode]
                 want_y = TITLE_Y + (h - 600) // 2
                 bar = title_bar(dump) if os.path.exists(dump) else None
@@ -97,7 +110,8 @@ def main(argv):
                     (bar is not None and abs(bar[0] + bar[2] + 1 - w) <= 1,
                      f"the title bar is centred across ({bar and (bar[0], bar[2])}, screen {w})"),
                     (bar is not None and bar[1] == want_y, f"the title bar starts at y {want_y} ({bar and bar[1]})"),
-                    (r.returncode == 0, f"Ok at the centred place closes the box (code {r.returncode})"),
+                    (r.returncode == 0 and os.path.exists(after) and title_bar(after) is None,
+                     f"Ok at the centred place closes the box (code {r.returncode})"),
                 ]
                 for good, text in checks:
                     print(f"{'ok   ' if good else 'FAIL '} {mode}: {text}")
