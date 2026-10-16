@@ -19,6 +19,7 @@
 #include "win.h"
 #include "host.h"
 #include "options.h"
+#include "winfit.h"
 
 #include <SDL.h>
 #include <stdlib.h>
@@ -156,6 +157,27 @@ static int window_on_screen(int x, int y, int w, int h)
     return 0;
 }
 
+/* A new window (not a remembered one) that does not fit in the usable part of its screen, for example
+ * HD mode on a 1080p screen, gets smaller with the same shape and goes to the middle (winfit.h). The
+ * window opens hidden and shows after this. When the title bar size is unknown (SDL gives it on Windows
+ * and Linux), 32 rows are kept for it. */
+static void fit_new_window(int w, int h)
+{
+    SDL_Rect r;
+    int d = SDL_GetWindowDisplayIndex(window);
+    if (d < 0 || SDL_GetDisplayUsableBounds(d, &r)) { SDL_ShowWindow(window); return; }
+    int top = 0, left = 0, bottom = 0, right = 0;
+    if (SDL_GetWindowBordersSize(window, &top, &left, &bottom, &right) || top + bottom == 0) top = 32;
+    int fw, fh;
+    winfit_size(w, h, r.w - left - right, r.h - top - bottom, &fw, &fh);
+    if (fw != w || fh != h) {
+        SDL_SetWindowSize(window, fw, fh);
+        SDL_SetWindowPosition(window, r.x + left + (r.w - left - right - fw) / 2, r.y + top + (r.h - top - bottom - fh) / 2);
+        fprintf(stderr, "recomp: window fitted to %dx%d in %dx%d\n", fw, fh, r.w, r.h);
+    }
+    SDL_ShowWindow(window);
+}
+
 /* The window. CM0102_VERSION comes from the CMake project version. */
 #ifndef CM0102_VERSION
 #define CM0102_VERSION "dev"
@@ -164,6 +186,7 @@ void win_video_init(void)
 {
     if (window) return;
     int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED, w = (int)rt_screen_w, h = (int)rt_screen_h, full = 0;
+    int remembered = 0;
     if (options_bool(OPT_REMEMBER_WINDOW)) {
         char path[1100];
         window_file(path, sizeof path);
@@ -172,13 +195,14 @@ void win_video_init(void)
         int ok = f && fscanf(f, "%d %d %d %d %d", &sx, &sy, &sw, &sh, &sf) == 5;
         if (f) fclose(f);
         if (ok) {
-            if (window_on_screen(sx, sy, sw, sh)) { x = sx; y = sy; w = sw; h = sh; full = sf != 0; }
+            if (window_on_screen(sx, sy, sw, sh)) { x = sx; y = sy; w = sw; h = sh; full = sf != 0; remembered = 1; }
             else { w = FALLBACK_W; h = FALLBACK_H; }          /* off every screen: 1280x800 in the middle */
         }
     }
     window = SDL_CreateWindow("CM 01/02: Bosman Edition " CM0102_VERSION, x, y, w, h,
-                              SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+                              SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | (remembered ? 0 : SDL_WINDOW_HIDDEN));
     if (!window) rt_fatal("SDL_CreateWindow: %s", SDL_GetError());
+    if (!remembered) fit_new_window(w, h);
     note_windowed();
     if (full && SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP))
         fprintf(stderr, "recomp: full screen: %s\n", SDL_GetError());
