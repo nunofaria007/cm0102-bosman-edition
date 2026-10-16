@@ -298,8 +298,9 @@ static void solve(const Candidate *c, int n, const int *first, const uint16_t *m
     assign(c, n, first, masks, SLOTS, slots, taken, team);      /* MAX_SUBS <= SLOTS */
 }
 
-/* The best of the 11 slots for a player: the fit, and in *mask the position bit that gives it with the
- * slot's side bits. Returns the value there (-1 when no slot takes him). */
+/* The best of the 11 slots for a player: the slot of his highest value (score), on a tie the higher fit
+ * (Q156). Gives the fit there, and in *mask the position bit that gives it with the slot's side bits.
+ * Returns the value there (-1 when no slot takes him). */
 static int best_slot(const Candidate *c, const uint16_t *masks, int *best_fit, uint16_t *mask)
 {
     int best = -1;
@@ -308,7 +309,7 @@ static int best_slot(const Candidate *c, const uint16_t *masks, int *best_fit, u
     for (int s = 0; s < SLOTS; s++) {
         uint16_t bit;
         int f = fit_bit(c, masks[s], &bit), v = value(c, masks[s]);
-        if (v < 0 || f < *best_fit || (f == *best_fit && v <= best)) continue;
+        if (v < 0 || v < best || (v == best && f <= *best_fit)) continue;
         best = v;
         *best_fit = f;
         *mask = (uint16_t)(bit | (masks[s] & 0xf80));
@@ -342,7 +343,7 @@ static void bench(const Candidate *c, int n, const uint16_t *masks, int slots, c
         }
     for (int i = 0; i < k; i++) {
         out->bench_staff[i] = c[order[i]].staff;
-        best_slot(&c[order[i]], masks, &out->bench_fit[i], &out->bench_mask[i]);
+        out->bench_score[i] = best_slot(&c[order[i]], masks, &out->bench_fit[i], &out->bench_mask[i]);
     }
     out->bench = k;
 }

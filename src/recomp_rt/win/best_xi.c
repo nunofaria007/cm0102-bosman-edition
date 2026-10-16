@@ -8,7 +8,8 @@
  * show (0x543280), so no hidden value feeds the pick or a number on the screen (Q111).
  *
  * Each player is a box with his name in the club's colours, on the pitch at the place of his slot's
- * position mask, and his position rating for the slot (1 to 20) under it in the attribute colour.
+ * position mask, and his score for the slot under it in the attribute colour: the picker's score, the
+ * average of the key shown attributes of the position times fit / 20, rounded, 1 to 20 (Q156).
  *
  * The Formation drop-down in the heading lists the tactics of the game's own Tactics drop-down (tactics.c).
  * Item 0 is the player's current tactic, where the tab opens. A choice sets node slot 2 and builds the
@@ -137,6 +138,13 @@ static int log_on(void)
     return on;
 }
 
+/* The number on the screen for a picker value (Pick.score): the score value / 1200, rounded, 1 to 20. */
+static int shown_score(int value)
+{
+    int v = (value + 600) / 1200;
+    return v < 1 ? 1 : v > 20 ? 20 : v;
+}
+
 static void log_draw(uint32_t club, int chosen, const Tactic *t, const Pick *p)
 {
     if (!log_on()) return;
@@ -150,6 +158,10 @@ static void log_draw(uint32_t club, int chosen, const Tactic *t, const Pick *p)
     for (int s = 0; s < SLOTS; s++) fprintf(stderr, " %d", p->fit[s]);
     fprintf(stderr, " selection");
     for (int s = 0; s < SLOTS; s++) fprintf(stderr, " %d", sel[s]);
+    fprintf(stderr, " score");
+    for (int s = 0; s < SLOTS; s++) fprintf(stderr, " %d", p->score[s]);
+    fprintf(stderr, " shown");
+    for (int s = 0; s < SLOTS; s++) fprintf(stderr, " %d", shown_score(p->score[s]));
     fprintf(stderr, "\n");
 }
 
@@ -175,7 +187,7 @@ static void formation(uint32_t buf, const Tactic *list, int n, int chosen, uint3
 static int across_px(int px) { return (px * 800 + (int)rt_screen_w - 1) / (int)rt_screen_w; }
 static int down_px(int px) { return (px * 600 + (int)rt_screen_h - 1) / (int)rt_screen_h; }
 
-/* The players: a name box and the rating under it for each slot. x1..x2, y1..y2: the pitch as drawn, in
+/* The players: a name box and the score under it for each slot. x1..x2, y1..y2: the pitch as drawn, in
  * classic numbers (views_pitch_rect). Every box stays inside the pitch (Q154). */
 static void players(uint32_t buf, const Tactic *t, const Pick *p, int x1, int y1, int x2, int y2, uint32_t bar,
                     uint32_t fg)
@@ -211,9 +223,9 @@ static void players(uint32_t buf, const Tactic *t, const Pick *p, int x1, int y1
             if (log_on()) fprintf(stderr, " %d %d", cx - half, cx - half + box);
             if (p->staff[s]) {
                 char r[8];
-                snprintf(r, sizeof r, "%d", p->fit[s]);
+                snprintf(r, sizeof r, "%d", shown_score(p->score[s]));
                 text_widget(buf, cx - half, cy + 2, cx - half + box, cy + 15, 0, 0,
-                            columns_attribute_colour(p->fit[s]), 0xc, r);
+                            columns_attribute_colour(shown_score(p->score[s])), 0xc, r);
             }
         }
         i = j;
@@ -237,7 +249,7 @@ static void position_text(uint16_t mask, char *out, size_t size)
 }
 
 /* The list beside the pitch (Q155): the subs of the pick, then the other players who can play, each with
- * the position and the rating of his best slot of the chosen formation. Two columns, rows of VIEWS_ROW_PX
+ * the position and the score of his best slot of the chosen formation. Two columns, rows of VIEWS_ROW_PX
  * screen pixels, in the panel x1..y2. */
 static void bench_list(uint32_t buf, const Pick *p, int x1, int y1, int x2, int y2)
 {
@@ -261,9 +273,9 @@ static void bench_list(uint32_t buf, const Pick *p, int x1, int y1, int x2, int 
         text_widget(buf, cx, cy, cx + pos_w, cy + row - 1, 0, 0, head, 1, t);
         short_name(p->bench_staff[i], t, sizeof t);
         text_widget(buf, cx + pos_w, cy, cx + col_w - fit_w - 4, cy + row - 1, 0, 0, text, 1, t);
-        snprintf(t, sizeof t, "%d", p->bench_fit[i]);
+        snprintf(t, sizeof t, "%d", shown_score(p->bench_score[i]));
         text_widget(buf, cx + col_w - fit_w - 4, cy, cx + col_w - 4, cy + row - 1, 0, 0,
-                    columns_attribute_colour(p->bench_fit[i]), 0xc, t);
+                    columns_attribute_colour(shown_score(p->bench_score[i])), 0xc, t);
         r++;
         shown++;
     }
@@ -275,6 +287,10 @@ static void bench_list(uint32_t buf, const Pick *p, int x1, int y1, int x2, int 
         for (int i = 0; i < p->bench; i++) fprintf(stderr, " %d", (int32_t)rd32(g_mem, p->bench_staff[i]));
         fprintf(stderr, " fit");
         for (int i = 0; i < p->bench; i++) fprintf(stderr, " %d", p->bench_fit[i]);
+        fprintf(stderr, " score");
+        for (int i = 0; i < p->bench; i++) fprintf(stderr, " %d", p->bench_score[i]);
+        fprintf(stderr, " numbers");
+        for (int i = 0; i < p->bench; i++) fprintf(stderr, " %d", shown_score(p->bench_score[i]));
         fprintf(stderr, " shown %d\n", shown);
     }
 }

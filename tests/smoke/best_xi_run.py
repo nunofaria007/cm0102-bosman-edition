@@ -12,11 +12,14 @@ Squad > Assistant > Team views. Screen dumps of each step in <out>/<mode>.
 
 The runtime writes a line for each draw of the eleven (RECOMP_VIEWS_LOG=1):
     recomp: best xi club <club> tactic <i> "<name>" masks <11 hex> staff <11 staff indices> fit <11>
-        selection <11 staff indices of the club's stored selection>
+        selection <11 staff indices of the club's stored selection> score <11 picker values> shown <11 numbers>
 a line for the Formation list: recomp: best xi tactics <n> current <i>,
 and two lines for each draw (Q154, Q155), in 800x600 numbers:
     recomp: best xi pitch <x1> <y1> <x2> <y2> boxes <x1> <x2> ... (left and right edge of each name box)
-    recomp: best xi bench subs <staff of the pick's sub slots> list <staff> fit <fit> shown <rows>
+    recomp: best xi bench subs <staff of the pick's sub slots> list <staff> fit <fit> score <picker values>
+        numbers <numbers on the screen> shown <rows>
+A picker value is the score times 1200 (picker.c value()); the number on the screen is the score rounded,
+1 to 20 (Q156).
 
 Checks:
     - the first draw is on the current tactic (tactic 0) and has 11 players, each fit 1 to 20
@@ -28,6 +31,7 @@ Checks:
     - every name box lies inside the pitch (Q154)
     - the list on the right starts with the pick's subs, holds no player of the eleven and no player twice,
       shows every player, and each fit is 1 to 20 (Q155)
+    - each number on the screen, in the eleven and the list, is the picker's score rounded, 1 to 20 (Q156)
 """
 import os
 import re
@@ -73,7 +77,7 @@ TOUR = [
 ]
 
 LINE = re.compile(r'recomp: best xi club (0x[0-9a-f]+) tactic (\d+) "([^"]*)" masks ([0-9a-f ]+) staff '
-                  r'([-0-9 ]+) fit ([-0-9 ]+) selection ([-0-9 ]+)')
+                  r'([-0-9 ]+) fit ([-0-9 ]+) selection ([-0-9 ]+) score ([-0-9 ]+) shown ([-0-9 ]+)')
 
 
 def run(program, game, folder, mode, out):
@@ -102,14 +106,27 @@ def draws(log):
     for m in LINE.finditer(log):
         d = {"club": m.group(1), "tactic": int(m.group(2)), "name": m.group(3), "masks": m.group(4).split(),
              "staff": [int(x) for x in m.group(5).split()], "fit": [int(x) for x in m.group(6).split()],
-             "selection": [int(x) for x in m.group(7).split()]}
+             "selection": [int(x) for x in m.group(7).split()], "score": [int(x) for x in m.group(8).split()],
+             "shown": [int(x) for x in m.group(9).split()]}
         if not out or out[-1] != d:
             out.append(d)
     return out
 
 
 PITCH = re.compile(r"recomp: best xi pitch (-?\d+) (-?\d+) (-?\d+) (-?\d+) boxes ([-0-9 ]+)")
-BENCH = re.compile(r"recomp: best xi bench subs ([-0-9 ]*) list ([-0-9 ]*) fit ([-0-9 ]*) shown (\d+)")
+BENCH = re.compile(r"recomp: best xi bench subs ([-0-9 ]*) list ([-0-9 ]*) fit ([-0-9 ]*) score ([-0-9 ]*) "
+                   r"numbers ([-0-9 ]*) shown (\d+)")
+
+
+def shown_score(value):
+    """The number on the screen for a picker value (Q156): the score value / 1200, rounded, 1 to 20."""
+    return max(1, min(20, (value + 600) // 1200))
+
+
+def score_problems(name, values, numbers):
+    if len(values) != len(numbers) or any(shown_score(v) != n for v, n in zip(values, numbers)):
+        return [f"{name}: the numbers {numbers} are not the picker's scores {values}"]
+    return []
 
 
 def check_layout(name, log):
@@ -125,8 +142,9 @@ def check_layout(name, log):
                 problems.append(f"{name}: a name box {left}..{right} sticks out of the pitch {x1}..{x2}")
                 break
     elevens = [set(d["staff"]) for d in draws(log)]
-    for subs, staff, fit, shown in benches:
-        subs, staff, fit = ([int(v) for v in t.split()] for t in (subs, staff, fit))
+    for subs, staff, fit, values, numbers, shown in benches:
+        subs, staff, fit, values, numbers = ([int(v) for v in t.split()] for t in (subs, staff, fit, values, numbers))
+        problems += score_problems(name + " list", values, numbers[:len(values)])
         if staff[:len(subs)] != subs:
             problems.append(f"{name}: the list starts {staff[:len(subs)]}, not with the subs {subs}")
         if len(staff) != len(set(staff)):
@@ -153,6 +171,7 @@ def check(name, code, log):
             problems.append(f"{name}: not 11 players in {x}")
         if any(not 1 <= f <= 20 for f in x["fit"]):
             problems.append(f"{name}: a fit outside 1 to 20 in {x}")
+        problems += score_problems(name + " eleven", x["score"], x["shown"])
     if len(d) < 4:
         return problems + [f"{name}: {len(d)} draws of the eleven, expected 4: {d}"]
     first, other, after, club2 = d[0], d[1], d[2], d[-1]
