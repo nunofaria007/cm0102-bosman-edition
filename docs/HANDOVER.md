@@ -9,6 +9,7 @@ The project lives in `/Users/max/Projects/cm0102` (moved from `~/Downloads/Game`
 v0.3.0 is out as a pre-release with Mac, Windows and Linux downloads. The 0.3.0 issues and milestone are closed. Spec `docs/specs/2026-10-15-features-0.3.0-spec.md` (all slices built).
 
 1. **Build the 0.4.0 spec** `docs/specs/2026-10-15-features-0.4.0-spec.md` (grilling Q100 to Q142 done 2026-10-15). Slice 1 (picker fix) ships first as 0.3.1. Slices 1, 3, 7, 8 and 9 can start in parallel. The picker check uses `/Users/max/Projects/cm0102/test-fixtures/yeovil.sav`, a copy of Max's Yeovil save at 20.8.02 (never edit his own save). The investigation scripts of 2026-10-15 lived in a session scratchpad and are not kept; the spec holds the findings.
+1a. **0.5.0 season screen:** decisions Q145 to Q149 and the Update Team's permission are in `docs/research/2026-10-15-season-screen-decisions.md`. Grill the rest, then spec, after 0.4.0.
 2. **Manual checks Max has not done:** the Windows keys (Ctrl+[, F11) on a Windows PC, `remember_window` on two screens and in full screen, the AppImage on a Steam Deck. u/gundenaf says the Windows build runs on the Deck through Proton.
 3. **Open spec checks:** #30 "no match in 60 days" message has no test (no such club in the test saves), and the same-save comparison against a manual Return from holiday is not done.
 4. Player requests and credits: `docs/requests.md`. Credit each requester by name, feature by feature, when their feature ships. Releases are announced as an update at the end of the original Reddit post (not a new post) and as a forum post. The 0.3.0 texts are in `/Users/max/Projects/cm0102/release-0.3.0-reddit-post.md`. Whether Max has posted them: unknown. The screenshots of the Reddit thread showed 16 of 17 comments; only u/gundenaf made suggestions in them.
@@ -46,7 +47,7 @@ Facts from 0.3.0:
 ## Rules
 
 - Never commit the original's code or data, saves, screenshots or the logo. Downloads use the clean files only (`/Users/max/Projects/cm0102/clean-3968`, made by `tools/clean_files/`); the fan pack in `/Users/max/Downloads/Game` is never a build input.
-- No feature may change match results or the game's decisions, except picking a team (Max: selection is selection).
+- No feature may change the game's decisions while the player makes the same clicks, except the team that is picked. A change of memory layout counts like opening a screen: the original's results already depend on where its memory blocks sit (Q152). Classic, widescreen and HD saves differ for this reason, as they always have.
 - Every option is a line in `settings.txt`. Feature issues labelled `enhancement` show on the site's "Coming next" list live, so their titles are written for players. Bugs use `bug` and never show.
 - Grilling before a new feature, then the spec. One shared brief for parallel agents; Opus for research, review and anything a player sees, Sonnet for routine builds.
 - Agents must not run `rm` with a wildcard or a variable path.

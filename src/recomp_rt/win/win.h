@@ -24,6 +24,8 @@ static inline void win_put_str(uint32_t dst, const char *s, uint32_t room)
 /* Settings of the run (main.c). */
 extern char win_game_dir[1024];        /* host folder of the original: cwd, registry Location */
 extern char win_user_dir[1024];        /* host folder of every write: ~/Library/Application Support/cm0102 */
+const char *win_save_folder(void);   /* files.c: the folder of the saved games (save_folder or the user folder) */
+int win_game_date(int *year, int *month, int *day);   /* savename.c: the game date, month and day from 1; 0 when unknown */
 extern char win_exe_path[1024];        /* host path of the player's cm0102.exe: the CD drive D:\ */
 extern char win_command_line[1024];    /* the Windows command line: "cm0102.exe" and the options */
 extern int win_trace;                  /* RECOMP_TRACE: print each import call */
@@ -109,6 +111,9 @@ typedef struct {
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
 int picker_pick(uint32_t club, uint32_t team_index, int kind);
 int picker_check_turn(void);                   /* at each human turn: the picker check; 1 when done */
+/* The Team views screen (views.c): pushes it for a club and team (0 = first team) of a squad screen. */
+void views_open(uint32_t club, uint32_t team);
+void views_widget_drawn(uint32_t widget);      /* after the game draws a widget: the pitch */
 /* Faster commentary (commentary.c): at each widget create, before the rect is scaled. */
 void commentary_widget_before(void);
 

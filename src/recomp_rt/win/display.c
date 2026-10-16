@@ -1,6 +1,7 @@
 /* Widescreen mode and classic mode (docs/research/2026-10-14-widescreen-inventory.md).
  *
- * The original draws at 800x600. In widescreen mode the screen is 1280x800:
+ * The original draws at 800x600. In widescreen mode the screen is 1280x800, in HD mode 1920x1080
+ * (0.4.0 spec, slice 9). Both modes use the same rule:
  * - tools/recomp/widescreen.py turns the size constants of the display code into rt_screen_w and
  *   rt_screen_h;
  * - the area and widget create functions get coordinates for 800x600 from about 600 places, so these
@@ -8,7 +9,7 @@
  * - a picture of exactly 800x600 (a background) is scaled to fill the screen when it is loaded.
  *
  * The settings file settings.txt in the user folder chooses the mode with the line
- * "display = classic" or "display = widescreen". options.c reads it and writes it when it is missing. */
+ * "display = classic", "display = widescreen" or "display = hd". options.c reads it and writes it when it is missing. */
 #include "win.h"
 #include "host.h"
 #include "options.h"
@@ -20,6 +21,8 @@
 #define CLASSIC_H 600u
 #define WIDE_W 1280u
 #define WIDE_H 800u
+#define HD_W 1920u
+#define HD_H 1080u
 
 /* Reads settings.txt in the user folder through the options module (options.h), which writes the
  * file when it is missing. Sets the screen size. */
@@ -31,6 +34,9 @@ void win_read_settings(void)
     if (options_enum(OPT_DISPLAY) == DISPLAY_CLASSIC) {
         rt_screen_w = CLASSIC_W;
         rt_screen_h = CLASSIC_H;
+    } else if (options_enum(OPT_DISPLAY) == DISPLAY_HD) {
+        rt_screen_w = HD_W;
+        rt_screen_h = HD_H;
     } else {
         rt_screen_w = WIDE_W;
         rt_screen_h = WIDE_H;

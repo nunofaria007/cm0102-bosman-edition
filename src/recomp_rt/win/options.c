@@ -18,8 +18,8 @@ typedef struct {
 } OptionDef;
 
 static const OptionDef defs[OPT_COUNT] = {
-    [OPT_DISPLAY] = {"display", KIND_ENUM, "widescreen", "widescreen|classic",
-        "display = widescreen draws the game at 1280x800. display = classic draws it at 800x600."},
+    [OPT_DISPLAY] = {"display", KIND_ENUM, "widescreen", "widescreen|classic|hd",
+        "display = widescreen draws the game at 1280x800. display = classic draws it at 800x600. display = hd draws it at 1920x1080."},
     [OPT_SPACE_TO_CONTINUE] = {"space_to_continue", KIND_SWITCH, "on", NULL,
         "space_to_continue = on lets the space bar press Continue Game."},
     [OPT_SHORTCUTS] = {"shortcuts", KIND_SWITCH, "on", NULL,
@@ -46,6 +46,8 @@ static const OptionDef defs[OPT_COUNT] = {
         "condition_colours = on colours condition percentages and morale words: red, amber or green."},
     [OPT_DATABASE] = {"database", KIND_ENUM, "3.9.68", "3.9.68|3.9.60|3.9.65",
         "database = the data set of a new game: 3.9.68 (2002/03), 3.9.60 (2001/02), 3.9.65 (2001/02, December update) or folder:<name> for a folder in Databases."},
+    [OPT_SQUAD_VIEWS] = {"squad_views", KIND_SWITCH, "on", NULL,
+        "squad_views = on adds Team views (best XI, squad depth, compare players) to the Assistant drop-down of a squad screen."},
 };
 
 #define TEXT_MAX 1100

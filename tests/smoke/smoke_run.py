@@ -2,9 +2,9 @@
 """Smoke run: the recompiled game plays the start screen, a new game and some days without a person.
 
 Usage:
-    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> <reference folder> [--mode classic|widescreen|hd]
         [--database 3.9.60|3.9.65|3.9.68] [--record] [--tolerance n]
-    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen] [--days n]
+    python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --same-save [--mode classic|widescreen|hd] [--days n]
     python3 tests/smoke/smoke_run.py <cm0102_recomp> <game folder> --match [--days n] [--speed very-fast|fastest]
 
 --tolerance n: a colour channel that differs by n or less counts as equal. The Linux build differs from the
@@ -43,7 +43,8 @@ With --database, settings.txt also chooses the data set of the new game, and the
 Data-3.9.65, as in a download). Without it, the run uses the default 3.9.68 and <reference folder>/<mode>.
 
 Widescreen mode draws at 1280x800 and the runtime scales every area by 1280/800 across and 800/600
-down, so the run scales each click and the date box by the same factors.
+down, so the run scales each click and the date box by the same factors. HD mode (display = hd) draws
+at 1920x1080 with the same rule.
 
 Screens and checks:
     1 settings   the first-start settings screen: up to 20% of pixels differ (random background)
@@ -85,8 +86,8 @@ STEPS = [
     "2000 dump {d}/3-leagues.bmp",
     "2500 click 705 572",                   # Next (England is selected)
     "wait box",
-    "1000 move 399 330 | 638 328",
-    "2000 click 399 330 | 638 328",         # "CD Not Required": Ok (the box is not scaled in widescreen)
+    "1000 move 399 330 | 638 328 | 959 328",
+    "2000 click 399 330 | 638 328 | 959 328",         # "CD Not Required": Ok (the box is not scaled in widescreen or HD)
     "wait typing",
     "1000 type Test",
     "3000 click 560 310",
@@ -105,7 +106,7 @@ STEPS = [
     "wait first-news",
     "2000 dump {d}/4-news.bmp",
     "2500 click 45 165",                    # manager menu (the manager's name)
-    "4500 click 150 427 | 199 474",         # Go on Holiday (popup items keep their size in widescreen)
+    "4500 click 150 427 | 199 474 | 270 541",  # Go on Holiday (popup items keep their size in widescreen and HD)
     "7000 click 705 572",                   # Please Confirm: Yes
     "37000 dump {d}/5-holiday.bmp",
     "38000 quit",
@@ -114,7 +115,9 @@ DATE_BOX = (0, 15, 90, 55)  # x0, y0, x1, y1 of the day and date in the left bar
 SCREENS = [("1-settings", 0.20), ("2-setup", 0.0), ("3-leagues", 0.0), ("4-news", 0.0), ("5-holiday", None)]
 
 
-SIZES = {"classic": (800, 600), "widescreen": (1280, 800)}
+SIZES = {"classic": (800, 600), "widescreen": (1280, 800), "hd": (1920, 1080)}
+# The modes that can have their own position after "|": "x y | widescreen x y | hd x y".
+OWN_POSITIONS = ["widescreen", "hd"]
 
 
 def scaled_steps(mode, shots, steps=STEPS):
@@ -122,10 +125,11 @@ def scaled_steps(mode, shots, steps=STEPS):
     w, h = SIZES[mode]
     out = []
     for step in steps:
-        step, _, wide = step.partition("|")  # "| x y": the widescreen position, where it does not scale
+        # "| x y": the widescreen position, where it does not scale, and "| x y" after it: the HD position.
+        step, *own = step.split("|")
         parts = step.format(d=shots).split()
-        if wide and mode == "widescreen":
-            parts[2:4] = wide.split()
+        if mode in OWN_POSITIONS and len(own) > OWN_POSITIONS.index(mode):
+            parts[2:4] = own[OWN_POSITIONS.index(mode)].split()
         elif parts[0] != "wait" and parts[1] in ("click", "move", "down", "up", "rclick"):
             parts[2] = str(int(parts[2]) * w // 800)
             parts[3] = str(int(parts[3]) * h // 600)
@@ -175,7 +179,8 @@ SAME_SAVE_RUNS = [
     ("silent", {"faster_days": "off", "sound": "off"}),
     ("off", {"space_to_continue": "off", "shortcuts": "off", "sharp_picture": "off", "sound": "off",
              "clickable_names": "off", "attribute_colours": "off", "faster_days": "off",
-             "match_columns": "off", "condition_colours": "off", "save_backups": "off", "remember_window": "off"}),
+             "match_columns": "off", "condition_colours": "off", "save_backups": "off", "remember_window": "off",
+             "squad_views": "off"}),
 ]
 
 # The match check (--match): the steps after the load of prematch.sav (fixtures.LOAD_STEPS), positions
@@ -209,7 +214,7 @@ MATCH_STEPS = [
     "1000 click 705 573",                   # Proceed to the match? Yes
     "wait match",
     "1000 click 45 254",                    # Commentary Speed
-    "2500 click 120 255 | 192 344",         # Very Fast (widescreen; the classic position is not checked)
+    "2500 click 120 255 | 192 344 | 260 451",  # Very Fast (widescreen and HD; the classic position is not checked)
     "4000 click 45 120",                    # Kick Off Match
     "wait label:Re-start 600000",           # half time
     "1000 click 45 120",                    # Re-start Match
@@ -334,7 +339,8 @@ def same_save(program, game, mode, days):
 
 
 # --speed fastest: the Fastest item (#31, commentary.c), one row above Very Fast.
-SPEED_CLICKS = {"very-fast": "2500 click 120 255 | 192 344", "fastest": "2500 click 120 242 | 192 323"}
+SPEED_CLICKS = {"very-fast": "2500 click 120 255 | 192 344 | 260 451",
+                "fastest": "2500 click 120 242 | 192 323 | 260 430"}
 
 
 def match(program, game, days, speed="very-fast"):
@@ -359,7 +365,7 @@ def main(argv):
     if "--mode" in argv[3:]:
         mode = argv[argv.index("--mode") + 1]
     if mode not in SIZES:
-        print(f"unknown mode {mode}: use classic or widescreen")
+        print(f"unknown mode {mode}: use classic, widescreen or hd")
         return 2
     if "--match" in argv[3:]:
         days = int(argv[argv.index("--days") + 1]) if "--days" in argv[3:] else MATCH_DAYS
