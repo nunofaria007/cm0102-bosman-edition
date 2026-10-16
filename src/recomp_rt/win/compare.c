@@ -66,6 +66,8 @@
 #define WHITE 0xffffu
 #define DARK 0x0841u                /* the text in the name boxes */
 #define FILL_ALPHA 77               /* 0.3 of 256 */
+#define BACKDROP 0x0867u            /* the middle panel's fill: (10, 15, 60), the screen colour of the prototype */
+#define BACKDROP_ALPHA 224
 
 #define FONT 1
 #define ROW_PX VIEWS_ROW_PX         /* a row of a list, screen pixels */
@@ -87,6 +89,7 @@ static struct {
     int radius;                     /* screen pixels */
     int value[2][COMPARE_AXES];     /* tenths */
     int marks, mark[MARKS];         /* the widgets that get a white frame */
+    int backdrop;                   /* the widget over the middle panel that gets the dark fill (Q158) */
 } shown;
 
 static uint32_t buf;                /* text buffer in the game's memory, VIEWS_TEXT_SIZE bytes */
@@ -348,6 +351,9 @@ static void side(const Sides *s, const Player *me, const Player *other, int left
 static void middle(const Sides *s, const Player *p, int x1, int y1, int x2, int y2)
 {
     panel_at(x1, y1, x2, y2);
+    /* A dark fill over the whole middle panel, so the background picture does not show through behind
+     * the polygon (Q158). Its widget comes first, so the game draws the texts over it. */
+    shown.backdrop = text_at(x1 + 1, y1 + 1, x2 - 1, y2 - 1, 0, 0, 0, 0xc, "", 0, 0);
     const CompareAxis *axes = compare_axes(s->keepers);
     int label_w = 0;
     for (int i = 0; i < COMPARE_AXES; i++) {
@@ -427,6 +433,7 @@ void compare_build(uint32_t text, uint32_t staff1, uint32_t staff2, int x1, int 
     buf = text;
     memset(&shown, 0, sizeof shown);
     shown.polygon = -1;
+    shown.backdrop = -1;
     uint32_t node = rd32(g_mem, TOP_NODE);
     shown.build = node ? rd32(g_mem, node) : 0;
     Player p[2];
@@ -536,13 +543,18 @@ void compare_widget_drawn(uint32_t w)
     if (w < first || (w - first) % WIDGET_SIZE) return;
     int i = (int)((w - first) / WIDGET_SIZE), mark = 0;
     for (int m = 0; m < shown.marks; m++) mark |= shown.mark[m] == i;
-    if (i != shown.polygon && !mark) return;
+    if (i != shown.polygon && i != shown.backdrop && !mark) return;
     uint32_t surface = rd32(g_mem, DRAW_SURFACE);
     if (!surface) return;
     DrawTarget t = {g_mem + rd32(g_mem, surface + 0x14), rd32(g_mem, surface + 0x10),
                     (int)rd32(g_mem, surface + 8), (int)rd32(g_mem, surface + 0xc)};
     int x1 = (int32_t)rd32(g_mem, w + 0x10), y1 = (int32_t)rd32(g_mem, w + 0x14);
     int x2 = (int32_t)rd32(g_mem, w + 0x18), y2 = (int32_t)rd32(g_mem, w + 0x1c);
+    if (i == shown.backdrop) {
+        int box[] = {x1, y1, x2 + 1, y1, x2 + 1, y2 + 1, x1, y2 + 1};
+        draw_polygon(&t, box, 4, BACKDROP, BACKDROP_ALPHA);
+        return;
+    }
     if (mark) {
         frame(&t, x1, y1, x2, y2, WHITE);
         return;
