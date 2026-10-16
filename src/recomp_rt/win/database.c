@@ -53,9 +53,9 @@ static void sets_fill(void)
     char names[DBFOLDER_MAX][DBFOLDER_NAME];
     int n = dbfolders_list(win_databases_root(), names, DBFOLDER_MAX);
     for (int i = 0; i < n; i++) {
-        char value[DBFOLDER_NAME + 8], label[24];
+        char value[DBFOLDER_NAME + 8], label[DBFOLDER_NAME];
         snprintf(value, sizeof value, "folder:%s", names[i]);
-        dbfolders_label(names[i], label, sizeof label);   /* the button holds about 32 characters */
+        dbfolders_label(names[i], label, dbfolders_label_room(rt_screen_w));
         char text[ITEM_TEXT_SIZE];
         snprintf(text, sizeof text, "Database: %s", label);
         choice_set(&sets[set_count++], value, text);

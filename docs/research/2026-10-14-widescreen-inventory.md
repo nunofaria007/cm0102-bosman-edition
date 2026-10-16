@@ -73,7 +73,7 @@ The recompiler gained `RT_WRAP(addr, name)`: the translation of the function bec
 
 ## 7. Known limits
 
-- The message box of `0x5e8290` keeps its classic y (242..357). It is centred across the screen but sits above the middle. Moving it needs about 15 more y constants, some of them in mouse tests. Not done.
+- The message box of `0x5e8290` kept its classic y (242..357) and sat above the middle. Fixed in 0.4.0 slice 10 (section 12).
 - Text keeps its size. Areas are larger, so lists show the same number of rows, with more space.
 - Not checked on screen: a match in progress (`match.mbr`), the tactics pitch, graphs, and the drag of a widget. Max plays a new game in widescreen mode as the spec's manual check.
 - Unknown: whether other functions draw straight onto the screen with classic coordinates. The scan finds constants 799 and 599, not other coordinates such as 555. A screen that draws that way shows its part in the top-left 800x600.
@@ -135,4 +135,14 @@ Checked on screen in HD from saved games: the setup, leagues and news screens, t
 
 Popups keep their item size, so the scripted runs need their own HD positions for the items: Go on Holiday (270, 541), Very Fast (260, 451), Fastest (260, 430), and the Ok of the centred box (959, 328). `tests/smoke/smoke_run.py` takes them after a second "|".
 
-Known limit, the same as in widescreen (section 7): the message box of `0x5e8290` keeps its classic y (242..357). In HD it sits in the top third of the screen. Its fix needs about 30 y constants of `0x5e8290`, some of them in mouse tests (`0x5e85f6`…`0x5e870b`). Not done in part 1.
+Known limit, the same as in widescreen (section 7): the message box of `0x5e8290` kept its classic y (242..357) and sat in the top third of the screen. Fixed in part 2 (section 12).
+
+## 12. HD mode, part 2 (2026-10-16)
+
+Slice 10 of `docs/specs/2026-10-15-features-0.4.0-spec.md`.
+
+**Message box centred.** The box of `0x5e8290` keeps its classic size (its text is not scaled), and its x values are screen pixels (the text width, centred by `0x5E8309`). Its y values were classic rows. `widescreen.py` `BOX_Y` adds (rt_screen_h - 600) / 2 to each of its 31 y constants: the save and the restore of the pixels under the box (`0x5e3dd0`, `0x5e3fd0`), the box, the title bar, the title and the text, the Ok and the second button (their rects at [esp+0x14] and [esp+0x1c]), the flips, and the mouse tests of the buttons (`0x5e85f6`..`0x5e870b`). The box is at y 342..457 in widescreen and 482..597 in HD. Classic does not change. The Ok of a centred box is at (638, 428) in widescreen and (959, 568) in HD. Check: `tests/smoke/message_box_run.py` (the place of the title bar and a click on Ok, in each mode).
+
+**Sweep of the 0.4.0 screens in HD** (from saved games): Team views (Best XI with the formation list, Squad depth, Compare players with the squad list), the comparison screen of two chosen players, the grouped profile of an outfield player and of a goalkeeper, the PDF message after a print, and the Database button on Setup Game. One fault: the button cut a folder name at 23 letters, the room of the classic button. The room now grows with the screen width (`dbfolders_label_room`: 38 letters in widescreen, 57 in HD). Seen in every mode, not changed: on the Best XI pitch the goalkeeper's score touches the line of the goal area.
+
+**The window.** A new window opened at the size of the game's screen. In HD that is 1920x1080, which goes past the edge of a 1080p screen (menu bar or task bar, title bar). A new window that does not fit in the usable part of its screen now gets smaller with the same shape and opens in the middle (`winfit.h`, `user32.c` `fit_new_window`). A remembered window keeps its size. On a 4K screen at "looks like 1920x1080" the window opens at 1863x1048 points. Full screen on a 4K screen scales by exactly 2.

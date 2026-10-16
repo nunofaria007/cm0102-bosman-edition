@@ -28,4 +28,9 @@ int dbfolders_path(const char *save_dir, const char *name, char *out, size_t roo
  * room - 1 bytes. */
 void dbfolders_label(const char *utf8, char *out, size_t room);
 
+/* The room for dbfolders_label on the Setup Game button, for a screen screen_w pixels wide. The button
+ * holds about 32 characters in classic mode (room 24, after "Database: "). The button grows with the
+ * screen and the text keeps its size, so the room grows by the same factor (0.4.0 slice 10). */
+size_t dbfolders_label_room(unsigned screen_w);
+
 #endif
