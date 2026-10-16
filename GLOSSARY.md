@@ -141,12 +141,16 @@ _Avoid_: loading screen
 ### Options and features
 
 **Settings file**:
-The file settings.txt in the save folder. Each line sets one option, such as `display = classic`. It is the only place where the player sets the options of the Bosman Edition.
+The file settings.txt in the save folder. Each line sets one option, such as `display = classic`. The options screen writes to the same file.
 _Avoid_: config, preferences file, ini
 
 **Option**:
 One line of the settings file that switches a feature on or off or sets its value.
 _Avoid_: preference, flag, toggle
+
+**Options screen**:
+The Bosman Edition Options screen in the game. It opens from the start screen and from Game Options in the side bar, and it changes options at once.
+_Avoid_: preferences, settings menu
 
 **Assistant selection**:
 The assistant manager picks the player's team, from the Assistant drop-down on the squad screen (0.3.0, #12): best team, most match-fit team or under-21 team. It scores each player by the average of the key shown attributes for the position times positional fit, and finds the eleven with the highest total (0.3.1).
