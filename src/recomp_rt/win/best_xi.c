@@ -320,3 +320,31 @@ int best_xi_input(uint32_t id, uint32_t data)
     set_slot(CHOSEN, data - 1);
     return 1;
 }
+
+/* For the Squad depth tab (squad_depth.c): the same Formation button and list, the same texts. */
+int views_formation(uint32_t buf, uint32_t bar, Tactic *chosen_out)
+{
+    static Tactic list[VIEWS_TACTICS];
+    int n = tactics_list(human_manager(), list, VIEWS_TACTICS);
+    if (n <= 0) return 0;
+    int chosen = (int)node_slot(CHOSEN);
+    if (chosen < 0 || chosen >= n) chosen = 0;
+    formation(buf, list, n, chosen, bar);
+    *chosen_out = list[chosen];
+    return chosen + 1;
+}
+
+void views_text(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t text_colour, uint32_t flags, const char *text)
+{
+    text_widget(buf, x1, y1, x2, y2, 0, 0, text_colour, flags, text);
+}
+
+void views_box(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t colour)
+{
+    text_widget(buf, x1, y1, x2, y2, 0x30, colour, colour, 0xc, "");
+}
+
+void views_short_name(uint32_t staff, char *out, size_t size) { short_name(staff, out, size); }
+int views_shown_score(int value) { return shown_score(value); }
+void views_position_text(uint16_t mask, char *out, size_t size) { position_text(mask, out, size); }
+uint32_t views_human_manager(void) { return human_manager(); }
