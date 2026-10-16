@@ -2,7 +2,7 @@
 """Attribute groups check (#43): the player profile with attribute_groups on and off, from start.sav.
 
 Usage:
-    python3 tests/smoke/attribute_groups_run.py <cm0102_recomp> <game folder> [--mode classic|widescreen]
+    python3 tests/smoke/attribute_groups_run.py <cm0102_recomp> <game folder> [--mode classic|widescreen|hd]
         [--shots <folder>]
 
 Two runs in parallel, one with the option on and one off. Each loads start.sav (tests/fixtures), opens the
@@ -33,6 +33,9 @@ STEPS = {
     "widescreen": ["1000 click 72 220", "2500 click 199 203", "6000 click 336 312", "9000 dump {d}/gk.bmp",
                    "9500 click 573 764", "12000 click 336 492", "15000 dump {d}/outfield.bmp",
                    "17000 click 72 220", "20500 click 199 474", "23500 click 1128 763"],
+    "hd": ["1000 click 108 297", "2500 click 271 271", "6000 click 460 414", "9000 dump {d}/gk.bmp",
+           "9500 click 860 1030", "12000 click 460 664", "15000 dump {d}/outfield.bmp",
+           "17000 click 108 297", "20500 click 270 542", "23500 click 1690 1030"],
 }
 DAYS = 2
 
@@ -55,7 +58,7 @@ def main(argv):
     mode = argv[argv.index("--mode") + 1] if "--mode" in argv else "classic"
     shots = argv[argv.index("--shots") + 1] if "--shots" in argv else None
     if mode not in STEPS:
-        print(f"unknown mode {mode}: use classic or widescreen")
+        print(f"unknown mode {mode}: use classic, widescreen or hd")
         return 2
     with tempfile.TemporaryDirectory(prefix="cm0102-groups-") as work:
         with concurrent.futures.ThreadPoolExecutor(2) as pool:
