@@ -12,8 +12,8 @@
  * slot is the average of the key shown attributes of the slot's position times that fit, divided by 20
  * (Max, Q138 to Q140, 2026-10-15). The shown attributes come from the game's getter 0x5431e0 (1 to 20),
  * as the squad screen shows them for the player's own club. The getter does not apply the screen's
- * mask of unknown attributes (0x543280), so a pick for another club (best XI, Q108) would use values
- * the screen hides (Q111): that slice must apply the mask. Current ability is not used: on Max's Yeovil save it put Weale in goal over
+ * mask of unknown attributes (0x543280); best XI (picker_compute_view) applies it, so a pick for another
+ * club uses only the values the screen shows (Q108, Q111). Current ability is not used: on Max's Yeovil save it put Weale in goal over
  * D. Williams (Agility 20), because fixed attributes such as Agility, Jumping and Technique do not feed
  * current ability. The eleven is the assignment of the highest total
  * value over all slots, found exactly with the Hungarian method (Q130). A player with a fit below 10
@@ -69,6 +69,8 @@ _Static_assert(SLOTS + MAX_SUBS <= PICK_SLOTS, "a Pick holds the eleven and the 
 #define FIT 90                   /* condition in % for "most match-fit" */
 #define NATURAL 15               /* the game's "natural" rating (0x5b7d20) */
 #define ABLE 10
+#define MIDDLE 10                /* the value of a player whose key attributes are all hidden (inference: neutral) */
+#define KNOWN 0x543280u          /* cdecl (viewer manager, staff, index): 0 when the viewer's screens hide it */
 
 /* The positions of the substitutes. The original draws them at random (0x6dd108); the runtime uses a
  * fixed list: GK, D, M, M, F, then M, D, F, M. */
@@ -155,6 +157,7 @@ static const uint8_t keys[][7] = {
     [ROLE_FC] = {FINISHING, OFF_THE_BALL, ANTICIPATION, TECHNIQUE, PACE},   /* Q140 */
 };
 
+/* attr[k] is 0 for an attribute that the screen of the viewer hides (0x543280). */
 typedef struct { uint32_t staff, data; int condition, age, ability; uint8_t attr[ATTRIBUTES + 1]; } Candidate;
 
 /* By condition, then by staff address, so that the order (and a pick among equal values) is the same on
@@ -206,7 +209,9 @@ static int value(const Candidate *c, uint16_t mask)
              : bit == 0x8 ? ROLE_DMC : bit == 0x10 ? (wide ? ROLE_MLR : ROLE_MC) : bit == 0x20 ? ROLE_AM
              : ROLE_FC;
     int sum = 0, n = 0;
-    for (const uint8_t *k = keys[role]; *k; k++, n++) sum += c->attr[*k];
+    for (const uint8_t *k = keys[role]; *k; k++)
+        if (c->attr[*k]) { sum += c->attr[*k]; n++; }
+    if (!n) return MIDDLE * f * 60;      /* every key attribute hidden: the middle of the scale */
     return sum * f * 60 / n;
 }
 
@@ -306,20 +311,22 @@ static void staff_name(uint32_t staff, char *out, size_t size)
                   second ? (const char *)(g_mem + second) : "");
 }
 
-static int compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
+static int compute(uint32_t club, uint32_t team_index, int kind, const uint16_t *formation, uint32_t viewer,
+                   Pick *out)
 {
     memset(out, 0, sizeof *out);
     uint32_t manager = rd32(g_mem, club + MANAGER);
     uint32_t m[1] = {manager};
-    uint32_t tactic = manager ? call_this(0x5fbd00u, rd32(g_mem, HUMANS), 1, m) : 0;
-    if (!tactic || kind < 1 || kind > 3) return 0;
+    uint32_t tactic = formation ? 0 : manager ? call_this(0x5fbd00u, rd32(g_mem, HUMANS), 1, m) : 0;
+    if ((!tactic && !formation) || kind < 1 || kind > 3) return 0;
     uint32_t fixture = team_index ? 0 : next_fixture(club);
     int subs = fixture ? (int)(rd8(g_mem, fixture + 0x4d) & 0xf) : DEFAULT_SUBS;
     if (subs > MAX_SUBS) subs = MAX_SUBS;
     int slots = SLOTS + subs;
     uint16_t masks[SLOTS + MAX_SUBS];
     for (int s = 0; s < slots; s++)
-        masks[s] = s < SLOTS ? (uint16_t)rd16(g_mem, tactic + 0x12d + 2 * (uint32_t)s) : sub_masks[s - SLOTS];
+        masks[s] = s >= SLOTS ? sub_masks[s - SLOTS]
+                 : formation ? formation[s] : (uint16_t)rd16(g_mem, tactic + 0x12d + 2 * (uint32_t)s);
 
     Candidate c[50];
     int n = 0;
@@ -342,6 +349,8 @@ static int compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
             uint32_t a[2] = {staff, k};
             uint32_t v = call_cdecl(0x5431e0u, 2, a) & 0xff;
             c[n].attr[k] = (uint8_t)(v > 20 ? 20 : v);
+            uint32_t q[3] = {viewer, staff, k};
+            if (viewer && !(call_cdecl(KNOWN, 3, q) & 0xff)) c[n].attr[k] = 0;
         }
         n++;
     }
@@ -426,8 +435,17 @@ static int store(uint32_t club, uint32_t team_index, const Pick *p)
 
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out)
 {
+    return picker_compute_view(club, team_index, kind, NULL, 0, out);
+}
+
+/* formation: 11 slot masks in place of the manager's active tactic, or NULL. viewer: a manager whose
+ * screens hide some attributes of other clubs' players (0x543280, as the squad list 0x45c74c asks with
+ * the manager of the player slot, 0x456b1b); a hidden attribute does not count in the score. 0: all. */
+int picker_compute_view(uint32_t club, uint32_t team_index, int kind, const uint16_t *formation, uint32_t viewer,
+                        Pick *out)
+{
     picking = 1;
-    int n = compute(club, team_index, kind, out);
+    int n = compute(club, team_index, kind, formation, viewer, out);
     picking = 0;
     return n;
 }
