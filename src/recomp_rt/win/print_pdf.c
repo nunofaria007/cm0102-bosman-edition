@@ -96,7 +96,9 @@ RT_WRAP(007d4460, club_printout)
 static void box(const char *title, const char *text)
 {
     /* Test runs only (tests/smoke/same_save_views.py): no box, to see what the box does to the game. */
-    if (getenv("RECOMP_TEST_NO_PDF_BOX")) return;
+    static int shown;
+    const char *from = getenv("RECOMP_TEST_NO_PDF_BOX");     /* N: no box from the Nth on */
+    if (from && ++shown >= atoi(from)) return;
     static uint32_t title_at, text_at;
     if (!title_at) {
         title_at = win_static_alloc(BOX_TITLE_SIZE);

@@ -80,10 +80,10 @@ OPTIONS = {"pdf": ["click 45 345", "click 148 397", "click 444 474", "click 662 
 PRINT_SQUAD = ["click 45 165", "click 148 156", "click 750 25", "click 700 49"]   # menu, squad, Print, Squad
 
 
-def print_steps(choice, times=1, box=True):
+def print_steps(choice, times=1, boxes=None):
     """The steps of a print run: Print To, then the squad printed times times, then a holiday. The times
-    count from the last wait of the load, each after the one before. box False: the run has no PDF message
-    box (RECOMP_TEST_NO_PDF_BOX), so no click closes it."""
+    count from the last wait of the load, each after the one before. boxes: how many PDF message boxes show
+    (RECOMP_TEST_NO_PDF_BOX=boxes+1); a box that does not show gets no click. None: all."""
     steps, t = [], 2000
 
     def add(action, gap=1000):
@@ -97,7 +97,7 @@ def print_steps(choice, times=1, box=True):
         for a in PRINT_SQUAD if n == 0 else PRINT_SQUAD[2:]:     # the squad screen is open for the later prints
             add(a)
         if choice == "pdf":
-            if box:
+            if boxes is None or n < boxes:
                 add("click 399 330", 3000)  # the message with the path: Ok
             else:
                 t += 3000
@@ -123,21 +123,25 @@ def run_compare(program, game, days, folder):
 
 def run_print(program, game, days, folder):
     """The message box of a PDF print must leave the game as it found it (Q152): the texts of the box are in
-    runtime memory, not on the game's heap. The saved game of a PDF print with the box equals that of a PDF
-    print without it (RECOMP_TEST_NO_PDF_BOX), once and twice. A print itself changes the heap layout of the
-    game, which changes five parts of a later save (fifa_rankings, general, national_teams, staff history,
-    transfer); so a PDF run is not compared with a run that does not print, or with a File run (the Save
-    Printout dialog is the original's code and changes much more)."""
+    runtime memory, not on the game's heap. The saved game of a PDF print with the second message box equals
+    that of one without it (RECOMP_TEST_NO_PDF_BOX=2), after two and three prints.
+
+    The first box of a run is not compared: the game's box code (0x5e8290) keeps a buffer for the pixels
+    under the box (0x5e3dd0) that it makes when it first shows, and since 0.4.0 the "CD Not Required" box,
+    which used to make it at the load, no longer shows. So the first box moves the game's memory blocks like
+    opening a screen (Q152) and changes the five parts that depend on the layout (fifa_rankings, general,
+    national_teams, staff history, transfer). Nor is a PDF run compared with a run that does not print, or
+    with a File run (the Save Printout dialog is the original's code and changes much more)."""
     base = smoke_run.without_intro_click(fixtures.LOAD_STEPS)
     save = os.path.join(folder, "start.sav")
-    quiet = {"RECOMP_TEST_NO_PDF_BOX": "1"}
     failed = 0
-    for times in (1, 2):
+    for times in (2, 3):
         runs = [(f"pdf x{times}", {"_steps": base + print_steps("pdf", times) + ["400000 quit"]}),
-                (f"pdf x{times} without the box", {"_steps": base + print_steps("pdf", times, False) + ["400000 quit"],
-                                                   "_env": quiet}),
+                (f"pdf x{times}, no box after the first",
+                 {"_steps": base + print_steps("pdf", times, 1) + ["400000 quit"],
+                  "_env": {"RECOMP_TEST_NO_PDF_BOX": "2"}}),
                 (f"pdf x{times} again", {"_steps": base + print_steps("pdf", times) + ["400000 quit"]})]
-        print(f"--- the squad printed {times} time(s) as PDF, with and without the message box, classic")
+        print(f"--- the squad printed {times} times as PDF, with and without the later message boxes, classic")
         failed += smoke_run.compare_runs(program, game, "classic", runs, base, days, save)
     return failed
 
