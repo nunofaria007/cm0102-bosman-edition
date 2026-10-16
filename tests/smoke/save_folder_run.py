@@ -82,9 +82,6 @@ def main(argv):
                          "1000 click 277 242",                          # Restore Saved Game
                          "3500 click 445 257",                          # the first file in the list
                          "5000 click 705 572",                          # Ok
-                         "wait box",
-                         "1000 move 399 330",
-                         "2000 click 399 330",                          # CD Not Required: Ok
                          "wait first-news",
                          f"2000 dump {loaded}", "3000 quit"]
         r = run(program, game, user2, saves, restore_steps, home)
