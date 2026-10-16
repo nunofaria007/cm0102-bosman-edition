@@ -45,7 +45,7 @@ static const OptionDef defs[OPT_COUNT] = {
     [OPT_CONDITION_COLOURS] = {"condition_colours", KIND_SWITCH, "on", NULL,
         "condition_colours = on colours condition percentages and morale words: red, amber or green."},
     [OPT_DATABASE] = {"database", KIND_ENUM, "3.9.68", "3.9.68|3.9.60|3.9.65",
-        "database = the data set of a new game: 3.9.68 (2002/03), 3.9.60 (2001/02) or 3.9.65 (2001/02, December update)."},
+        "database = the data set of a new game: 3.9.68 (2002/03), 3.9.60 (2001/02), 3.9.65 (2001/02, December update) or folder:<name> for a folder in Databases."},
     [OPT_SQUAD_VIEWS] = {"squad_views", KIND_SWITCH, "on", NULL,
         "squad_views = on adds Team views (best XI, squad depth, compare players) to the Assistant drop-down of a squad screen."},
     [OPT_ATTRIBUTE_GROUPS] = {"attribute_groups", KIND_SWITCH, "on", NULL,
@@ -97,6 +97,12 @@ static void reset(void)
     loaded = 1;
 }
 
+/* A custom data set: "folder:" and a name. The name keeps its case. */
+static int is_custom_database(int id, const char *v)
+{
+    return id == OPT_DATABASE && !strncmp(v, "folder:", 7) && v[7];
+}
+
 /* Sets option id from the word in the file. A word that does not fit keeps the default. */
 static void set_value(const char *path, int id, const char *value)
 {
@@ -104,6 +110,10 @@ static void set_value(const char *path, int id, const char *value)
     char word[TEXT_MAX];
     snprintf(word, sizeof word, "%s", value);
     if (d->kind == KIND_TEXT) {
+        snprintf(text_value[id], TEXT_MAX, "%s", word);
+        return;
+    }
+    if (is_custom_database(id, word)) {
         snprintf(text_value[id], TEXT_MAX, "%s", word);
         return;
     }
@@ -215,6 +225,7 @@ int options_enum(OptionId id)
 {
     if (!loaded) reset();
     if (id >= OPT_COUNT || defs[id].kind != KIND_ENUM) return 0;
+    if (is_custom_database((int)id, text_value[id])) return DATABASE_CUSTOM;
     return parse_enum(defs[id].values, text_value[id]);
 }
 
@@ -235,7 +246,8 @@ static void option_key(const char *line, char *key, size_t room)
 int options_set_enum(OptionId id, const char *value)
 {
     if (!loaded) reset();
-    if (id >= OPT_COUNT || defs[id].kind != KIND_ENUM || parse_enum(defs[id].values, value) < 0) return 0;
+    if (id >= OPT_COUNT || defs[id].kind != KIND_ENUM) return 0;
+    if (!is_custom_database((int)id, value) && parse_enum(defs[id].values, value) < 0) return 0;
     snprintf(text_value[id], TEXT_MAX, "%s", value);
     if (!file_path[0]) return 1;
     /* Read the whole file, write it again with the new value on the option's lines to a temporary file
