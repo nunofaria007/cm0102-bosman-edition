@@ -3,7 +3,8 @@
  * picture. Only test runs with a script read the states. Two parts run in every game: waits_poll (at
  * each input poll it counts the poll, notes the screen node and the date of the first news screen, and
  * prints the screen log when RECOMP_SCREEN_LOG is set) and the wrap of the message box (it counts open
- * boxes). Both only record. They do not change what the game does.
+ * boxes). Both only record. They do not change what the game does. The wrap also skips the box "CD Not
+ * Required" (cd_box).
  *
  * A state of a screen counts only after an input poll 0x55f620 has run on that screen after the wait
  * started. The screen is then built and drawn and takes input (main loop 0x7fc7e0: build, draw, pump,
@@ -18,14 +19,14 @@
  *   setup       the start screen (Setup Game), build 0x81bab0
  *   leagues     Select League(s), build 0x81d010
  *   loaded      the game is made: the database load and the days before the start are done
- *               (0xdd711c = 1, set at the end of game creation 0x828110). The "CD Not Required" box
- *               shows after this.
+ *               (0xdd711c = 1, set at the end of game creation 0x828110).
  *   first-news  the first news screen (build 0x7881e0) of this run: a news screen on the date and part
  *               of the day of the first news screen that took input
  *   news        any news screen
  *   popup       a popup is open (input mode, the dword at the screen manager + 0, is 1; keys.c)
- *   box         a message box of 0x5e8290 is open, for example "CD Not Required" after a new game or
- *               a load. The box runs its own loop without the input poll, so this state needs no poll.
+ *   box         a message box of 0x5e8290 is open. The box "CD Not Required" of a new game and a
+ *               load never shows (cd_box). The box runs its own loop without the input poll, so
+ *               this state needs no poll.
  *   typing      a text entry takes keys (keys.c)
  *   match       the match screen of the player's club, build MATCH_BUILD
  *   continue    Continue Game can take a click (keys.c)
@@ -177,10 +178,26 @@ void waits_poll(void)
 }
 
 void o_005e8290(void);
+extern const uint32_t rt_site_cd_box_new, rt_site_cd_box_load;
+
+/* The box "CD Not Required" at the end of a new game (call 0x82a98b) and of a load (call 0x82e400). The
+ * build uses no CD, so the box never shows. Both callers drop the return value of the box. The title is
+ * checked too, so that another box at these calls still shows. */
+static int cd_box(void)
+{
+    uint32_t back = rd32(g_mem, cpu.esp), title = rt_arg(0);
+    return (back == rt_site_cd_box_new || back == rt_site_cd_box_load) && title &&
+           !strcmp((const char *)(g_mem + title), "CD Not Required");
+}
 
 /* The message box of the game: its own loop draws it and waits for Ok. */
 RT_WRAP(005e8290, message_box)
 {
+    if (cd_box()) {
+        fprintf(stderr, "recomp: skipped the box CD Not Required\n");
+        rt_ret_cdecl(0);
+        return;
+    }
     in_box++;
     o_005e8290();
     in_box--;

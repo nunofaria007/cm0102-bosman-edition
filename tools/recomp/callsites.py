@@ -42,6 +42,10 @@ CALL_SITES = {
     # and the speed getter call whose result the build copies into the match (esi) at 0x719c4e.
     "speed_very_fast": (0x719861, 0x55F990),
     "speed_copy": (0x719C49, 0x5FCFF0),
+    # No CD box: the message box "CD Not Required" (title 0xa81384, text 0xa81354) at the end of a new game
+    # 0x828110 and of a load 0x82a9c0. Both callers drop the return value (0x82a990, 0x82e405).
+    "cd_box_new": (0x82A98B, 0x5E8290),
+    "cd_box_load": (0x82E400, 0x5E8290),
 }
 
 SITES = {addr: (name, target) for name, (addr, target) in CALL_SITES.items()}

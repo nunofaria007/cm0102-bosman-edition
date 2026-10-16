@@ -2,6 +2,10 @@
 
 CM 01/02 Bosman Edition uses semantic versioning. A patch release (0.1.1) fixes bugs. A minor release (0.2.0) adds features. A major release (1.0.0 and later) can break saved games or settings. Releases below 1.0.0 are test releases.
 
+## Unreleased
+
+- The box "CD Not Required" no longer shows after a new game or a load. The game uses no CD, so you no longer need to click Ok.
+
 ## 0.3.1 (pre-release)
 
 A fix for the Assistant menu on the squad screen.
