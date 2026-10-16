@@ -8,7 +8,7 @@ Usage:
 Two runs in parallel, one with the option on and one off. Each loads start.sav (tests/fixtures), opens the
 profile of Seaman (a goalkeeper) and of Vieira from the Arsenal squad and dumps both, then goes on holiday
 and saves after 2 game days. The check passes when the two saves are the same and the dumps of the two
-runs differ (the option draws). The dumps go to the shots folder as on-gk.png, off-gk.png, on-outfield.png
+runs differ (the option draws). In classic mode the saves may differ (ACCEPTED_DIFFERENCE). The dumps go to the shots folder as on-gk.png, off-gk.png, on-outfield.png
 and off-outfield.png, for the screen check by eye: headings, the goalkeeper layout and the attribute
 colours.
 """
@@ -38,6 +38,11 @@ STEPS = {
            "17000 click 108 297", "20500 click 270 542", "23500 click 1690 1030"],
 }
 DAYS = 2
+# Modes where the saves with the option on and off may differ. In classic the option gives the profile's
+# attribute area 13 rows in place of 12, which changes the memory layout and so later days of the game.
+# The spec accepts that (Q152, Q153). In widescreen and HD the 13 rows leave the game the same: the saves
+# must be identical.
+ACCEPTED_DIFFERENCE = {"classic": "accepted: 13 rows in place of 12, Q152 and Q153"}
 
 
 def run(program, game, mode, value, work):
@@ -81,8 +86,12 @@ def main(argv):
             a = smoke_run.save_parts(os.path.join(on, "samesave.sav"))
             b = smoke_run.save_parts(os.path.join(off, "samesave.sav"))
             differ = sorted(k for k in set(a) | set(b) if a.get(k, (b"",))[0] != b.get(k, (b"",))[0])
-            print(f"FAIL  the saves differ in: {', '.join(differ) or 'the file header'}")
-            failed += 1
+            parts = ', '.join(differ) or 'the file header'
+            if mode in ACCEPTED_DIFFERENCE:
+                print(f"ok    the saves differ in: {parts} ({ACCEPTED_DIFFERENCE[mode]})")
+            else:
+                print(f"FAIL  the saves differ in: {parts}")
+                failed += 1
         for name in ("gk", "outfield"):
             if read(os.path.join(on, name + ".bmp")) != read(os.path.join(off, name + ".bmp")):
                 print(f"ok    {name}: the profile differs with the option on")
