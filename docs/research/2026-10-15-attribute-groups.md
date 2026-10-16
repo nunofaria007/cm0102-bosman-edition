@@ -20,3 +20,7 @@ Slice 7 of `docs/specs/2026-10-15-features-0.4.0-spec.md`. Code: `src/recomp_rt/
 ## Same save and uninitialised stack in index.dat
 
 The save writer 0x52dad0 writes `local_1cc`, 0x1cc bytes of its stack frame that it never sets, into `index.dat` (pseudocode of 0x52dad0, the writes after the 22 index entries: `FUN_00932e10(local_1cc, 0x1cc, 1, file)` in the save path, `FUN_00945ce6` in the file path). So the save holds stack bytes left by earlier code. A run that draws a different screen can leave other bytes there.
+
+The save file's table has the same fault. The open of a part 0x9326e0 takes the save object from `operator_new(0xa3191)` and does not clear it. It sets the offset (+0x25 of the row), the size (+0x29) and the name (+0x2d, only up to its end byte) of the new row, not the rest of the 256-byte name field and not the word at +0x108 of the row (+0x12d). The close 0x932b00 writes the whole table, 0x416ec bytes from +0x19: three words and 1000 rows. In a widescreen run with the option on and off, every part's bytes, offsets and sizes were equal, and only these words and the bytes after the first row's name differed (values such as 0xe320e320, which look like RGB565 pixel pairs).
+
+Test saves (RECOMP_SAVE_AFTER_DAYS, `src/recomp_rt/win/testrun.c`) write zeros in both places. Proof for the pad: with only the pad zeroed, the widescreen saves with the option on and off differed in the row words only. Normal saves are unchanged. Whether the loader reads the pad or the row words: unknown.
