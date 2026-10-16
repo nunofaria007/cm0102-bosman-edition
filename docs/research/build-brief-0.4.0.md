@@ -25,7 +25,7 @@ Slices 3, 7 and 9 may touch the same draw files. Keep each change small and in i
 - Send long decompiles to a subagent: REA returns each listing twice.
 
 ## Rules
-- No feature may change match results or the game's decisions, except the team that is picked. If a design would, stop and report.
+- No feature may change the game's decisions while the player makes the same clicks, except the team that is picked. A change of memory layout counts like opening a screen: the original's results already depend on where its memory blocks sit (Q152). The same-save check proves this with the same steps on and off. If a design would change decisions under the same steps, stop and report.
 - No hidden value (current ability, potential ability, or any value the original does not show) may appear on a screen or feed a shown number.
 - Every option is a line in the settings file, read through the existing reader, with the default from the spec. Add it to `ctest -R options`.
 - Never commit the original's code or data, saves, screenshots or the logo.

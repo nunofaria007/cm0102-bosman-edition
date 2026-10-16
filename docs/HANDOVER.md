@@ -47,7 +47,7 @@ Facts from 0.3.0:
 ## Rules
 
 - Never commit the original's code or data, saves, screenshots or the logo. Downloads use the clean files only (`/Users/max/Projects/cm0102/clean-3968`, made by `tools/clean_files/`); the fan pack in `/Users/max/Downloads/Game` is never a build input.
-- No feature may change match results or the game's decisions, except picking a team (Max: selection is selection).
+- No feature may change the game's decisions while the player makes the same clicks, except the team that is picked. A change of memory layout counts like opening a screen: the original's results already depend on where its memory blocks sit (Q152). Classic, widescreen and HD saves differ for this reason, as they always have.
 - Every option is a line in `settings.txt`. Feature issues labelled `enhancement` show on the site's "Coming next" list live, so their titles are written for players. Bugs use `bug` and never show.
 - Grilling before a new feature, then the spec. One shared brief for parallel agents; Opus for research, review and anything a player sees, Sonnet for routine builds.
 - Agents must not run `rm` with a wildcard or a variable path.
