@@ -15,7 +15,7 @@ Slice 7 of `docs/specs/2026-10-15-features-0.4.0-spec.md`. Code: `src/recomp_rt/
 
 - `attribute_groups.py` turns the three constants (0x87a81e, 0x87a85b, 0x87acb5) into calls of the runtime. With the option off they give 0x24, 0xddf5d4, 0x24.
 - With the option on, `rt_groups_cells` copies the game's own cells into a runtime table in group order, finds each attribute by the name that `0x5428a0` gives, and adds heading and blank cells (name starts with byte 1). A goalkeeper is a player whose positions text (`0x53ee50`, as the squad list shows it) starts with "GK".
-- The area create (call site profile_area) gets 13 rows when 13 rows of the font fit the scaled area: widescreen yes, classic no (12). In classic a column that does not fit with its heading rows keeps 12 cells and loses its heading row (Q125).
+- The area create (call site profile_area) gets 13 rows in both modes. In classic the font's row is 18 pixels and the area 220, so 13 rows are 17 pixels apart. On the classic screenshots (outfield player and goalkeeper, zoomed) no text clips, the descenders and the last row included (Q125).
 
 ## Same save and uninitialised stack in index.dat
 

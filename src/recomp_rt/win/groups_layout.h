@@ -4,8 +4,7 @@
 #define RECOMP_GROUPS_LAYOUT_H
 
 #define GROUP_COLUMNS 3
-#define GROUP_ROWS 13            /* the rows of a column with heading rows */
-#define GROUP_ROWS_MIN 12        /* the rows of the original: 36 cells in 3 columns */
+#define GROUP_ROWS 13            /* the rows of a column with heading rows (the original has 12) */
 
 /* The kinds of cell. 1 to 31 are the attribute numbers of the game's getter (names: 0x5428a0), in
  * alphabetical order of their English names. */
@@ -23,16 +22,12 @@ enum {
 };
 
 typedef struct {
-    int rows;                                  /* rows in each column */
-    int cell[GROUP_COLUMNS][GROUP_ROWS];
-    const char *title[GROUP_COLUMNS];          /* the group names of a column without its heading rows,
-                                                * or NULL */
+    int cell[GROUP_COLUMNS][GROUP_ROWS];       /* blank cells fill each column to GROUP_ROWS */
 } GroupLayout;
 
-/* Fills out for a goalkeeper (keeper 1) or an outfield player, when fit rows fit the area. A column
- * whose cells and heading rows do not fit loses its heading rows, and its group names go to its title
- * (Q125). Returns the rows of each column: GROUP_ROWS or GROUP_ROWS_MIN. */
-int groups_layout(int keeper, int fit, GroupLayout *out);
+/* Fills out for a goalkeeper (keeper 1) or an outfield player. Every column has its heading rows, in
+ * classic mode too (Q125). */
+void groups_layout(int keeper, GroupLayout *out);
 
 /* The text of a heading cell, or NULL for any other cell. */
 const char *groups_heading(int cell);

@@ -7,9 +7,9 @@
  * On Loan. It then shares the cells out over three columns and draws them in table order. With the option
  * on, three constants of the build (tools/recomp/attribute_groups.py) point it at a table of the runtime:
  * - rt_groups_cells copies the cells of the game's table in group order, with heading and blank cells,
- *   and gives their count: 13 rows in each column when 13 rows fit the area, else 12;
+ *   and gives their count: 13 rows in each column;
  * - rt_groups_table gives the first cell of that table, rt_groups_count the count again.
- * The area create of the build (call site profile_area) gets 13 rows when they fit. A heading or blank
+ * The area create of the build (call site profile_area) gets 13 rows. A heading or blank
  * cell has a name that starts with byte 1: the name label (call site profile_name) drops the byte and
  * draws a heading in yellow, and the value label after it gets an empty text.
  *
@@ -19,7 +19,6 @@
 #include "options.h"
 #include "groups_layout.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 extern const uint32_t rt_site_profile_area;
@@ -32,7 +31,6 @@ extern const uint32_t rt_site_profile_value;
 #define CELLS 36u
 #define ATTRIBUTE_NAME 0x5428a0u /* cdecl (attribute 1..31, text, size, 0): the attribute's name */
 #define POSITIONS 0x53ee50u      /* cdecl (player data, text, size, 1): the positions text, "GK" first */
-#define FONT_HEIGHT 0x5e5cd0u    /* cdecl (font): the height of a text row */
 #define YELLOW 0xaebdecu         /* the colour global of the values and the "Born" line */
 #define MARK 1                   /* first byte of the name of a heading or blank cell */
 
@@ -41,12 +39,12 @@ extern const uint32_t rt_site_profile_value;
 #define SCRATCH_SIZE 128u
 
 static struct {
-    int fit;                     /* rows that fit the attribute area of the last profile build */
+    int widened;                 /* the area of the last profile build got 13 rows */
     uint32_t table;              /* the runtime's table, GROUP_COLUMNS * GROUP_ROWS cells */
     uint32_t first;              /* the value byte of the first cell of the table in use */
     uint32_t count;              /* the cells in use */
     int blank_value;             /* the next value label of the profile gets an empty text */
-} groups = {GROUP_ROWS_MIN, 0, TABLE + VALUE, CELLS, 0};
+} groups = {0, 0, TABLE + VALUE, CELLS, 0};
 
 static uint32_t call_cdecl(uint32_t fn, int n, const uint32_t *args)
 {
@@ -93,7 +91,8 @@ uint32_t rt_groups_cells(uint32_t esp)
     groups.first = TABLE + VALUE;
     groups.count = CELLS;
     groups.blank_value = 0;
-    if (!options_bool(OPT_ATTRIBUTE_GROUPS)) return groups.count;
+    if (!options_bool(OPT_ATTRIBUTE_GROUPS) || !groups.widened) return groups.count;
+    groups.widened = 0;
     if (!groups.table) groups.table = win_static_alloc(GROUP_COLUMNS * GROUP_ROWS * CELL);
     /* The generated code keeps its registers in locals: the calls of the game's functions below push
      * below the build's own stack. */
@@ -101,10 +100,10 @@ uint32_t rt_groups_cells(uint32_t esp)
     cpu.esp = esp - 64;
     uint32_t staff = rd32(g_mem, esp + 0x20);
     GroupLayout l;
-    groups_layout(staff ? is_keeper(rd32(g_mem, staff + 0x61)) : 0, groups.fit, &l);
+    groups_layout(staff ? is_keeper(rd32(g_mem, staff + 0x61)) : 0, &l);
     uint32_t to = groups.table;
     for (int c = 0; c < GROUP_COLUMNS; c++)
-        for (int r = 0; r < l.rows; r++, to += CELL) {
+        for (int r = 0; r < GROUP_ROWS; r++, to += CELL) {
             int k = l.cell[c][r];
             uint32_t from = k >= 1 && k <= 31 ? attribute_cell(k)
                 : k >= CELL_FOOT && k <= CELL_ON_LOAN ? TABLE + (uint32_t)(31 + k - CELL_FOOT) * CELL : 0;
@@ -119,27 +118,20 @@ uint32_t rt_groups_cells(uint32_t esp)
         }
     cpu.esp = keep_esp;
     groups.first = groups.table + VALUE;
-    groups.count = (uint32_t)(GROUP_COLUMNS * l.rows);
+    groups.count = GROUP_COLUMNS * GROUP_ROWS;
     return groups.count;
 }
 
 uint32_t rt_groups_table(void) { return groups.first; }
 uint32_t rt_groups_count(void) { return groups.count; }
 
-/* From the area create wrap (display.c), after the rectangle is scaled to the screen: for the attribute
- * area of the profile, the rows that fit, and 13 rows when they fit. */
+/* From the area create wrap (display.c): the attribute area of the profile gets 13 rows, in classic
+ * mode too (Q125: 13 rows of 17 pixels, the font's rows are 18, and no text clips on the screenshots). */
 void groups_area_before(void)
 {
     if (rd32(g_mem, cpu.esp) != rt_site_profile_area) return;
-    int32_t y1 = (int32_t)rt_arg(1), y2 = (int32_t)rt_arg(3);
-    uint32_t a[1] = {2};
-    int h = (int16_t)call_cdecl(FONT_HEIGHT, 1, a);
-    groups.fit = h > 0 ? (y2 - y1 + 1) / h : GROUP_ROWS_MIN;
-    const char *force = getenv("RECOMP_GROUPS_FIT");   /* for tests: the rows that fit */
-    if (force && *force) groups.fit = atoi(force);
-    WIN_TRACE("groups: area y %d..%d, row %d, fit %d, rows %u\n", y1, y2, h, groups.fit, rt_arg(6) & 0xff);
-    if (options_bool(OPT_ATTRIBUTE_GROUPS) && groups.fit >= GROUP_ROWS && (rt_arg(6) & 0xff) < GROUP_ROWS)
-        wr32(g_mem, cpu.esp + 4 + 4 * 6, GROUP_ROWS);
+    groups.widened = options_bool(OPT_ATTRIBUTE_GROUPS);
+    if (groups.widened && (rt_arg(6) & 0xff) < GROUP_ROWS) wr32(g_mem, cpu.esp + 4 + 4 * 6, GROUP_ROWS);
 }
 
 /* From the label create wrap (columns.c), before the colours: the name and value labels of a heading

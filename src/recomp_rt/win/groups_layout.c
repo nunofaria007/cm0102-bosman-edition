@@ -32,29 +32,11 @@ const char *groups_heading(int cell)
     }
 }
 
-int groups_layout(int keeper, int fit, GroupLayout *out)
+void groups_layout(int keeper, GroupLayout *out)
 {
-    static char titles[GROUP_COLUMNS][48];
-    int rows = fit >= GROUP_ROWS ? GROUP_ROWS : GROUP_ROWS_MIN;
     memset(out, 0, sizeof *out);
-    out->rows = rows;
     for (int c = 0; c < GROUP_COLUMNS; c++) {
         const int *src = keeper && c == 0 ? keeper_first : outfield[c];
-        int n = 0;
-        while (src[n] >= 0) n++;
-        int drop = n > rows;   /* the column does not fit with its heading rows */
-        titles[c][0] = 0;
-        int r = 0;
-        for (int i = 0; i < n; i++) {
-            const char *h = groups_heading(src[i]);
-            if (h && drop) {
-                if (titles[c][0]) strncat(titles[c], ", ", sizeof titles[c] - strlen(titles[c]) - 1);
-                strncat(titles[c], h, sizeof titles[c] - strlen(titles[c]) - 1);
-                continue;
-            }
-            out->cell[c][r++] = src[i];
-        }
-        out->title[c] = drop ? titles[c] : NULL;
+        for (int r = 0; src[r] >= 0; r++) out->cell[c][r] = src[r];
     }
-    return rows;
 }
