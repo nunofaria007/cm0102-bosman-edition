@@ -65,9 +65,11 @@ Planned for 0.4.0 ([milestone](https://github.com/maxevans60/cm0102-bosman-editi
 - An HD layout at 1920 × 1080.
 - Custom databases: play any of the CM 01/02 Update Team's databases from 2003 to 2026.
 
-Planned for 0.5.0: a Choose Season screen that starts the game in the season of the database you pick.
+Planned for 0.5.0 ([milestone](https://github.com/maxevans60/cm0102-bosman-edition/milestone/6)): fixes for rare crashes in the original game, a mark for players with a foreign player restriction, positions on the tactics screen and faster transfer and discipline screens.
 
 Planned for 0.6.0 ([#45](https://github.com/maxevans60/cm0102-bosman-edition/issues/45)): easy online play with friends. The host gets a short join code and friends type it in, with no extra patch or VPN.
+
+Planned for 0.7.0 ([milestone](https://github.com/maxevans60/cm0102-bosman-edition/milestone/7)): choose your season, from 2001/02 to 2025/26. Each season starts in its own year and plays with the rules, league sizes, European cups and international competitions of its time.
 
 ## How it works
 
