@@ -67,6 +67,8 @@ Planned for 0.4.0 ([milestone](https://github.com/maxevans60/cm0102-bosman-editi
 
 Planned for 0.5.0: a Choose Season screen that starts the game in the season of the database you pick.
 
+Planned for 0.6.0 ([#45](https://github.com/maxevans60/cm0102-bosman-edition/issues/45)): easy online play with friends. The host gets a short join code and friends type it in, with no extra patch or VPN.
+
 ## How it works
 
 The original program is about 9,400 functions of 32-bit x86 code. The recompiler in [`tools/recomp`](tools/recomp) translates each function into C. A small runtime in [`src/recomp_rt`](src/recomp_rt) replaces the Windows calls the game makes (windows, drawing, files, sound, input) with SDL2. Fixes and features hook the game through checked addresses: the build stops if a hooked address no longer matches the original. A smoke test plays the game from a new game to the first news, and further tests play a match and compare saved games byte for byte.
