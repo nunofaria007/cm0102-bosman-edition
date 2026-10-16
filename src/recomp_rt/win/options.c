@@ -48,6 +48,8 @@ static const OptionDef defs[OPT_COUNT] = {
         "database = the data set of a new game: 3.9.68 (2002/03), 3.9.60 (2001/02) or 3.9.65 (2001/02, December update)."},
     [OPT_SQUAD_VIEWS] = {"squad_views", KIND_SWITCH, "on", NULL,
         "squad_views = on adds Team views (best XI, squad depth, compare players) to the Assistant drop-down of a squad screen."},
+    [OPT_ATTRIBUTE_GROUPS] = {"attribute_groups", KIND_SWITCH, "on", NULL,
+        "attribute_groups = on shows the player profile's attributes in Technical, Mental and Physical groups."},
 };
 
 #define TEXT_MAX 1100

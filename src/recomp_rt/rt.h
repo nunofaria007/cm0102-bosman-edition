@@ -290,6 +290,12 @@ void rt_fatal(const char *fmt, ...) __attribute__((noreturn, format(printf, 1, 2
  * mode, 1920x1080 in HD mode. The constants of tools/recomp/widescreen.py read these. */
 extern uint32_t rt_screen_w, rt_screen_h;
 
+/* Attribute groups (#43, src/recomp_rt/win/groups.c): the cells of the player profile's attribute table
+ * and their place. The constants of tools/recomp/attribute_groups.py read these. */
+uint32_t rt_groups_cells(uint32_t esp);
+uint32_t rt_groups_table(void);
+uint32_t rt_groups_count(void);
+
 /* Arguments and return for replacements: esp points at the return address. */
 static inline uint32_t rt_arg(int i) { return rd32(g_mem, cpu.esp + 4 + 4 * (uint32_t)i); }
 static inline void rt_ret_cdecl(uint32_t v) { cpu.eax = v; cpu.esp += 4; }

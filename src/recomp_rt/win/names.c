@@ -49,6 +49,13 @@ typedef struct { int set, x1, x2; char text[24]; } TextPlace;
 static TextPlace places[MAX_WIDGETS];
 static uint32_t drawn_widget;               /* the widget that 0x5ee590 draws, or 0 */
 
+/* What each widget's box looked like when the game drew it: a hash of its pixels. A box or popup that the
+ * game paints over a name later changes those pixels, while the hit test still finds the name under it
+ * (the goal box of the match screen does). Then the name gets no line (Q150). */
+static uint32_t drawn_hash[MAX_WIDGETS];
+static uint8_t hashed[MAX_WIDGETS];
+#define DRAW_SURFACE 0xaebde4u              /* the surface that the draw functions of the original draw on */
+
 static int widget_index(uint32_t w)
 {
     if (w < WIDGETS || w >= WIDGETS + WIDGET_SIZE * MAX_WIDGETS || (w - WIDGETS) % WIDGET_SIZE) return -1;
@@ -58,12 +65,32 @@ static int widget_index(uint32_t w)
 void o_005ee590(void);
 void o_005e6d80(void);
 
+/* FNV-1a over the pixels of the box x1..x2, y1..y2 of a surface; 0 when the box is not on it. */
+static uint32_t box_hash(uint32_t px, uint32_t pitch, int x1, int y1, int x2, int y2)
+{
+    if (!px || x1 < 0 || y1 < 0 || x2 >= (int)rt_screen_w || y2 >= (int)rt_screen_h || x1 > x2 || y1 > y2) return 0;
+    uint32_t h = 2166136261u;
+    for (int y = y1; y <= y2; y++) {
+        const uint8_t *row = g_mem + px + (uint32_t)y * pitch + (uint32_t)x1 * 2;
+        for (int k = 0; k < (x2 - x1 + 1) * 2; k++) h = (h ^ row[k]) * 16777619u;
+    }
+    return h | 1;
+}
+
 /* The widget draw, thiscall on the widget, one argument. */
 RT_WRAP(005ee590, widget_draw)
 {
     uint32_t outer = drawn_widget;
     drawn_widget = cpu.ecx;
     o_005ee590();
+    int i = widget_index(drawn_widget);
+    uint32_t surface = rd32(g_mem, DRAW_SURFACE);
+    if (i >= 0 && surface) {
+        uint32_t w = drawn_widget;
+        drawn_hash[i] = box_hash(rd32(g_mem, surface + 0x14), rd32(g_mem, surface + 0x10), s32at(w + 0x10),
+                                 s32at(w + 0x14), s32at(w + 0x18), s32at(w + 0x1c));
+        hashed[i] = 1;
+    }
     views_widget_drawn(drawn_widget);
     drawn_widget = outer;
 }
@@ -104,8 +131,8 @@ RT_WRAP(005e6d80, text_box)
     o_005e6d80();
 }
 
-/* The underline that the frame shows: on, x1..x2 at row y, in an RGB565 colour. */
-static struct { int on, x1, x2, y; uint16_t colour; } line;
+/* The underline that the frame shows: on, x1..x2 at row y, in an RGB565 colour, for widget i. */
+static struct { int on, x1, x2, y, i; uint16_t colour; } line;
 
 /* True for the action ids that open a person's or a club's profile (0x7643d0): 7d5 club, 7d6 club
  * reserves, 7d7, 7d8, 7da..7dd and 7e7 a staff profile at different pages. */
@@ -167,6 +194,17 @@ static uint16_t label_colour(int link)
 
 uint32_t win_primary_pixels(void);
 extern int win_screen_dirty;
+
+/* True when the shown picture of widget i differs from the picture that the game drew for it: something
+ * covers it. A widget with no hash (not drawn yet) counts as not covered. */
+static int covered(int i)
+{
+    if (i < 0 || i >= MAX_WIDGETS || !hashed[i]) return 0;
+    uint32_t w = widget(i);
+    uint32_t now = box_hash(win_primary_pixels(), rt_screen_w * 2, s32at(w + 0x10), s32at(w + 0x14), s32at(w + 0x18),
+                            s32at(w + 0x1c));
+    return now != drawn_hash[i];
+}
 
 /* The row for the line: two pixels under the lowest row of x1..x2 that holds a pixel of the text colour,
  * inside the widget. Without such a pixel, the bottom row of the widget. */
@@ -254,12 +292,22 @@ static void trim_to_text(uint32_t w, int *x1, int *x2, uint16_t colour)
  * frame for the next present. */
 void names_after_poll(void)
 {
+    /* Test runs only: RECOMP_TEST_COVER="x1 y1 x2 y2" paints a red box on the shown screen after the game
+     * draws, as the goal box of the match screen does (tests/smoke/name_cover_run.py). */
+    const char *cover = getenv("RECOMP_TEST_COVER");
+    int c[4];
+    uint32_t shown = win_primary_pixels();
+    if (cover && shown && sscanf(cover, "%d %d %d %d", &c[0], &c[1], &c[2], &c[3]) == 4)
+        for (int cy = c[1]; cy <= c[3] && cy < (int)rt_screen_h; cy++)
+            for (int cx = c[0]; cx <= c[2] && cx < (int)rt_screen_w; cx++)
+                wr16(g_mem, shown + 2 * ((uint32_t)cy * rt_screen_w + (uint32_t)cx), 0xf800);
     int on = 0, x1 = 0, x2 = 0, y = 0;
     uint16_t colour = 0;
     if (options_bool(OPT_CLICKABLE_NAMES) && rd32(g_mem, CURSOR_KIND) == 2 && !rd16(g_mem, DISPLAY)) {
         int i = widget_under(s32at(MOUSE_X), s32at(MOUSE_Y));
         uint32_t w = i >= 0 ? widget(i) : 0;
-        if (w && name_action(rd32(g_mem, w + 8)) && rd32(g_mem, w + 0x38) == 1 && rd32(g_mem, w + 0x48)) {
+        if (w && name_action(rd32(g_mem, w + 8)) && rd32(g_mem, w + 0x38) == 1 && rd32(g_mem, w + 0x48) &&
+            !covered(i)) {
             const char *text = win_str(w + 0x80);
             if (!*text) {                                  /* a link over a name in running text */
                 link_extent(i, &x1, &x2);
@@ -273,6 +321,7 @@ void names_after_poll(void)
                 on = 1;
             }
             if (on) y = line_row(w, x1, x2, colour);
+            line.i = i;
         }
     }
     if (on != line.on || (on && (x1 != line.x1 || x2 != line.x2 || y != line.y || colour != line.colour))) {
@@ -295,7 +344,7 @@ static void rgb(uint16_t c, uint8_t *r, uint8_t *g, uint8_t *b)
 /* Draws the line on the frame, after the game's picture. */
 void names_draw(SDL_Renderer *renderer)
 {
-    if (!line.on) return;
+    if (!line.on || covered(line.i)) return;
     uint8_t r, g, b;
     rgb(line.colour, &r, &g, &b);
     SDL_SetRenderDrawColor(renderer, r, g, b, 255);
@@ -306,7 +355,8 @@ void names_draw(SDL_Renderer *renderer)
 /* Draws the line on a copy of the screen for a dump. */
 void names_draw_surface(SDL_Surface *s)
 {
-    if (!line.on || !s) return;
+    if (!line.on || !s || covered(line.i)) return;
+    if (getenv("RECOMP_SCREEN_LOG")) fprintf(stderr, "recomp: name line in dump: x %d..%d, y %d\n", line.x1, line.x2, line.y);
     uint8_t r, g, b;
     rgb(line.colour, &r, &g, &b);
     SDL_Rect rect = {line.x1, line.y, line.x2 - line.x1 + 1, 1};

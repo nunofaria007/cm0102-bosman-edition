@@ -424,10 +424,12 @@ static uint32_t condition_label_colour(const char *s)
 }
 
 void o_00804100(void);
+void groups_label_before(void);
 
 /* The label create 0x804100. */
 RT_WRAP(00804100, label_create)
 {
+    groups_label_before();
     uint32_t ret = rd32(g_mem, cpu.esp);
     if ((ret == rt_site_profile_value || ret == rt_site_squad_attribute) && options_bool(OPT_ATTRIBUTE_COLOURS)) {
         uint32_t text = rt_arg(8);

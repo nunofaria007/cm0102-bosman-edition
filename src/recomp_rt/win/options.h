@@ -27,6 +27,7 @@ typedef enum {
     OPT_CONDITION_COLOURS,     /* switch, on */
     OPT_DATABASE,              /* enum: 3.9.68 (default), 3.9.60, 3.9.65: the data set of a new game */
     OPT_SQUAD_VIEWS,           /* switch, on: the Team views screen (views.c) */
+    OPT_ATTRIBUTE_GROUPS,      /* switch, on */
     OPT_COUNT
 } OptionId;
 
