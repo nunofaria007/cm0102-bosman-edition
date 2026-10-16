@@ -13,5 +13,6 @@ Max posts on Reddit as u/IndividualAd6919. The 0.2.0 release post: https://www.r
 | Android and iOS builds | u/gundenaf | Reddit, 0.2.0 post, 2026-10-15 | #37, #38 | |
 | A choice of database: 3.9.60 (the original 01/02 data), 3.9.65 (01/02 winter transfers, not sure), 3.9.68 (02/03 data, says the poster) | u/gundenaf | Reddit, 0.2.0 post, 2026-10-15 | #39 (0.3.0) | 0.3.0 |
 | Group player attributes into physical, technical and mental, as an option, as in later versions | u/gundenaf | Reddit, 0.2.0 post, 2026-10-15 (added to their first comment) | #43 (0.4.0) | 0.4.0 |
+| Expand the stadium or build a new one, with the rules of later games | Max | Session, 2026-10-16 | #55 | |
 
 Notes from the 0.2.0 thread: u/gundenaf reports that the Windows version runs on the Steam Deck through Proton.
