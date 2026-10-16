@@ -103,6 +103,14 @@ static const char *save_dir(void)
     return dir;
 }
 
+/* The folder of the saved games: the option save_folder, else the user folder. Printouts go in a
+ * folder below it (print_pdf.c). */
+const char *win_save_folder(void)
+{
+    const char *d = save_dir();
+    return d ? d : win_user_dir;
+}
+
 static int has_sav_ending(const char *name)
 {
     size_t n = strlen(name);

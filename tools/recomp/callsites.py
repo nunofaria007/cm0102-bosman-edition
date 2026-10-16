@@ -33,6 +33,8 @@ CALL_SITES = {
     "setup_menu": (0x81BCC5, 0x5ED300),
     # Assistant drop-down (#12): the Clear Squad button of the squad list 0x456900.
     "squad_clear": (0x458AD0, 0x8040A0),
+    # Team views (#22): the Filter button of the squad list 0x456900, made after Clear Squad.
+    "squad_filter": (0x458B10, 0x8040A0),
     # Holiday until next match (#30): the Go on Holiday item create of the left bar build 0x75db00
     # (docs/research/2026-10-15-holiday-next-match-inventory.md, 4a).
     "holiday_item": (0x75F1D4, 0x55F990),
