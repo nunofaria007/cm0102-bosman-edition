@@ -102,3 +102,9 @@ void dbfolders_label(const char *utf8, char *out, size_t room)
     }
     out[n] = 0;
 }
+
+size_t dbfolders_label_room(unsigned screen_w)
+{
+    size_t room = 24u * screen_w / 800u;
+    return room < 24 ? 24 : room > DBFOLDER_NAME ? DBFOLDER_NAME : room;
+}

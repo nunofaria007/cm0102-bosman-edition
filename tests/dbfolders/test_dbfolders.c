@@ -106,6 +106,13 @@ int main(void)
     dbfolders_label("A very long folder name that goes on and on", text, 20);
     CHECK(strlen(text) == 19);
 
+    /* The room for the name grows with the button (0.4.0 slice 10): 23 letters in classic, as before. */
+    CHECK(dbfolders_label_room(800) == 24);
+    CHECK(dbfolders_label_room(1280) == 38);
+    CHECK(dbfolders_label_room(1920) == 57);
+    dbfolders_label("Update Team May 2026 Championship Edition", text, dbfolders_label_room(1920));
+    CHECK(!strcmp(text, "Update Team May 2026 Championship Edition"));
+
     /* Remove the test folders: only the names made above. */
     static const char *const sets[] = {"May 2026", "Zo\xc3\xab Update", "Upper", "No staff"};
     for (size_t s = 0; s < 4; s++) {
