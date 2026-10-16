@@ -64,3 +64,8 @@ TRUE_WIDTH = {
     # comp_text 0x4aeaf0 (news text and its name buttons): left as it is for the clickable names work.
     0x4AEB54, 0x4AEDEF, 0x4AF16F, 0x4AF58B, 0x4AF66F,
 }
+
+# The attribute groups (#43) replace constants of the player profile build in the same way.
+from attribute_groups import PATCHES as GROUP_PATCHES  # noqa: E402
+
+PATCHES.update(GROUP_PATCHES)

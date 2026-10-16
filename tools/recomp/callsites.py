@@ -15,6 +15,13 @@ CALL_SITES = {
     # Attribute colours (#19): the label create 0x804100 of an attribute number.
     "profile_value": (0x87AC15, 0x804100),       # player profile, every value cell (0x87a510)
     "squad_attribute": (0x45C7CA, 0x804100),     # squad list, View Attributes (0x456900)
+    # Attribute groups (#43): the attribute area and the name label of each cell of the player profile
+    # 0x87a510 (docs/research/2026-10-15-attribute-groups.md).
+    "profile_area": (0x87A705, 0x55FBA0),
+    "profile_name": (0x87AA09, 0x804100),
+    # Test saves (testrun.c): the write of 0x1cc stack bytes that the save 0x52dad0 never sets, into
+    # index.dat (docs/research/2026-10-15-attribute-groups.md).
+    "index_pad": (0x53142B, 0x932E10),
     # Match columns (#23): the player list area of the tactics screen 0x899ea0, 9 columns.
     "tactics_area_heading": (0x89C894, 0x55FBA0),  # with a heading row
     "tactics_area": (0x89C93C, 0x55FBA0),          # without a heading row

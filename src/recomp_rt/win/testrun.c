@@ -8,12 +8,20 @@
  * The human turn is FUN_005cde40 (game.cpp). The day loop FUN_005cccd0 calls it once per slice, after
  * the day's processing (docs/research/2026-10-14-assistant-and-days-inventory.md, 2a). The save is
  * FUN_0082e430(path, 0x16), the call of the Auto Save at 0x7617d8. The folder is the save folder of
- * the game options, [0xae3138] + 0xf, as the Auto Save uses it at 0x7617bb. */
+ * the game options, [0xae3138] + 0xf, as the Auto Save uses it at 0x7617bb.
+ *
+ * In such a run the save writes zeros in place of the 0x1cc bytes that the save 0x52dad0 copies from its
+ * stack into index.dat without setting them (call site index_pad, 0x53142b). Those bytes are left over
+ * from earlier code, so two runs that draw different screens could save different bytes with the same
+ * game state. In the same way it writes zeros in the word at the end of each row of the save's table
+ * (+0x108 of the row), after the name of each row and in the unused rows, which the open of a part 0x9326e0 leaves as they were in
+ * the heap (docs/research/2026-10-15-attribute-groups.md). */
 #include "win.h"
 
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define GAME_DATE 0xae2c90u        /* s16 day of the year, s16 year */
 #define GAME_OPTIONS 0xae3138u     /* pointer to the game options; +0xf is the save folder */
@@ -60,4 +68,38 @@ RT_WRAP(005cde40, human_turn)
         }
     }
     o_005cde40();
+}
+
+void o_00932e10(void);
+extern const uint32_t rt_site_index_pad;
+
+/* The write of a part of a save, cdecl (data, size, count, file). */
+RT_WRAP(00932e10, save_write)
+{
+    if (save_after >= 0 && rd32(g_mem, cpu.esp) == rt_site_index_pad && rt_arg(1) == 0x1cc)
+        memset(g_mem + rt_arg(0), 0, 0x1cc);
+    o_00932e10();
+}
+
+void o_009326e0(void);
+
+/* The open of a part of a save, cdecl (folder, name, write, ...): the save object. It holds the count of
+ * rows at +0x21 and the table of 1000 rows of 0x10c bytes at +0x25, which the close 0x932b00 writes to
+ * the file whole. Unused rows are heap bytes too: they get zeros. */
+RT_WRAP(009326e0, save_open)
+{
+    uint32_t write = rt_arg(2);
+    o_009326e0();
+    if (rt_unwinding || save_after < 0 || write != 1 || !cpu.eax) return;
+    uint32_t count = rd32(g_mem, cpu.eax + 0x21), table = cpu.eax + 0x25;
+    for (uint32_t row = 0; row < 1000; row++) {
+        uint32_t r = table + row * 0x10c;
+        if (row < count) {
+            size_t name = strnlen(win_str(r + 8), 0x100);   /* the bytes after the name */
+            memset(g_mem + r + 8 + name, 0, 0x100 - name);
+            wr32(g_mem, r + 0x108, 0);
+        } else {
+            memset(g_mem + r, 0, 0x10c);
+        }
+    }
 }
