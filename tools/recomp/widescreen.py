@@ -64,3 +64,14 @@ TRUE_WIDTH = {
     # comp_text 0x4aeaf0 (news text and its name buttons): left as it is for the clickable names work.
     0x4AEB54, 0x4AEDEF, 0x4AF16F, 0x4AF58B, 0x4AF66F,
 }
+
+# Not a screen size: a fix for an endless loop (0.4.0 slice 12, custom data sets). euro.cfg is read by 0x9059e0
+# (docs/research/2026-10-16-update-team-databases.md). When a line of it is not a "*" header (after a header
+# that names an unknown nation, or a file that does not match the database), the original tests the same line
+# again for ever: 0x905a45 cmp [0xde1f64], '*' / 0x905a4c jne 0x905c21 / 0x905c21 test eax, eax / jne 0x905a45.
+# The fix reads the next line first (the read call 0x90cba0 of 0x905a35: file in edi, buffer 0xde1f64, cdecl)
+# and goes on at 0x905c21 with its result, so the loop ends at the next header or at the end of the file.
+# A file that the loop reads without this case, such as the official data, takes the same path as before.
+INSNS[0x905A4C] = ("jne 0x905c21",
+    "if (!cc_e(F)) { esp -= 4; W32(esp, 0xde1f64u); esp -= 4; W32(esp, edi); esp -= 4; W32(esp, 0x905a52u); "
+    "SYNC(); f_0090cba0(); LOAD(); RT_AFTER_CALL(); esp += 8; goto L_905c21; }")
