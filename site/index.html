@@ -243,7 +243,7 @@ a { color: inherit; }
     <p>Championship Manager 01/02, rebuilt to run on Mac, Windows and Linux.</p>
   </div>
   <div class="flank right">
-    <div class="fact">Free download<br>Version <span data-version>0.2.0</span>
+    <div class="fact">Free download<br>Version <span data-version>0.4.0</span>
       <div class="marks"><a data-link="mac" href="#release" aria-label="Download for Mac"><svg aria-hidden="true"><use href="#apple"/></svg></a><a data-link="win" href="#release" aria-label="Download for Windows"><svg aria-hidden="true"><use href="#win"/></svg></a><a data-link="linux" href="#release" aria-label="Download for Linux"><svg aria-hidden="true"><use href="#linux"/></svg></a></div>
     </div>
   </div>
@@ -263,14 +263,14 @@ a { color: inherit; }
         <h3 class="sub">You get</h3>
         <ul>
           <li>The whole game from the 2008 free release, with the last official patch, 3.9.68.</li>
-          <li>Three official databases to choose from for each new game: the original 2001/02 data, its December 2001 update and the 2002/03 data. No fan updates.</li>
-          <li>Widescreen at 1280 × 800, in a window you can resize. The old 800 × 600 layout is one setting away.</li>
+          <li>Three official databases to choose from for each new game: the original 2001/02 data, its December 2001 update and the 2002/03 data. You can add the CM 01/02 Update Team's databases yourself.</li>
+          <li>Widescreen at 1280 × 800, in a window you can resize. HD at 1920 × 1080 and the old 800 × 600 layout are one setting away.</li>
           <li>One Mac app for Apple silicon and Intel, macOS 11 or later.</li>
           <li>An installer for 64-bit Windows 10 and 11.</li>
           <li>One AppImage for 64-bit Linux, which also runs on the Steam Deck in desktop mode.</li>
         </ul>
         <ul class="later">
-          <li>Not in this version yet: network play and printing.</li>
+          <li>Not in this version yet: network play.</li>
         </ul>
       </div>
       <figure class="shot" data-in style="margin:0">
@@ -282,18 +282,18 @@ a { color: inherit; }
 
 <section class="screen" id="new" aria-labelledby="new-title">
   <div class="inner">
-    <h2 class="bar" id="new-title">New in <em>0.3.0</em></h2>
+    <h2 class="bar" id="new-title">New in <em>0.4.0</em></h2>
     <div class="release">
       <div class="panel" data-in>
         <h3 class="sub">Added</h3>
         <ul>
-          <li>A Linux version, which also runs on the Steam Deck.</li>
-          <li>Choose the database for a new game on the Setup Game screen.</li>
-          <li>An Assistant menu on the squad screen picks the best team, the fittest team or an under-21 team.</li>
-          <li>Holiday until next match: the holiday ends the day before your club plays.</li>
-          <li>A Fastest commentary speed, twice as fast as Very Fast.</li>
-          <li>Save names with your club and the date, backups of your last three saves, and a window that opens where you left it.</li>
-          <li>Condition and morale in red, amber and green.</li>
+          <li>Team views on every squad screen: your best XI on a pitch with the subs beside it, and a squad depth table for any formation.</li>
+          <li>A player comparison with a polygon of each player's strengths, from the comparison screen or the Compare tab.</li>
+          <li>Attributes in Technical, Mental and Physical groups on the player profile, with a Goalkeeping group for keepers.</li>
+          <li>Print to PDF: the print buttons save squad lists, tables and fixtures as PDF files.</li>
+          <li>An HD layout at 1920 × 1080 for big screens.</li>
+          <li>Play the CM 01/02 Update Team's databases, from 2003 to 2026.</li>
+          <li>No more "CD Not Required" box after a load.</li>
         </ul>
         <ul class="later">
           <li>Each option can be switched off in settings.txt. The changelog on GitHub lists every change.</li>
@@ -368,10 +368,10 @@ a { color: inherit; }
         <p>On a Mac: <code>~/Library/Application Support/cm0102</code>. On Windows: <code>%APPDATA%\cm0102</code>. On Linux: <code>~/.local/share/cm0102</code>. A new release does not change this folder. Older copies of each save are in the <code>backups</code> folder inside it.</p></details>
       <details><summary>How do I get the 800 × 600 layout back?</summary>
         <p>Open <code>settings.txt</code> in the save folder and change the line to <code>display = classic</code>. Then start the game again.</p></details>
-      <details><summary>Which settings can I change in version 0.3.0?</summary>
+      <details><summary>Which settings can I change in version 0.4.0?</summary>
         <p>Open <code>settings.txt</code> in the save folder. Each option has one line, and a switch takes <code>on</code> or <code>off</code>. The defaults are:</p>
         <ul>
-          <li><code>display = widescreen</code> draws the game at 1280 × 800. <code>classic</code> draws it at 800 × 600.</li>
+          <li><code>display = widescreen</code> draws the game at 1280 × 800. <code>hd</code> draws it at 1920 × 1080, and <code>classic</code> at 800 × 600.</li>
           <li><code>space_to_continue = on</code> lets the space bar press Continue Game.</li>
           <li><code>shortcuts = on</code> adds keys for Back, for closing a popup and for full screen.</li>
           <li><code>sharp_picture = on</code> scales the picture to the window in whole pixels, so that text stays crisp.</li>
@@ -385,7 +385,10 @@ a { color: inherit; }
           <li><code>remember_window = on</code> opens the window at the size and place it had when you quit.</li>
           <li><code>condition_colours = on</code> colours condition and morale: red, amber or green.</li>
           <li><code>database = 3.9.68</code> is the database for the next new game. <code>3.9.60</code> is the original 2001/02 data and <code>3.9.65</code> its December 2001 update. <code>folder:May 2026</code> is a folder of your own in <code>Databases</code> (see the FAQ). The Database button on the Setup Game screen changes this line.</li>
-        </ul></details>
+          <li><code>squad_views = on</code> adds Team views (best XI, squad depth, compare players) to the Assistant menu of every squad screen, and the polygon to the comparison screen.</li>
+          <li><code>attribute_groups = on</code> shows the player profile's attributes in Technical, Mental and Physical groups.</li>
+        </ul>
+        <p>Prints go to the <code>Prints</code> folder as PDF files. To get the old text files, set Print To to File in the game's own options.</p></details>
       <details><summary>Is the database updated?</summary>
         <p>You can choose. The default is the data of the last official patch, 3.9.68, which has the 2002/03 squads. The original 2001/02 data and its December 2001 update are on the Database button of the Setup Game screen. Fan databases are not included, but you can play them: copy a database of the CM 01/02 Update Team (<a href="https://champman0102.co.uk">champman0102.co.uk</a>) into a new folder in <code>Databases</code> in your save folder, for example <code>Databases/May 2026</code>. Copy every file of the database, euro.cfg included. The Database button then lists the folder by its name. The game starts in July 2001 whatever the database.</p></details>
       <details><summary>Something does not work</summary>

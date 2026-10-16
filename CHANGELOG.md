@@ -2,9 +2,19 @@
 
 CM 01/02 Bosman Edition uses semantic versioning. A patch release (0.1.1) fixes bugs. A minor release (0.2.0) adds features. A major release (1.0.0 and later) can break saved games or settings. Releases below 1.0.0 are test releases.
 
-## Unreleased
+## 0.4.0 (pre-release)
 
-- The box "CD Not Required" no longer shows after a new game or a load. The game uses no CD, so you no longer need to click Ok.
+New screens and an HD layout. Each new option has a line in `settings.txt` in the save folder. No feature changes the game's decisions while you make the same clicks.
+
+- Team views on every squad screen, from the Assistant menu (`squad_views`): your best XI on a pitch in any of the game's formations, with the subs and other players beside it, and a squad depth table with the best players for each position. The numbers are the assistant's score for each position, from the attributes the profile shows. Players who cannot play the next match are left out of the eleven and shown in grey in the table.
+- A player comparison with a polygon of eight strengths, on the original's comparison screen and on the Compare tab. Two goalkeepers get goalkeeper strengths.
+- Attribute groups on the player profile (`attribute_groups`): Technical, Mental and Physical, with Goalkeeping first for goalkeepers.
+- Print to PDF: Print To shows PDF in place of Printer, and each print saves a PDF in the `Prints` folder of the save folder. File still saves a text file, and Both saves both.
+- An HD layout at 1920 × 1080 (`display = hd`). A new window shrinks to fit the screen.
+- The CM 01/02 Update Team's databases from 2003 to 2026: copy a database into a folder in `Databases` in the save folder, and choose it with the Database button. The game still starts in July 2001.
+- Message boxes are centred in widescreen and HD.
+- The box "CD Not Required" no longer shows after a new game or a load.
+- A clickable name no longer shows its underline under a box that covers it.
 
 ## 0.3.1 (pre-release)
 
