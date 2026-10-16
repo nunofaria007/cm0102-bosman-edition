@@ -33,7 +33,8 @@
 #define POPUP_COLOUR 0xae31aau      /* u16 colours of the Print items (0x4564ed) */
 #define ITEM_HIGHLIGHT 0xaebdecu
 #define ITEM_TEXT 0xaebdeau
-#define BUTTON_TEXT 0xae3184u       /* the Print button's text colour when the bar colour is ITEM_TEXT */
+#define BUTTON_TEXT 0xae3184u
+#define LIST_TEXT 0xaebde8u         /* the text colour of the squad list's cells (0x45c781) */       /* the Print button's text colour when the bar colour is ITEM_TEXT */
 
 #define FORMATION_ID 0x62u          /* the Formation items; data 1 + the index in the list */
 #define CHOSEN 2                    /* node slot: the index of the chosen tactic in the list */
@@ -70,12 +71,13 @@ static uint32_t human_manager(void)
     return rd32(g_mem, PLAYER_MANAGER + (uint32_t)(int32_t)(int16_t)rd16(g_mem, PLAYER_SLOT) * 0x300u);
 }
 
-/* A widget at a rectangle of the 800x600 screen with a text; the widget create copies the text. */
+/* A widget at a rectangle of the 800x600 screen with a text; the widget create copies the text. flags:
+ * the text flags, 0xc centred (the tabs), 1 left (the popup items). */
 static void text_widget(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t style, uint32_t colour,
-                        uint32_t text_colour, const char *text)
+                        uint32_t text_colour, uint32_t flags, const char *text)
 {
     win_put_str(buf, text, VIEWS_TEXT_SIZE);
-    uint32_t w[18] = {2, (uint32_t)x1, (uint32_t)y1, (uint32_t)x2, (uint32_t)y2, 0, 0, style, colour, colour, 0xc, 1,
+    uint32_t w[18] = {2, (uint32_t)x1, (uint32_t)y1, (uint32_t)x2, (uint32_t)y2, 0, 0, style, colour, colour, flags, 1,
                       text_colour, buf, 0, 0, 0, 0xffffffffu};
     call_this(WIDGET_CREATE, display(), 18, w);
 }
@@ -125,14 +127,19 @@ static void stored(uint32_t club, int *out)
     for (int s = 0; s < SLOTS; s++) out[s] = (int32_t)rd32(g_mem, record + 2 + 4 * (uint32_t)s);
 }
 
-static void log_draw(uint32_t club, int chosen, const Tactic *t, const Pick *p)
+static int log_on(void)
 {
     static int on = -1;
     if (on < 0) {
         const char *v = getenv("RECOMP_VIEWS_LOG");
         on = v && *v == '1';
     }
-    if (!on) return;
+    return on;
+}
+
+static void log_draw(uint32_t club, int chosen, const Tactic *t, const Pick *p)
+{
+    if (!log_on()) return;
     int sel[SLOTS];
     stored(club, sel);
     fprintf(stderr, "recomp: best xi club %#x tactic %d \"%s\" masks", club, chosen, t->name);
@@ -164,10 +171,14 @@ static void formation(uint32_t buf, const Tactic *list, int n, int chosen, uint3
     }
 }
 
+/* A length of screen pixels in classic numbers, across and down (the widget create scales them back). */
+static int across_px(int px) { return (px * 800 + (int)rt_screen_w - 1) / (int)rt_screen_w; }
+static int down_px(int px) { return (px * 600 + (int)rt_screen_h - 1) / (int)rt_screen_h; }
+
 /* The players: a name box and the rating under it for each slot. x1..x2, y1..y2: the pitch as drawn, in
- * classic numbers (views_pitch_rect); ox1..ox2: the panel, where a full row spreads. */
-static void players(uint32_t buf, const Tactic *t, const Pick *p, int x1, int y1, int x2, int y2, int ox1, int ox2,
-                    uint32_t bar, uint32_t fg)
+ * classic numbers (views_pitch_rect). Every box stays inside the pitch (Q154). */
+static void players(uint32_t buf, const Tactic *t, const Pick *p, int x1, int y1, int x2, int y2, uint32_t bar,
+                    uint32_t fg)
 {
     Spot spots[SLOTS];
     for (int s = 0; s < SLOTS; s++) {
@@ -175,39 +186,101 @@ static void players(uint32_t buf, const Tactic *t, const Pick *p, int x1, int y1
         place(t->masks[s], &spots[s].across, &spots[s].down);
     }
     qsort(spots, SLOTS, sizeof *spots, by_place);
-    int w = x2 - x1, h = y2 - y1;
+    int w = x2 - x1, h = y2 - y1, box = across_px(VIEWS_BOX_PX), half = box / 2, gap = across_px(2);
+    int lo = x1 + gap + half, hi = x2 - gap - (box - half);
+    if (log_on()) fprintf(stderr, "recomp: best xi pitch %d %d %d %d boxes", x1, y1, x2, y2);
     for (int i = 0; i < SLOTS;) {
         int j = i;
         while (j < SLOTS && spots[j].down == spots[i].down) j++;
         /* A row of k players: each at the place of its side when no two boxes overlap there, else the
          * row spreads evenly over the pitch in the same order. */
-        int k = j - i, half = VIEWS_BOX_W / 2, cxs[SLOTS], spread = 0;
+        int k = j - i, cxs[SLOTS], spread = 0;
         for (int m = i; m < j; m++) {
-            cxs[m - i] = x1 + w * spots[m].across / 1000;
-            if (m > i && cxs[m - i] - cxs[m - i - 1] < VIEWS_BOX_W + 2) spread = 1;
+            int cx = x1 + w * spots[m].across / 1000;
+            cxs[m - i] = cx < lo ? lo : cx > hi ? hi : cx;
+            if (m > i && cxs[m - i] - cxs[m - i - 1] < box + gap) spread = 1;
         }
         for (int m = i; m < j; m++) {
             int s = spots[m].slot, cx = cxs[m - i];
-            if (spread) cx = ox1 + (ox2 - ox1) * (2 * (m - i) + 1) / (2 * k);
-            if (cx - half < ox1) cx = ox1 + half;
-            if (cx + half > ox2) cx = ox2 - half;
+            if (spread) cx = k > 1 ? lo + (hi - lo) * (m - i) / (k - 1) : (lo + hi) / 2;
             int cy = y1 + h * spots[m].down / 1000;
             char name[64];
             if (p->staff[s]) short_name(p->staff[s], name, sizeof name);
             else snprintf(name, sizeof name, "-");
-            text_widget(buf, cx - half, cy - 14, cx + half, cy + 1, 0x30, bar, fg, name);
+            text_widget(buf, cx - half, cy - 14, cx - half + box, cy + 1, 0x30, bar, fg, 0xc, name);
+            if (log_on()) fprintf(stderr, " %d %d", cx - half, cx - half + box);
             if (p->staff[s]) {
                 char r[8];
                 snprintf(r, sizeof r, "%d", p->fit[s]);
-                text_widget(buf, cx - half, cy + 2, cx + half, cy + 15, 0, 0, columns_attribute_colour(p->fit[s]), r);
+                text_widget(buf, cx - half, cy + 2, cx - half + box, cy + 15, 0, 0,
+                            columns_attribute_colour(p->fit[s]), 0xc, r);
             }
         }
         i = j;
     }
+    if (log_on()) fprintf(stderr, "\n");
 }
 
-int best_xi_build(uint32_t club, uint32_t team, uint32_t buf, int ox1, int ox2, int x1, int y1, int x2, int y2,
-                  uint32_t bar, uint32_t fg)
+/* The position text of a position bit with its side bits: GK, SW, then D, DM, M, AM or F with L, C or R. */
+static void position_text(uint16_t mask, char *out, size_t size)
+{
+    static const struct { uint16_t bit; const char *name; } names[] = {
+        {0x1, "GK"}, {0x2, "SW"}, {0x4, "D"}, {0x8, "DM"}, {0x10, "M"}, {0x20, "AM"}, {0x40, "F"}};
+    const char *name = "-", *side = "";
+    for (unsigned i = 0; i < sizeof names / sizeof *names; i++)
+        if (mask & names[i].bit) { name = names[i].name; break; }
+    if (mask & 0x3) side = "";
+    else if (mask & 0x80) side = "L";
+    else if (mask & 0x800) side = "R";
+    else if (mask & 0x700) side = "C";
+    snprintf(out, size, "%s%s", name, side);
+}
+
+/* The list beside the pitch (Q155): the subs of the pick, then the other players who can play, each with
+ * the position and the rating of his best slot of the chosen formation. Two columns, rows of VIEWS_ROW_PX
+ * screen pixels, in the panel x1..y2. */
+static void bench_list(uint32_t buf, const Pick *p, int x1, int y1, int x2, int y2)
+{
+    int row = down_px(VIEWS_ROW_PX), rows = (y2 - y1) / row, col_w = (x2 - x1) / 2;
+    int pos_w = across_px(34), fit_w = across_px(24);
+    uint32_t text = rd16(g_mem, LIST_TEXT), head = rd16(g_mem, ITEM_HIGHLIGHT);
+    int subs = 0;
+    for (int s = SLOTS; s < p->slots; s++) subs += p->staff[s] != 0;
+    int r = 0, shown = 0;
+    for (int i = 0; i < p->bench && r < 2 * rows; i++) {
+        if (i == 0 || i == subs) {             /* a heading before each part, never last in a column */
+            if (r % rows == rows - 1) r++;
+            int cx = x1 + (r / rows) * col_w, cy = y1 + (r % rows) * row;
+            text_widget(buf, cx, cy, cx + col_w - 4, cy + row - 1, 0, 0, head, 1,
+                        i < subs ? "Substitutes" : "Other players");
+            if (++r >= 2 * rows) break;
+        }
+        int cx = x1 + (r / rows) * col_w, cy = y1 + (r % rows) * row;
+        char t[64];
+        position_text(p->bench_mask[i], t, sizeof t);
+        text_widget(buf, cx, cy, cx + pos_w, cy + row - 1, 0, 0, head, 1, t);
+        short_name(p->bench_staff[i], t, sizeof t);
+        text_widget(buf, cx + pos_w, cy, cx + col_w - fit_w - 4, cy + row - 1, 0, 0, text, 1, t);
+        snprintf(t, sizeof t, "%d", p->bench_fit[i]);
+        text_widget(buf, cx + col_w - fit_w - 4, cy, cx + col_w - 4, cy + row - 1, 0, 0,
+                    columns_attribute_colour(p->bench_fit[i]), 0xc, t);
+        r++;
+        shown++;
+    }
+    if (log_on()) {
+        fprintf(stderr, "recomp: best xi bench subs");
+        for (int s = SLOTS; s < p->slots; s++)
+            if (p->staff[s]) fprintf(stderr, " %d", (int32_t)rd32(g_mem, p->staff[s]));
+        fprintf(stderr, " list");
+        for (int i = 0; i < p->bench; i++) fprintf(stderr, " %d", (int32_t)rd32(g_mem, p->bench_staff[i]));
+        fprintf(stderr, " fit");
+        for (int i = 0; i < p->bench; i++) fprintf(stderr, " %d", p->bench_fit[i]);
+        fprintf(stderr, " shown %d\n", shown);
+    }
+}
+
+int best_xi_build(uint32_t club, uint32_t team, uint32_t buf, int x1, int y1, int x2, int y2, int lx1, int ly1,
+                  int lx2, int ly2, uint32_t bar, uint32_t fg)
 {
     static Tactic list[VIEWS_TACTICS];
     int n = tactics_list(human_manager(), list, VIEWS_TACTICS);
@@ -220,7 +293,8 @@ int best_xi_build(uint32_t club, uint32_t team, uint32_t buf, int ox1, int ox2, 
     Pick p;
     picker_compute_view(club, team, 1, list[chosen].masks, human_manager(), &p);
     log_draw(club, chosen, &list[chosen], &p);
-    players(buf, &list[chosen], &p, x1, y1, x2, y2, ox1, ox2, bar, fg);
+    players(buf, &list[chosen], &p, x1, y1, x2, y2, bar, fg);
+    bench_list(buf, &p, lx1, ly1, lx2, ly2);
     return n;
 }
 

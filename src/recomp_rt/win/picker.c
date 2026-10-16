@@ -298,6 +298,55 @@ static void solve(const Candidate *c, int n, const int *first, const uint16_t *m
     assign(c, n, first, masks, SLOTS, slots, taken, team);      /* MAX_SUBS <= SLOTS */
 }
 
+/* The best of the 11 slots for a player: the fit, and in *mask the position bit that gives it with the
+ * slot's side bits. Returns the value there (-1 when no slot takes him). */
+static int best_slot(const Candidate *c, const uint16_t *masks, int *best_fit, uint16_t *mask)
+{
+    int best = -1;
+    *best_fit = 0;
+    *mask = 0;
+    for (int s = 0; s < SLOTS; s++) {
+        uint16_t bit;
+        int f = fit_bit(c, masks[s], &bit), v = value(c, masks[s]);
+        if (v < 0 || f < *best_fit || (f == *best_fit && v <= best)) continue;
+        best = v;
+        *best_fit = f;
+        *mask = (uint16_t)(bit | (masks[s] & 0xf80));
+    }
+    return best;
+}
+
+/* The bench of a pick (Pick.bench): the subs in slot order, then the other candidates by their best value,
+ * then by staff address (a fixed order on every system). */
+static void bench(const Candidate *c, int n, const uint16_t *masks, int slots, const int *team, Pick *out)
+{
+    int in_team[50] = {0}, order[50], values[50], k = 0;
+    for (int s = 0; s < slots; s++)
+        if (team[s] >= 0) in_team[team[s]] = s < SLOTS ? 1 : 2;
+    out->bench = 0;
+    for (int s = SLOTS; s < slots; s++)
+        if (team[s] >= 0) order[k++] = team[s];
+    int subs = k;
+    for (int i = 0; i < n; i++)
+        if (!in_team[i]) order[k++] = i;
+    for (int i = 0; i < k; i++) {
+        int f;
+        uint16_t m;
+        values[i] = best_slot(&c[order[i]], masks, &f, &m);
+    }
+    for (int i = subs + 1; i < k; i++)          /* insertion sort of the others */
+        for (int j = i; j > subs && (values[j] > values[j - 1] ||
+             (values[j] == values[j - 1] && c[order[j]].staff < c[order[j - 1]].staff)); j--) {
+            int t = order[j]; order[j] = order[j - 1]; order[j - 1] = t;
+            t = values[j]; values[j] = values[j - 1]; values[j - 1] = t;
+        }
+    for (int i = 0; i < k; i++) {
+        out->bench_staff[i] = c[order[i]].staff;
+        best_slot(&c[order[i]], masks, &out->bench_fit[i], &out->bench_mask[i]);
+    }
+    out->bench = k;
+}
+
 /* Set by the picker check (RECOMP_PICK_CHECK): picker_compute writes its candidates and its pick here. */
 static FILE *dump_to;
 
@@ -378,6 +427,7 @@ static int compute(uint32_t club, uint32_t team_index, int kind, const uint16_t 
         out->fit[s] = team[s] >= 0 ? fit(&c[team[s]], masks[s]) : 0;
         out->score[s] = team[s] >= 0 ? value(&c[team[s]], masks[s]) : 0;
     }
+    bench(c, n, masks, slots, team, out);
     if (dump_to) {
         fprintf(dump_to, "pick\t%d\t", kind);
         for (int s = 0; s < slots; s++) fprintf(dump_to, "%s%x", s ? " " : "", masks[s]);

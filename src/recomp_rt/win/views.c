@@ -176,11 +176,12 @@ static void views_build(void)
         /* Best XI: the pitch on the left, the table on the right. The players' widgets come after the
          * pitch widget, so the game draws them over the pitch. */
         panel(100, top, 440, bottom);
-        int x1 = 110, y1 = top + 8, x2 = 430, y2 = bottom - 8;
+        int x1 = 104, y1 = top + 8, x2 = 436, y2 = bottom - 8;
         pitch_widget = plain_widget(x1, y1, x2, y2);
         views_pitch_rect(&x1, &y1, &x2, &y2);
-        best_xi_build(club, team, scratch + TEXT_AT, 104, 436, x1, y1, x2, y2, node_slot(6), node_slot(5));
         panel(450, top, 790, bottom);
+        best_xi_build(club, team, scratch + TEXT_AT, x1, y1, x2, y2, 460, top + 6, 780, bottom - 6, node_slot(6),
+                      node_slot(5));
     } else {
         panel(100, top, 790, bottom);
     }
@@ -228,12 +229,15 @@ static int on_top(void)
     return node && rd32(g_mem, node) == build_fn();
 }
 
-/* The largest pitch of 68 by 105 that fits the box (screen pixels), in its middle. */
+/* The largest pitch of 68 by 105 that fits the box (screen pixels), in its middle, but at least as wide as
+ * five name boxes and their gaps (Q154) when the box allows: then the pitch is wider than 68 by 105. */
+#define MIN_PITCH_W (5 * (VIEWS_BOX_PX + 4) + 4)
 static void fit_pitch(int *x1, int *y1, int *x2, int *y2)
 {
     int bw = *x2 - *x1, bh = *y2 - *y1;
     if (bw * 105 > bh * 68) {
         int pw = bh * 68 / 105;
+        if (pw < MIN_PITCH_W) pw = MIN_PITCH_W < bw ? MIN_PITCH_W : bw;
         *x1 += (bw - pw) / 2;
         *x2 = *x1 + pw;
     } else {

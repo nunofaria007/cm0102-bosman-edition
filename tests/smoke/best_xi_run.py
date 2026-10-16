@@ -13,7 +13,10 @@ Squad > Assistant > Team views. Screen dumps of each step in <out>/<mode>.
 The runtime writes a line for each draw of the eleven (RECOMP_VIEWS_LOG=1):
     recomp: best xi club <club> tactic <i> "<name>" masks <11 hex> staff <11 staff indices> fit <11>
         selection <11 staff indices of the club's stored selection>
-and a line for the Formation list: recomp: best xi tactics <n> current <i>.
+a line for the Formation list: recomp: best xi tactics <n> current <i>,
+and two lines for each draw (Q154, Q155), in 800x600 numbers:
+    recomp: best xi pitch <x1> <y1> <x2> <y2> boxes <x1> <x2> ... (left and right edge of each name box)
+    recomp: best xi bench subs <staff of the pick's sub slots> list <staff> fit <fit> shown <rows>
 
 Checks:
     - the first draw is on the current tactic (tactic 0) and has 11 players, each fit 1 to 20
@@ -22,6 +25,9 @@ Checks:
     - after "Pick best team" the stored selection equals the eleven of the first draw (same day)
     - the other club's draw has 11 players of another club
     - no draw holds a player twice
+    - every name box lies inside the pitch (Q154)
+    - the list on the right starts with the pick's subs, holds no player of the eleven and no player twice,
+      shows every player, and each fit is 1 to 20 (Q155)
 """
 import os
 import re
@@ -102,8 +108,40 @@ def draws(log):
     return out
 
 
-def check(name, code, log):
+PITCH = re.compile(r"recomp: best xi pitch (-?\d+) (-?\d+) (-?\d+) (-?\d+) boxes ([-0-9 ]+)")
+BENCH = re.compile(r"recomp: best xi bench subs ([-0-9 ]*) list ([-0-9 ]*) fit ([-0-9 ]*) shown (\d+)")
+
+
+def check_layout(name, log):
+    """Problems of the pitch boxes and the list on the right."""
     problems = []
+    pitches, benches = PITCH.findall(log), BENCH.findall(log)
+    if not pitches or not benches:
+        return [f"{name}: no pitch or list line in the log"]
+    for x1, y1, x2, y2, boxes in pitches:
+        e = [int(v) for v in boxes.split()]
+        for left, right in zip(e[0::2], e[1::2]):
+            if left < int(x1) or right > int(x2):
+                problems.append(f"{name}: a name box {left}..{right} sticks out of the pitch {x1}..{x2}")
+                break
+    elevens = [set(d["staff"]) for d in draws(log)]
+    for subs, staff, fit, shown in benches:
+        subs, staff, fit = ([int(v) for v in t.split()] for t in (subs, staff, fit))
+        if staff[:len(subs)] != subs:
+            problems.append(f"{name}: the list starts {staff[:len(subs)]}, not with the subs {subs}")
+        if len(staff) != len(set(staff)):
+            problems.append(f"{name}: a player twice in the list {staff}")
+        if not any(not (set(staff) & e) for e in elevens):
+            problems.append(f"{name}: the list holds a player of the eleven")
+        if int(shown) != len(staff) or not staff:
+            problems.append(f"{name}: the list shows {shown} of {len(staff)} players")
+        if any(not 1 <= f <= 20 for f in fit):
+            problems.append(f"{name}: a fit outside 1 to 20 in the list {fit}")
+    return problems
+
+
+def check(name, code, log):
+    problems = check_layout(name, log)
     if code != 0:
         problems.append(f"{name}: exit code {code}")
     d = draws(log)
