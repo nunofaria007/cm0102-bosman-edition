@@ -28,6 +28,8 @@ Checks:
     - each number on the screen is the picker's score rounded, 1 to 20 (Q156), each fit 1 to 20
     - a player appears in more than one row somewhere
     - a dark panel (each colour channel below a quarter) lies behind the whole table (Q162)
+    - no hidden attribute of another club's player feeds a value (hidden_check.py): each value is one that the
+      visible key attributes of the player allow; a player with no score shows "-" (0)
 """
 import os
 import re
@@ -41,6 +43,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import fixtures  # noqa: E402
 import smoke_run  # noqa: E402
 import best_xi_run  # noqa: E402
+import hidden_check  # noqa: E402
 
 TOUR = [
     "2500 click 45 165",                    # the manager's menu
@@ -165,6 +168,7 @@ def check(name, code, log):
         problems.append(f"{name}: the first two draws are not the own club on tactic 0 and another tactic")
     if club2["club"] == own["club"]:
         problems.append(f"{name}: the last draw is not of another club")
+    problems += hidden_check.check_flags(name, log)
     twice, full = False, 0
     for x in t:
         tag = f"{name} club {x['club']} tactic {x['tactic']}"
@@ -178,8 +182,15 @@ def check(name, code, log):
         if not xi:
             problems.append(f"{tag}: no Best XI draw of the same club and tactic")
         seen = {}
+        lines = hidden_check.attribute_lines(log)
         for r in x["rows"]:
             problems += check_row(tag, r, xi)
+            for staff, value, fit, _out, _shown in r[3] if xi else []:
+                values = hidden_check.latest(lines, staff, len(log))
+                masks = [int(xi["masks"][s], 16) for s in r[1]]
+                if values and not any(value in hidden_check.expected_scores(m, fit, values) for m in masks):
+                    problems.append(f"{tag} {r[0]}: staff {staff} has value {value}, the visible attributes allow "
+                                    f"{sorted(set().union(*(hidden_check.expected_scores(m, fit, values) for m in masks)))}")
             full += len(r[3]) == len(r[1]) + 2
             for p in r[3]:
                 seen.setdefault(p[0], set()).add(r[0])

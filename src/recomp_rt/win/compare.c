@@ -39,9 +39,6 @@
 #define WIDGET_SIZE 0x18cu
 #define NO_DRAW 0xaebe0cu           /* not 0: the draw functions of the original draw nothing */
 #define DRAW_SURFACE 0xaebde4u      /* the surface that the draw functions of the original draw on */
-#define MASKING 0x9cc270u           /* byte: not 0 when the game masks attributes of unknown players */
-#define SHOWN_MASKED 0x543440u      /* cdecl (viewer manager, staff, attribute): the shown value, < 0 masked */
-#define SHOWN 0x543540u             /* cdecl (staff, player data, attribute): the shown value */
 #define ATTRIBUTE_NAME 0x5428a0u    /* cdecl (attribute 1..31, text, size, 0): the attribute's name */
 #define POSITIONS 0x53ee50u         /* cdecl (player data, text, size, 1): the positions text, "GK" first */
 #define CLUB_NAME 0x542100u         /* cdecl (club, team, buffer, size >= 0x47, mode, flag); mode 1: short */
@@ -79,6 +76,7 @@ typedef struct {
     uint32_t staff, data;
     int keeper;
     uint8_t attr[32];               /* shown values, 0 = hidden */
+    uint8_t hidden[32];             /* 1: the game hides the attribute from the viewer (for the log) */
     char name[64], line[96];
 } Player;
 
@@ -93,6 +91,16 @@ static struct {
 } shown;
 
 static uint32_t buf;                /* text buffer in the game's memory, VIEWS_TEXT_SIZE bytes */
+
+/* Forgets the comparison built last. Called when a screen or tab is built that is not a comparison: the
+ * Team views screen keeps its build function across its tabs, so the polygon and the frames of the old
+ * comparison would draw on the new tab. */
+void compare_clear(void)
+{
+    memset(&shown, 0, sizeof shown);
+    shown.polygon = -1;
+    shown.backdrop = -1;
+}
 
 static uint32_t call_this(uint32_t fn, uint32_t self, int n, const uint32_t *args)
 {
@@ -208,13 +216,12 @@ static void load(Player *p, uint32_t staff)
     char pos[64];
     positions(p->data, pos, sizeof pos);
     p->keeper = !strncmp(pos, "GK", 2);
-    /* The getters of the profile and the original comparison (0x87743f..0x8774b6). */
+    /* The one masking rule of best XI, squad depth and the comparison (picker_shown_attribute): the value
+     * that the player's screens show, 0 when the game hides it from the viewer. */
     uint32_t viewer = human_manager();
-    int masking = rd8(g_mem, MASKING) != 0;
     for (uint32_t k = 1; k <= 31; k++) {
-        uint32_t a[3] = {viewer, staff, k}, b[3] = {staff, p->data, k};
-        int v = (int8_t)(masking ? call(SHOWN_MASKED, 3, a) : call(SHOWN, 3, b));
-        p->attr[k] = (uint8_t)(v < 0 ? 0 : v > 20 ? 20 : v);
+        p->attr[k] = (uint8_t)picker_shown_attribute(viewer, staff, k);
+        p->hidden[k] = (uint8_t)!picker_attribute_known(viewer, staff, k);
     }
     full_name(staff, p->name, sizeof p->name);
     char club[0x80] = "";
@@ -304,44 +311,66 @@ static unsigned two_columns(const Group *g, int k)
     return best;
 }
 
+/* The rows of one side. Each player has the layout of his own position: a goalkeeper's side shows
+ * Goalkeeping, whoever stands on the other side. */
 typedef struct {
-    int keepers, n, rows[COMPARE_ROWS], k, columns;
+    int n, rows[COMPARE_ROWS], k, columns;
     Group g[8];
     unsigned second;                /* the groups in column 2 */
-    int name_w, value_w;            /* screen pixels */
+    int name_w;                     /* screen pixels */
     char names[COMPARE_ROWS][48];
+} Layout;
+
+typedef struct {
+    int keepers;                    /* both players are goalkeepers: the polygon has the goalkeeper axes */
+    Layout l[2];
+    int value_w;                    /* screen pixels */
 } Sides;
 
-static int side_width(const Sides *s) { return s->columns * (s->name_w + s->value_w) + (s->columns - 1) * GAP_PX + 8; }
+static int side_width(const Layout *l, int value_w)
+{
+    return l->columns * (l->name_w + value_w) + (l->columns - 1) * GAP_PX + 8;
+}
 
-/* One side: the name box (a drop-down when club is not 0, else a link to the profile), the line under it
- * and the rows. */
-static void side(const Sides *s, const Player *me, const Player *other, int left, int x1, int y1, int x2, int y2,
+/* 1 when attribute k is a row of the layout. */
+static int has_row(const Layout *l, int k)
+{
+    for (int i = 0; i < l->n; i++)
+        if (l->rows[i] == k) return 1;
+    return 0;
+}
+
+/* One side i (0 left, 1 right): the name box (a drop-down when club is not 0, else a link to the
+ * profile), the line under it and the rows. A white frame marks a number that is higher than the other
+ * player's number of the same attribute, when the other side shows that attribute too. */
+static void side(const Sides *s, const Player *me, const Player *other, int i, int x1, int y1, int x2, int y2,
                  uint32_t club, uint32_t id, int page)
 {
+    const Layout *l = &s->l[i], *across = &s->l[!i];
     panel_at(x1, y1, x2, y2);
-    uint32_t colour = left ? BLUE : ORANGE;
+    uint32_t colour = i == 0 ? BLUE : ORANGE;
     if (club) chooser(x1 + 4, y1 + 4, x2 - 4, y1 + 4 + ROW_PX, colour, me->name, club, id, page);
     else text_at(x1 + 4, y1 + 4, x2 - 4, y1 + 4 + ROW_PX, 0x30, colour, DARK, 0xc, me->name, PROFILE_ID, me->staff);
     text_at(x1 + 4, y1 + 6 + ROW_PX, x2 - 4, y1 + 6 + 2 * ROW_PX, 0, 0, rd16(g_mem, LIST_TEXT), 0xc, me->line, 0, 0);
-    int top = y1 + 10 + 2 * ROW_PX, col_w = s->name_w + s->value_w;
-    for (int c = 0; c < s->columns; c++) {
+    int top = y1 + 10 + 2 * ROW_PX, col_w = l->name_w + s->value_w;
+    for (int c = 0; c < l->columns; c++) {
         int x = x1 + 4 + c * (col_w + GAP_PX), y = top;
-        for (int i = 0; i < s->k; i++) {
-            if ((int)((s->second >> i) & 1) != c && s->columns == 2) continue;
-            for (int r = s->g[i].start; r < s->g[i].start + s->g[i].count; r++, y += ROW_PX) {
-                int k = s->rows[r];
+        for (int g = 0; g < l->k; g++) {
+            if ((int)((l->second >> g) & 1) != c && l->columns == 2) continue;
+            for (int r = l->g[g].start; r < l->g[g].start + l->g[g].count; r++, y += ROW_PX) {
+                int k = l->rows[r];
                 if (groups_heading(k)) {
-                    text_at(x, y, x + col_w, y + ROW_PX - 1, 0, 0, rd16(g_mem, ITEM_HIGHLIGHT), 1, s->names[r], 0, 0);
+                    text_at(x, y, x + col_w, y + ROW_PX - 1, 0, 0, rd16(g_mem, ITEM_HIGHLIGHT), 1, l->names[r], 0, 0);
                     continue;
                 }
-                text_at(x, y, x + s->name_w - 1, y + ROW_PX - 1, 0, 0, rd16(g_mem, LIST_TEXT), 1, s->names[r], 0, 0);
+                text_at(x, y, x + l->name_w - 1, y + ROW_PX - 1, 0, 0, rd16(g_mem, LIST_TEXT), 1, l->names[r], 0, 0);
                 char v[8];
                 int mine = me->attr[k], theirs = other->attr[k];
                 snprintf(v, sizeof v, mine ? "%d" : "-", mine);
-                int w = text_at(x + s->name_w, y, x + col_w - 1, y + ROW_PX - 2, 0, 0,
+                int w = text_at(x + l->name_w, y, x + col_w - 1, y + ROW_PX - 2, 0, 0,
                                 mine ? columns_attribute_colour(mine) : rd16(g_mem, LIST_TEXT), 0xc, v, 0, 0);
-                if (mine && theirs && mine > theirs && shown.marks < MARKS) shown.mark[shown.marks++] = w;
+                if (mine && theirs && mine > theirs && has_row(across, k) && shown.marks < MARKS)
+                    shown.mark[shown.marks++] = w;
             }
         }
     }
@@ -431,9 +460,7 @@ void compare_build(uint32_t text, uint32_t staff1, uint32_t staff2, int x1, int 
                    int page1, int page2)
 {
     buf = text;
-    memset(&shown, 0, sizeof shown);
-    shown.polygon = -1;
-    shown.backdrop = -1;
+    compare_clear();
     uint32_t node = rd32(g_mem, TOP_NODE);
     shown.build = node ? rd32(g_mem, node) : 0;
     Player p[2];
@@ -442,33 +469,36 @@ void compare_build(uint32_t text, uint32_t staff1, uint32_t staff2, int x1, int 
 
     static Sides s;
     s.keepers = p[0].keeper && p[1].keeper;
-    s.n = compare_rows(s.keepers, s.rows, COMPARE_ROWS);
-    s.k = groups_of(s.rows, s.n, s.g);
-    s.name_w = 0;
-    for (int r = 0; r < s.n; r++) {
-        const char *h = groups_heading(s.rows[r]);
-        if (h) snprintf(s.names[r], sizeof s.names[r], "%s", h);
-        else attribute_name(s.rows[r], s.names[r], sizeof s.names[r]);
-        int w = width_of(s.names[r]);
-        if (w > s.name_w) s.name_w = w;
-    }
-    s.name_w += 8;
     s.value_w = width_of("20") + 14;
-
     int X1 = sx(x1), Y1 = sy(y1), X2 = sx(x2 + 1) - 1, Y2 = sy(y2 + 1) - 1;
-    int fit = (Y2 - Y1 - 14 - 2 * ROW_PX) / ROW_PX;
-    s.columns = s.n <= fit ? 1 : 2;
-    s.second = s.columns == 2 ? two_columns(s.g, s.k) : 0;
-    int w = side_width(&s);
+    int fit = (Y2 - Y1 - 14 - 2 * ROW_PX) / ROW_PX, w = 0;
+    for (int i = 0; i < 2; i++) {
+        Layout *l = &s.l[i];
+        l->n = compare_rows(p[i].keeper, l->rows, COMPARE_ROWS);
+        l->k = groups_of(l->rows, l->n, l->g);
+        l->name_w = 0;
+        for (int r = 0; r < l->n; r++) {
+            const char *h = groups_heading(l->rows[r]);
+            if (h) snprintf(l->names[r], sizeof l->names[r], "%s", h);
+            else attribute_name(l->rows[r], l->names[r], sizeof l->names[r]);
+            int nw = width_of(l->names[r]);
+            if (nw > l->name_w) l->name_w = nw;
+        }
+        l->name_w += 8;
+        l->columns = l->n <= fit ? 1 : 2;
+        l->second = l->columns == 2 ? two_columns(l->g, l->k) : 0;
+        int lw = side_width(l, s.value_w);
+        if (lw > w) w = lw;                 /* both side panels as wide as the wider list */
+    }
 
-    side(&s, &p[0], &p[1], 1, X1, Y1, X1 + w, Y2, club, CHOOSE1_ID, page1);
-    side(&s, &p[1], &p[0], 0, X2 - w, Y1, X2, Y2, club, CHOOSE2_ID, page2);
+    side(&s, &p[0], &p[1], 0, X1, Y1, X1 + w, Y2, club, CHOOSE1_ID, page1);
+    side(&s, &p[1], &p[0], 1, X2 - w, Y1, X2, Y2, club, CHOOSE2_ID, page2);
     middle(&s, p, X1 + w + 6, Y1, X2 - w - 6, Y2);
 
     if (log_on()) {
         fprintf(stderr, "recomp: compare staff %d %d keepers %d columns %d rows %d", p[0].staff ?
                 (int32_t)rd32(g_mem, p[0].staff) : -1, p[1].staff ? (int32_t)rd32(g_mem, p[1].staff) : -1,
-                s.keepers, s.columns, s.n);
+                s.keepers, s.l[0].columns, s.l[0].n);
         for (int c = 0; c < 2; c++) {
             fprintf(stderr, " attr%d", c + 1);
             for (int k = 1; k <= 31; k++) fprintf(stderr, " %d", p[c].attr[k]);
@@ -477,7 +507,16 @@ void compare_build(uint32_t text, uint32_t staff1, uint32_t staff2, int x1, int 
             fprintf(stderr, " axes%d", c + 1);
             for (int i = 0; i < COMPARE_AXES; i++) fprintf(stderr, " %d", shown.value[c][i]);
         }
-        fprintf(stderr, " marks %d\n", shown.marks);
+        fprintf(stderr, " marks %d sides %d %d", shown.marks, p[0].keeper, p[1].keeper);
+        for (int c = 0; c < 2; c++) {
+            fprintf(stderr, " hidden%d", c + 1);
+            for (int k = 1; k <= 31; k++) fprintf(stderr, " %d", p[c].hidden[k]);
+        }
+        for (int c = 0; c < 2; c++) {
+            fprintf(stderr, " listed%d", c + 1);
+            for (int k = 1; k <= 31; k++) fprintf(stderr, " %d", has_row(&s.l[c], k));
+        }
+        fprintf(stderr, "\n");
     }
 }
 

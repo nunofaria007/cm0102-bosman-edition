@@ -443,5 +443,9 @@ RT_WRAP(00804100, label_create)
     }
     last.condition = -1;   /* a value colours only the next label */
     last.morale_colour = 0;
+    /* RECOMP_COLOUR_LOG=1: the text and the colour of each value label of the profile, for the check that
+     * each attribute colour matches its value (tests/smoke/attribute_groups_run.py). */
+    if (ret == rt_site_profile_value && getenv("RECOMP_COLOUR_LOG") && rt_arg(8))
+        fprintf(stderr, "recomp: profile value \"%s\" colour %#x\n", win_str(rt_arg(8)), rt_arg(7) & 0xffff);
     o_00804100();
 }

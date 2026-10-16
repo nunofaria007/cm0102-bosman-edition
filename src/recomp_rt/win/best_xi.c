@@ -39,6 +39,10 @@
 
 #define FORMATION_ID 0x62u          /* the Formation items; data 1 + the index in the list */
 #define CHOSEN 2                    /* node slot: the index of the chosen tactic in the list */
+#define FORM_PAGE 3                 /* node slot: the page of the Formation list */
+#define PAGE_ITEM 100u              /* data of a page item: PAGE_ITEM + the page */
+#define ITEM_PX 21                  /* a popup item, screen pixels: the items do not scale */
+#define BUTTON_BOTTOM 35            /* the Formation button's lower edge, classic numbers */
 #define SLOTS 11
 
 static uint32_t call_this(uint32_t fn, uint32_t self, int n, const uint32_t *args)
@@ -138,11 +142,16 @@ static int log_on(void)
     return on;
 }
 
-/* The number on the screen for a picker value (Pick.score): the score value / 1200, rounded, 1 to 20. */
-static int shown_score(int value)
+/* The number on the screen for a picker value (Pick.score): the score value / 1200, rounded, 1 to 20.
+ * 0 for a player with no score (every key attribute hidden): the screen shows "-". */
+static int shown_score(int value) { return pick_shown(value); }
+
+/* The text and colour of a score: "-" in the list's text colour when there is none. */
+static void score_text(int shown, char *out, size_t size, uint32_t *colour)
 {
-    int v = (value + 600) / 1200;
-    return v < 1 ? 1 : v > 20 ? 20 : v;
+    if (shown) snprintf(out, size, "%d", shown);
+    else snprintf(out, size, "-");
+    *colour = shown ? columns_attribute_colour(shown) : rd16(g_mem, LIST_TEXT);
 }
 
 static void log_draw(uint32_t club, int chosen, const Tactic *t, const Pick *p)
@@ -165,22 +174,45 @@ static void log_draw(uint32_t club, int chosen, const Tactic *t, const Pick *p)
     fprintf(stderr, "\n");
 }
 
+/* The tactics that one page of the Formation popup holds. A popup holds at most 30 widgets (0x4033fa) and
+ * opens under its button when it fits above the screen's bottom (0x4039b5), so the list goes in pages
+ * of 28 at most, with an item for the page before and the page after, as the squad drop-down of the
+ * Compare tab does. RECOMP_VIEWS_FORMATION_PAGE sets the size for a test. */
+static int formation_page_size(void)
+{
+    const char *v = getenv("RECOMP_VIEWS_FORMATION_PAGE");
+    if (v && atoi(v) > 0) return atoi(v) > 28 ? 28 : atoi(v);
+    int bottom = (BUTTON_BOTTOM * (int)rt_screen_h + 599) / 600;
+    int n = ((int)rt_screen_h - bottom - 12) / ITEM_PX - 2;
+    return n > 28 ? 28 : n < 4 ? 4 : n;
+}
+
+static void formation_item(uint32_t buf, uint32_t popup, const char *text, uint32_t data)
+{
+    win_put_str(buf, text, VIEWS_TEXT_SIZE);
+    uint32_t w[18] = {2, 0, 0, 0, 0, 0, 0, 0x10, rd16(g_mem, POPUP_COLOUR), rd16(g_mem, ITEM_HIGHLIGHT), 1, 1,
+                      rd16(g_mem, ITEM_TEXT), buf, 0, FORMATION_ID, data, popup};
+    call_this(WIDGET_CREATE, display(), 18, w);
+}
+
 /* The Formation button in the heading, as the Print button of the club screen (0x45641b..0x4566a6), with
- * the chosen tactic's name, and its drop-down with every tactic of the list. */
+ * the chosen tactic's name, and its drop-down with the tactics of the list, a page at a time when the
+ * list does not fit. */
 static void formation(uint32_t buf, const Tactic *list, int n, int chosen, uint32_t bar)
 {
     uint32_t fg = bar == rd16(g_mem, ITEM_TEXT) ? rd16(g_mem, BUTTON_TEXT) : rd16(g_mem, ITEM_TEXT);
     win_put_str(buf, list[chosen].name, VIEWS_TEXT_SIZE);
-    uint32_t b[12] = {VIEWS_FORMATION_X1, 15, 785, 35, 0x30, bar, 0xc, 1, fg, buf, 0, 0};
+    uint32_t b[12] = {VIEWS_FORMATION_X1, 15, 785, BUTTON_BOTTOM, 0x30, bar, 0xc, 1, fg, buf, 0, 0};
     uint32_t button = (uint32_t)(int32_t)(int16_t)call_this(BUTTON, SCREENS, 12, b);
     uint32_t a[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0x130, rd16(g_mem, POPUP_COLOUR), button};
     uint32_t popup = (uint32_t)(int32_t)(int16_t)call_this(AREA_CREATE, display(), 11, a);
-    for (int i = 0; i < n; i++) {
-        win_put_str(buf, list[i].name, VIEWS_TEXT_SIZE);
-        uint32_t w[18] = {2, 0, 0, 0, 0, 0, 0, 0x10, rd16(g_mem, POPUP_COLOUR), rd16(g_mem, ITEM_HIGHLIGHT), 1, 1,
-                          rd16(g_mem, ITEM_TEXT), buf, 0, FORMATION_ID, (uint32_t)i + 1, popup};
-        call_this(WIDGET_CREATE, display(), 18, w);
-    }
+    int size = formation_page_size(), paged = n > size, page = paged ? (int)node_slot(FORM_PAGE) : 0;
+    if (!paged) size = n;
+    else if (page < 0 || page * size >= n) page = 0;
+    if (paged && page > 0) formation_item(buf, popup, "Earlier formations", PAGE_ITEM + (uint32_t)page - 1);
+    for (int i = page * size; i < n && i < (page + 1) * size; i++)
+        formation_item(buf, popup, list[i].name, (uint32_t)i + 1);
+    if (paged && (page + 1) * size < n) formation_item(buf, popup, "More formations", PAGE_ITEM + (uint32_t)page + 1);
 }
 
 /* A length of screen pixels in classic numbers, across and down (the widget create scales them back). */
@@ -223,9 +255,9 @@ static void players(uint32_t buf, const Tactic *t, const Pick *p, int x1, int y1
             if (log_on()) fprintf(stderr, " %d %d", cx - half, cx - half + box);
             if (p->staff[s]) {
                 char r[8];
-                snprintf(r, sizeof r, "%d", shown_score(p->score[s]));
-                text_widget(buf, cx - half, cy + 2, cx - half + box, cy + 15, 0, 0,
-                            columns_attribute_colour(shown_score(p->score[s])), 0xc, r);
+                uint32_t colour;
+                score_text(shown_score(p->score[s]), r, sizeof r, &colour);
+                text_widget(buf, cx - half, cy + 2, cx - half + box, cy + 15, 0, 0, colour, 0xc, r);
             }
         }
         i = j;
@@ -273,9 +305,9 @@ static void bench_list(uint32_t buf, const Pick *p, int x1, int y1, int x2, int 
         text_widget(buf, cx, cy, cx + pos_w, cy + row - 1, 0, 0, head, 1, t);
         short_name(p->bench_staff[i], t, sizeof t);
         text_widget(buf, cx + pos_w, cy, cx + col_w - fit_w - 4, cy + row - 1, 0, 0, text, 1, t);
-        snprintf(t, sizeof t, "%d", shown_score(p->bench_score[i]));
-        text_widget(buf, cx + col_w - fit_w - 4, cy, cx + col_w - 4, cy + row - 1, 0, 0,
-                    columns_attribute_colour(shown_score(p->bench_score[i])), 0xc, t);
+        uint32_t colour;
+        score_text(shown_score(p->bench_score[i]), t, sizeof t, &colour);
+        text_widget(buf, cx + col_w - fit_w - 4, cy, cx + col_w - 4, cy + row - 1, 0, 0, colour, 0xc, t);
         r++;
         shown++;
     }
@@ -317,7 +349,8 @@ int best_xi_build(uint32_t club, uint32_t team, uint32_t buf, int x1, int y1, in
 int best_xi_input(uint32_t id, uint32_t data)
 {
     if (id != FORMATION_ID || data < 1) return 0;
-    set_slot(CHOSEN, data - 1);
+    if (data >= PAGE_ITEM) set_slot(FORM_PAGE, data - PAGE_ITEM);    /* a page item: only the page changes */
+    else set_slot(CHOSEN, data - 1);
     return 1;
 }
 
@@ -346,5 +379,6 @@ void views_box(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t colour)
 
 void views_short_name(uint32_t staff, char *out, size_t size) { short_name(staff, out, size); }
 int views_shown_score(int value) { return shown_score(value); }
+void views_score_text(int shown, char *out, size_t size, uint32_t *colour) { score_text(shown, out, size, colour); }
 void views_position_text(uint16_t mask, char *out, size_t size) { position_text(mask, out, size); }
 uint32_t views_human_manager(void) { return human_manager(); }

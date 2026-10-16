@@ -11,9 +11,15 @@ and saves after 2 game days. The check passes when the two saves are the same an
 runs differ (the option draws). In classic mode the saves may differ (ACCEPTED_DIFFERENCE). The dumps go to the shots folder as on-gk.png, off-gk.png, on-outfield.png
 and off-outfield.png, for the screen check by eye: headings, the goalkeeper layout and the attribute
 colours.
+
+The runtime also logs the text and colour of each value label of the profile (RECOMP_COLOUR_LOG=1,
+columns.c). With the option on, every value that is a whole number 1 to 20 must have the attribute colour of
+that number (1 to 5 red, 6 to 10 amber, 11 to 15 light green, 16 to 20 bright green, as RGB565), and the two
+profiles must show at least 40 such values together.
 """
 import concurrent.futures
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -37,6 +43,9 @@ STEPS = {
            "9500 click 860 1030", "12000 click 460 664", "15000 dump {d}/outfield.bmp",
            "17000 click 108 297", "20500 click 270 542", "23500 click 1690 1030"],
 }
+# The attribute colours as the runtime paints them (columns.c COLOUR_*), written again here.
+COLOUR = [(5, 0xFA8A), (10, 0xFD84), (15, 0xA70C), (20, 0x37E6)]
+VALUE = re.compile(r'recomp: profile value "([^"]*)" colour (0x[0-9a-f]+)')
 DAYS = 2
 # Modes where the saves with the option on and off may differ. In classic the option gives the profile's
 # attribute area 13 rows in place of 12, which changes the memory layout and so later days of the game.
@@ -51,8 +60,25 @@ def run(program, game, mode, value, work):
     with open(steps, "w") as f:
         f.write("\n".join(STEPS[mode]) + "\n")
     r = subprocess.run([sys.executable, FIXTURES, "play", program, game, "start.sav", steps, out, "--mode", mode,
-                        "--set", f"attribute_groups={value}", "--days", str(DAYS)], capture_output=True, text=True)
+                        "--set", f"attribute_groups={value}", "--days", str(DAYS)], capture_output=True, text=True,
+                       env=dict(os.environ, RECOMP_COLOUR_LOG="1"))
     return r, out
+
+
+def check_colours(folder):
+    """Problems of the attribute colours of the profiles in the log of a run with the option on. The log
+    holds the goalkeeper's profile and then the outfield player's (the steps of STEPS)."""
+    log = open(os.path.join(folder, "stderr.txt"), errors="replace").read()
+    values = [(m.group(1).strip(), int(m.group(2), 16)) for m in VALUE.finditer(log)]
+    numbers = [(int(t), c) for t, c in values if t.isdigit() and 1 <= int(t) <= 20]
+    problems = []
+    for v, c in numbers:
+        want = next(colour for top, colour in COLOUR if v <= top)
+        if c != want:
+            problems.append(f"the value {v} has the colour {c:#x}, expected {want:#x}")
+    if len(numbers) < 40:
+        problems.append(f"only {len(numbers)} attribute values in the log of two profiles, expected 40 or more")
+    return problems
 
 
 def main(argv):
@@ -92,6 +118,13 @@ def main(argv):
             else:
                 print(f"FAIL  the saves differ in: {parts}")
                 failed += 1
+        problems = check_colours(on)
+        for p in problems:
+            print(f"FAIL  colours: {p}")
+        if problems:
+            failed += 1
+        else:
+            print("ok    the attribute colours match the values on the grouped profiles")
         for name in ("gk", "outfield"):
             if read(os.path.join(on, name + ".bmp")) != read(os.path.join(off, name + ".bmp")):
                 print(f"ok    {name}: the profile differs with the option on")

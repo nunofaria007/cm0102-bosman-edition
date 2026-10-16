@@ -93,6 +93,8 @@ int main(void)
     CHECK(strstr(get(), "display = hd draws it at 1920x1080") != NULL);
     CHECK(strstr(get(), "\nsave_folder = \n") != NULL);
     CHECK(strstr(get(), "\nsave_backups = on\n") != NULL);
+    CHECK(strstr(get(), "\nsquad_views = on\n") != NULL);
+    CHECK(strstr(get(), "\nattribute_groups = on\n") != NULL);
     static char first[16384];
     snprintf(first, sizeof first, "%s", get());
     options_load(path);                         /* a second start changes nothing */
@@ -202,7 +204,10 @@ int main(void)
     CHECK(options_set_enum(OPT_DATABASE, "folder:Upper Case") == 1);
     CHECK(options_enum(OPT_DATABASE) == DATABASE_CUSTOM);
     t = get();
-    CHECK(!strncmp(t, "# x\ndatabase = folder:Upper Case\r\nsound = off\n", 44));
+    {
+        const char *want = "# x\ndatabase = folder:Upper Case\r\nsound = off\n";   /* the whole line, not a prefix */
+        CHECK(!strncmp(t, want, strlen(want)));
+    }
     options_load(path);
     CHECK(!strcmp(options_string(OPT_DATABASE), "folder:Upper Case"));
     CHECK(options_set_enum(OPT_DATABASE, "folder:") == 0);

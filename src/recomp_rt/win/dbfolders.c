@@ -47,12 +47,20 @@ int dbfolders_list(const char *save_dir, char names[][DBFOLDER_NAME], int max)
     if (!d) return 0;
     int n = 0;
     const char *e;
-    while (n < max && (e = host_readdir(d))) {
+    while ((e = host_readdir(d))) {
         if (e[0] == '.' || strlen(e) >= DBFOLDER_NAME) continue;
         snprintf(path, sizeof path, "%s/%s", dbs, e);
         HostStat st;
         if (host_stat(path, &st) != 0 || !st.is_dir || !dbfolders_valid(path)) continue;
-        snprintf(names[n++], DBFOLDER_NAME, "%s", e);
+        if (n < max) {
+            snprintf(names[n++], DBFOLDER_NAME, "%s", e);
+            continue;
+        }
+        /* The list is full: the folders that sort first stay, whatever order the disk gives. */
+        int last = 0;
+        for (int i = 1; i < n; i++)
+            if (by_name(names[i], names[last]) > 0) last = i;
+        if (n > 0 && by_name(e, names[last]) < 0) snprintf(names[last], DBFOLDER_NAME, "%s", e);
     }
     host_closedir(d);
     qsort(names, (size_t)n, DBFOLDER_NAME, by_name);

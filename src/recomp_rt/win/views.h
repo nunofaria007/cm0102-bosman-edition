@@ -43,6 +43,8 @@ void compare_build(uint32_t text, uint32_t staff1, uint32_t staff2, int x1, int 
 int compare_input(uint32_t club, uint32_t id, uint32_t data, uint32_t *value);
 /* The first two players of the club's squad, 0 when there are none. */
 void compare_first_two(uint32_t club, uint32_t *a, uint32_t *b);
+/* Forgets the comparison built last: call it when a screen or tab is built that is not a comparison. */
+void compare_clear(void);
 /* After the game draws a widget: the polygon and the frames of the comparison built last. */
 void compare_widget_drawn(uint32_t widget);
 /* Parts of best_xi.c for the Squad depth tab. views_formation builds the Formation button and list and
@@ -53,7 +55,8 @@ void views_text(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t text_colo
 /* A box filled with one colour (RGB565) and no text. */
 void views_box(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t colour);
 void views_short_name(uint32_t staff, char *out, size_t size);
-int views_shown_score(int value);
+int views_shown_score(int value);      /* 0 for a player with no score */
+void views_score_text(int shown, char *out, size_t size, uint32_t *colour);   /* "-" when 0 */
 void views_position_text(uint16_t mask, char *out, size_t size);
 uint32_t views_human_manager(void);
 

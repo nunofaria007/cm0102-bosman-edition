@@ -274,10 +274,15 @@ def without_intro_click(steps):
         steps[first_wait:]
 
 
-def compare_runs(program, game, mode, runs, steps, days, save=None, timeout=600):
+def compare_runs(program, game, mode, runs, steps, days, save=None, timeout=600, allowed=()):
     """Plays the runs at the same time, each with its option lines, and compares each saved game with
-    the save of the first run. save: a saved game to copy into each user folder first."""
+    the save of the first run. save: a saved game to copy into each user folder first. allowed: names of
+    parts that may differ (an accepted difference, for example the parts that depend on the memory layout of
+    the game, Q152); a difference in any other part fails."""
     def play(name, options, work):
+        steps_of_run = options.get("_steps", steps)        # a run may have its own steps and environment
+        extra_env = options.get("_env", {})
+        options = {k: v for k, v in options.items() if k not in ("_steps", "_env")}
         run = os.path.join(work, name)
         user, home, shots = (os.path.join(run, d) for d in ("user", "home", "shots"))
         for d in (user, home, shots):
@@ -291,7 +296,7 @@ def compare_runs(program, game, mode, runs, steps, days, save=None, timeout=600)
         env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", RECOMP_NO_BOX="1",
                    RECOMP_USER_DIR=user,
                    RECOMP_FIXED_CLOCK="1", RECOMP_SAVE_AFTER_DAYS=str(days),
-                   RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots, steps)))
+                   RECOMP_SCRIPT="; ".join(scaled_steps(mode, shots, steps_of_run)), **extra_env)
         start = time.time()
         r = subprocess.run([program, "--game", game, "-seed", "1"], env=env, capture_output=True, text=True,
                            timeout=timeout)
@@ -323,9 +328,12 @@ def compare_runs(program, game, mode, runs, steps, days, save=None, timeout=600)
             if open(saves[name], "rb").read() == want:
                 print(f"ok    {name}: the save is the same as {first}")
                 continue
-            failed += 1
             a, b = save_parts(saves[first]), save_parts(saves[name])
             differ = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
+            if differ and set(differ) <= set(allowed):
+                print(f"ok    {name}: the save differs from {first} only in accepted parts: {', '.join(differ)}")
+                continue
+            failed += 1
             print(f"FAIL  {name}: the save differs from {first} in: {', '.join(differ) or 'the file header'}")
     print("PASS" if not failed else "FAIL")
     return 1 if failed else 0

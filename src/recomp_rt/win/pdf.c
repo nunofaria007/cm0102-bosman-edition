@@ -15,6 +15,9 @@
 
 typedef struct { char *p; size_t n, cap; } Buf;
 
+/* A string literal with its true length, so a count cannot differ from the text. */
+#define LIT(s) (s), (sizeof(s) - 1)
+
 static int put(Buf *b, const void *s, size_t n)
 {
     if (b->n + n + 1 > b->cap) {
@@ -130,16 +133,16 @@ char *pdf_build(const char *text, size_t len, int lines_per_page, size_t *out_le
     size_t nobj = 3 + 2 * nsheets;
     size_t *off = calloc(nobj + 1, sizeof *off);
     if (!off) { free(sheets); goto fail; }
-    if (!put(&b, "%PDF-1.4\n", 9)) goto fail2;
+    if (!put(&b, LIT("%PDF-1.4\n"))) goto fail2;
     #define BEGIN(id) do { off[id] = b.n; if (!putf(&b, "%zu 0 obj\n", (size_t)(id))) goto fail2; } while (0)
     BEGIN(1);
-    if (!put(&b, "<< /Type /Catalog /Pages 2 0 R >>\nendobj\n", 41)) goto fail2;
+    if (!put(&b, LIT("<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"))) goto fail2;
     BEGIN(2);
-    if (!put(&b, "<< /Type /Pages /Kids [", 23)) goto fail2;
+    if (!put(&b, LIT("<< /Type /Pages /Kids ["))) goto fail2;
     for (size_t s = 0; s < nsheets; s++) if (!putf(&b, "%zu 0 R ", 4 + 2 * s)) goto fail2;
     if (!putf(&b, "] /Count %zu >>\nendobj\n", nsheets)) goto fail2;
     BEGIN(3);
-    if (!put(&b, "<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>\nendobj\n", 80)) goto fail2;
+    if (!put(&b, LIT("<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>\nendobj\n"))) goto fail2;
     for (size_t s = 0; s < nsheets; s++) {
         size_t pobj = 4 + 2 * s, sobj = pobj + 1;
         BEGIN(pobj);
@@ -148,18 +151,18 @@ char *pdf_build(const char *text, size_t len, int lines_per_page, size_t *out_le
         if (!putf(&c, "BT\n/F1 %.2f Tf\n%.2f TL\n%.2f %.2f Td\n", font, font * LEADING, MARGIN, SHEET_H - MARGIN - font)) { free(c.p); goto fail2; }
         for (size_t k = 0; k < sheets[s].count; k++) {
             Line l = lines[sheets[s].first + k];
-            if (!put(&c, "(", 1)) { free(c.p); goto fail2; }
+            if (!put(&c, LIT("("))) { free(c.p); goto fail2; }
             for (size_t j = 0; j < l.len; j++) {
                 unsigned char ch = (unsigned char)text[l.start + j];
                 if (ch < 0x20 || ch == 0x7f) ch = ' ';
-                if (ch == '(' || ch == ')' || ch == '\\') if (!put(&c, "\\", 1)) { free(c.p); goto fail2; }
+                if (ch == '(' || ch == ')' || ch == '\\') if (!put(&c, LIT("\\"))) { free(c.p); goto fail2; }
                 if (!put(&c, &ch, 1)) { free(c.p); goto fail2; }
             }
-            if (!put(&c, ") Tj T*\n", 8)) { free(c.p); goto fail2; }
+            if (!put(&c, LIT(") Tj T*\n"))) { free(c.p); goto fail2; }
         }
-        if (!put(&c, "ET\n", 3)) { free(c.p); goto fail2; }
+        if (!put(&c, LIT("ET\n"))) { free(c.p); goto fail2; }
         BEGIN(sobj);
-        if (!putf(&b, "<< /Length %zu >>\nstream\n", c.n) || !put(&b, c.p, c.n) || !put(&b, "endstream\nendobj\n", 17)) { free(c.p); goto fail2; }
+        if (!putf(&b, "<< /Length %zu >>\nstream\n", c.n) || !put(&b, c.p, c.n) || !put(&b, LIT("endstream\nendobj\n"))) { free(c.p); goto fail2; }
         free(c.p);
     }
     size_t xref = b.n;

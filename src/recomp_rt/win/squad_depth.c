@@ -132,10 +132,9 @@ void squad_depth_build(uint32_t club, uint32_t team, uint32_t buf, int x1, int y
             int cx = x1 + pos_w + j * cell;
             views_short_name(d.staff[r][j], str, sizeof str);
             views_text(buf, cx, cy, cx + name_w, cy + text, d.out[r][j] ? grey : plain, 1, str);
-            int shown = views_shown_score(d.score[r][j]);
-            snprintf(str, sizeof str, "%d", shown);
-            views_text(buf, cx + name_w, cy, cx + name_w + score_w, cy + text, columns_attribute_colour(shown), 0xc,
-                       str);
+            uint32_t colour;
+            views_score_text(views_shown_score(d.score[r][j]), str, sizeof str, &colour);
+            views_text(buf, cx + name_w, cy, cx + name_w + score_w, cy + text, colour, 0xc, str);
         }
         if (log_on()) log_row(club, chosen, pos[r], r, row_of, &p, &d);
     }

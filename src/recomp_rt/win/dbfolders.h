@@ -10,14 +10,15 @@
 
 #include <stddef.h>
 
-#define DBFOLDER_MAX 32      /* the most folders that are listed */
+#define DBFOLDER_MAX 128     /* the most folders that are listed: the Update Team zips hold 49 */
 #define DBFOLDER_NAME 128    /* the longest folder name in bytes, with the end */
 
 /* 1 when the folder holds every database file. */
 int dbfolders_valid(const char *dir);
 
 /* Lists the usable folders of <save_dir>/Databases, sorted by name without regard to case. Returns the
- * count, at most max. A missing Databases folder gives 0. */
+ * count, at most max. When more folders exist, the first max by name stay. A missing Databases folder
+ * gives 0. */
 int dbfolders_list(const char *save_dir, char names[][DBFOLDER_NAME], int max);
 
 /* The host path of the folder name in <save_dir>/Databases. Returns 0 when the name has a path part,

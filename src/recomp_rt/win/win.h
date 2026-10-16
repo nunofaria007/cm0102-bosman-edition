@@ -101,6 +101,7 @@ void holiday_next_turn(void);                  /* at each human turn, before the
 /* The Assistant's picks (picker.c). picker_compute picks without writing; picker_pick stores the pick as
  * the club's selection. kind 1: best team, 2: most match-fit, 3: under-21. Both return the players picked. */
 #define PICK_SLOTS 20
+#include "pick_score.h"                /* PICK_UNSCORED: the value of a player whose key attributes are all hidden */
 typedef struct {
     int slots;                     /* 11 and the subs */
     uint16_t masks[PICK_SLOTS];    /* the position mask of each slot */
@@ -134,6 +135,10 @@ typedef struct {
 int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, uint32_t viewer, const Pick *xi,
                  const int *row_of, int rows, Depth *out);
 int picker_pick(uint32_t club, uint32_t team_index, int kind);
+/* The one masking rule of best XI, squad depth and the comparison: the value that a player's screens
+ * show, 1 to 20, or 0 when the game hides it from the viewer (0 hides nothing). */
+int picker_shown_attribute(uint32_t viewer, uint32_t staff, uint32_t k);
+int picker_attribute_known(uint32_t viewer, uint32_t staff, uint32_t k);
 int picker_check_turn(void);                   /* at each human turn: the picker check; 1 when done */
 /* The Team views screen (views.c): pushes it for a club and team (0 = first team) of a squad screen. */
 void views_open(uint32_t club, uint32_t team);
