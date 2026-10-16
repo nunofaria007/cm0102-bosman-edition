@@ -108,6 +108,9 @@ typedef struct {
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
 int picker_pick(uint32_t club, uint32_t team_index, int kind);
 int picker_check_turn(void);                   /* at each human turn: the picker check; 1 when done */
+/* The Team views screen (views.c): pushes it for a club and team (0 = first team) of a squad screen. */
+void views_open(uint32_t club, uint32_t team);
+void views_widget_drawn(uint32_t widget);      /* after the game draws a widget: the pitch */
 /* Faster commentary (commentary.c): at each widget create, before the rect is scaled. */
 void commentary_widget_before(void);
 

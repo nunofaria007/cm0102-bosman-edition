@@ -109,6 +109,9 @@ if(NOT WIN32)
     add_executable(savename_test tests/savename/test_cp1252.c)
     target_include_directories(savename_test PRIVATE src/recomp_rt/win)
     add_test(NAME savename COMMAND savename_test)
+    add_executable(draw_test tests/draw/test_draw.c src/recomp_rt/win/draw.c)
+    target_include_directories(draw_test PRIVATE src/recomp_rt/win)
+    add_test(NAME draw COMMAND draw_test)
 endif()
 
 # The recompiled original (docs/specs/2026-10-14-recompile-spec.md). tools/recomp translates the
