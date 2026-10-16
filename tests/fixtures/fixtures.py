@@ -53,8 +53,8 @@ LOAD_STEPS = [
     "4000 click 445 257",                   # the first save in the list
     "5000 click 705 573",                   # Ok
     "wait box",
-    "1000 move 399 330 | 638 328 | 959 328",
-    "2000 click 399 330 | 638 328 | 959 328",         # "CD Not Required": Ok (the box is not scaled in widescreen or HD)
+    "1000 move 399 330 | 638 428 | 959 568",
+    "2000 click 399 330 | 638 428 | 959 568",         # "CD Not Required": Ok (the box keeps its size, centred on the screen)
     "wait first-news",
 ]
 

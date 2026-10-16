@@ -86,8 +86,8 @@ STEPS = [
     "2000 dump {d}/3-leagues.bmp",
     "2500 click 705 572",                   # Next (England is selected)
     "wait box",
-    "1000 move 399 330 | 638 328 | 959 328",
-    "2000 click 399 330 | 638 328 | 959 328",         # "CD Not Required": Ok (the box is not scaled in widescreen or HD)
+    "1000 move 399 330 | 638 428 | 959 568",
+    "2000 click 399 330 | 638 428 | 959 568",         # "CD Not Required": Ok (the box keeps its size, centred on the screen)
     "wait typing",
     "1000 type Test",
     "3000 click 560 310",

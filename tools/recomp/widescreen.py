@@ -35,7 +35,7 @@ PATCHES = {
     0x8AEED3: (600, H), 0x8AEED8: (800, W), 0x8AEEFB: (600, H), 0x8AEF00: (800, W),
     # Outline draw 0x5e7840: the span list starts at x 800, and the lock covers the whole screen.
     0x5E78BA: (800, W), 0x5E78E2: (800, W), 0x5E78EA: (600, H),
-    # Error box 0x5e8290: centred in a screen 800 wide.
+    # Error box 0x5e8290: centred in a screen 800 wide. Its y values follow in BOX_Y.
     0x5E8309: (800, W),
     # Widget init 0x5ee150: x2 and y2 are clamped to 799 and 599.
     0x5EE1F5: (799, W1), 0x5EE20A: (599, H1),
@@ -43,6 +43,31 @@ PATCHES = {
     # 800 and counts only if it ends below 800.
     0x8A20F8: (800, W), 0x8A21E2: (800, W), 0x8A260F: (800, W), 0x8A26F6: (800, W),
 }
+
+# The message box 0x5e8290 keeps its classic size, and its x values are screen pixels already (the width of
+# its text, centred by 0x5E8309). Its y values are classic rows: the box at 242..357 is centred on 600 rows.
+# Each y constant gets (rt_screen_h - 600) / 2 more rows, so the box is centred on any screen (0.4.0 slice
+# 10). In classic mode the values do not change. The constants: the save and the restore of the pixels under
+# the box (0x5e3dd0, 0x5e3fd0), the box and its title bar (0x5e5df0), the title and the text (0x5e6d80), the
+# Ok and the second button (0x5e5df0, 0x5e6d80, their rects at [esp+0x14] and [esp+0x1c]), the flips
+# (0x5e2eb0) and the mouse tests of the two buttons.
+DY = "(rt_screen_h - 600u) / 2u"
+BOX_Y = {
+    0x5E832C: 0x13E, 0x5E8337: 0x156,                       # the second button: y1, y2
+    0x5E8374: 0x165, 0x5E837A: 0xF2,                        # save the pixels under the box
+    0x5E83AD: 0x165, 0x5E83B3: 0xF2,                        # the box
+    0x5E83D0: 0x108, 0x5E83D9: 0xF4,                        # the title bar
+    0x5E83FD: 0x108, 0x5E8406: 0xF4,                        # the title
+    0x5E842F: 0x13B, 0x5E8438: 0x10A,                       # the text
+    0x5E846F: 0x156, 0x5E8475: 0x13E, 0x5E8495: 0x158, 0x5E849E: 0x140,    # Ok, pressed
+    0x5E84B3: 0x156, 0x5E84B9: 0x13E, 0x5E84D7: 0x156, 0x5E84DD: 0x13E,    # Ok
+    0x5E85C4: 0x165, 0x5E85CA: 0xF2,                        # flip
+    0x5E85F6: 0x13E, 0x5E8605: 0x156,                       # mouse over Ok
+    0x5E86D3: 0x13E, 0x5E86E2: 0x156, 0x5E86FC: 0x13E, 0x5E870B: 0x156,    # mouse down and up on Ok
+    0x5E882A: 0xF2,                                         # restore the pixels under the box
+    0x5E8835: 0x165, 0x5E883B: 0xF2,                        # flip
+}
+PATCHES.update({a: (v, f"({v:#x}u + {DY})") for a, v in BOX_Y.items()})
 
 # Instructions whose whole translation is replaced: address: (the instruction in the original, C code).
 # The circle plot 0x5e7aa0 finds the pixel of row y as y * 25 * 32 (lea, lea, shl 5): a row of 800 pixels.
