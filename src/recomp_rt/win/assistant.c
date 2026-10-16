@@ -106,6 +106,7 @@ RT_WRAP(008040a0, cell_button)
     if (site == rt_site_squad_filter) {
         int other = !clear_made;
         clear_made = 0;
+        text(0);    /* the same heap blocks with squad_views on and off (see text) */
         if (other && options_bool(OPT_SQUAD_VIEWS) && !(node_slot(7) & PENALTY_VIEW)) {
             uint32_t b[11] = {rt_arg(0), 0, 0, 0x30, rd16(g_mem, BUTTON_COLOUR), 0xc, 1, rd16(g_mem, BUTTON_TEXT),
                               text(0), 0, 0};
