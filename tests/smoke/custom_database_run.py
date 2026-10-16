@@ -7,7 +7,7 @@ Usage:
 
 Each run uses a new user folder (RECOMP_USER_DIR) with settings.txt: display = classic and
 database = folder:<name>. The Databases folder holds copies of data, so the player's folders stay unchanged.
-    plain     the folder "Copia 3.9.68" is a copy of the clean 3.9.68 Data: the news screen equals the
+    plain     the folder "Copia 3.9.68" is a copy of the clean 3.9.68 Data (every file, as a player copies a database): the news screen equals the
               reference picture <reference>/classic/4-news.bmp
     own       the folder "Zoë 3.9.60" (a space and a non-ASCII letter) is a copy of the 3.9.60 data set:
               Select League(s) and the news screen equal <reference>/classic-3.9.60, so the game reads the folder
@@ -34,7 +34,7 @@ DATA_FILES = None
 def copy_data(src, dest):
     os.makedirs(dest)
     for name in sorted(os.listdir(src)):
-        if name.lower().endswith(".dat"):
+        if os.path.isfile(os.path.join(src, name)):
             shutil.copyfile(os.path.join(src, name), os.path.join(dest, name))
 
 
