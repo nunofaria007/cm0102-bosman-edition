@@ -112,6 +112,9 @@ if(NOT WIN32)
     add_executable(draw_test tests/draw/test_draw.c src/recomp_rt/win/draw.c)
     target_include_directories(draw_test PRIVATE src/recomp_rt/win)
     add_test(NAME draw COMMAND draw_test)
+    add_executable(pdf_test tests/pdfprint/test_pdf.c src/recomp_rt/win/pdf.c)
+    target_include_directories(pdf_test PRIVATE src/recomp_rt/win)
+    add_test(NAME pdf COMMAND pdf_test)
 endif()
 
 # The recompiled original (docs/specs/2026-10-14-recompile-spec.md). tools/recomp translates the

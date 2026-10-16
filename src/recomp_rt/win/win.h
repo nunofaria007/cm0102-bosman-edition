@@ -24,6 +24,8 @@ static inline void win_put_str(uint32_t dst, const char *s, uint32_t room)
 /* Settings of the run (main.c). */
 extern char win_game_dir[1024];        /* host folder of the original: cwd, registry Location */
 extern char win_user_dir[1024];        /* host folder of every write: ~/Library/Application Support/cm0102 */
+const char *win_save_folder(void);   /* files.c: the folder of the saved games (save_folder or the user folder) */
+int win_game_date(int *year, int *month, int *day);   /* savename.c: the game date, month and day from 1; 0 when unknown */
 extern char win_exe_path[1024];        /* host path of the player's cm0102.exe: the CD drive D:\ */
 extern char win_command_line[1024];    /* the Windows command line: "cm0102.exe" and the options */
 extern int win_trace;                  /* RECOMP_TRACE: print each import call */

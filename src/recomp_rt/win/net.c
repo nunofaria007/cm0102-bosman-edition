@@ -40,9 +40,14 @@ RT_IMPORT(WSOCK32_ord12)                                                        
     rt_ret_stdcall(text, 1);
 }
 
-/* Printing: no printer. EnumPrintersA and PrintDlgA fail, so the GDI32 calls of the print function
- * 0x84c830 are not reached; they fail too. */
-RT_IMPORT(EnumPrintersA) { rt_ret_stdcall(0, 7); }
+/* Printing: the print function 0x84c830 is replaced by the PDF writer (print_pdf.c), so PrintDlgA and
+ * the GDI32 calls are not reached; they fail. EnumPrintersA answers that one printer exists (0x84c7f0
+ * returns "returned != 0"), so the default of Print To is Printer, which the game shows as PDF. */
+RT_IMPORT(EnumPrintersA)
+{
+    if (rt_arg(6)) wr32(g_mem, rt_arg(6), 1);       /* returned: the number of printers */
+    rt_ret_stdcall(1, 7);
+}
 RT_IMPORT(PrintDlgA) { rt_ret_stdcall(0, 1); }
 RT_IMPORT(GetDeviceCaps) { rt_ret_stdcall(0, 2); }
 RT_IMPORT(CreateFontA) { rt_ret_stdcall(0, 14); }
