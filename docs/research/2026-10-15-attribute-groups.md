@@ -24,3 +24,12 @@ The save writer 0x52dad0 writes `local_1cc`, 0x1cc bytes of its stack frame that
 The save file's table has the same fault. The open of a part 0x9326e0 takes the save object from `operator_new(0xa3191)` and does not clear it. It sets the offset (+0x25 of the row), the size (+0x29) and the name (+0x2d, only up to its end byte) of the new row, not the rest of the 256-byte name field and not the word at +0x108 of the row (+0x12d). The close 0x932b00 writes the whole table, 0x416ec bytes from +0x19: three words and 1000 rows. In a widescreen run with the option on and off, every part's bytes, offsets and sizes were equal, and only these words and the bytes after the first row's name differed (values such as 0xe320e320, which look like RGB565 pixel pairs).
 
 Test saves (RECOMP_SAVE_AFTER_DAYS, `src/recomp_rt/win/testrun.c`) write zeros in both places. Proof for the pad: with only the pad zeroed, the widescreen saves with the option on and off differed in the row words only. Normal saves are unchanged. Whether the loader reads the pad or the row words: unknown.
+
+## 13 rows in classic mode change the game (2026-10-16)
+
+The lead chose 13 rows in classic too (17 pixels apart). On the screenshots no text clips. But the attribute groups check (start.sav, both profiles, 2 days of holiday) then gives saves that differ in club.dat, finance.dat, transfer.dat, fifa_rankings.dat, general.dat and others. On and off each give the same save twice, so this is not timing.
+
+- A heap log of the profile view shows other block sizes from the allocation at return address 0x94557b (for example 4832 against 4288 bytes). Inference: these are text buffers sized by the label cell, which is 17 pixels high in place of 18. After Back, a heap pointer at 0xadab44 differs by 0x30.
+- With every heap block zero-filled (a test probe, not kept), the saves still differ, in fifa_rankings.dat, general.dat, national_teams.dat, staff history.tmp and transfer.dat. So later game decisions depend on the heap layout or on other memory that the probe does not clear. Which code reads it: unknown.
+- The same happens with the display mode alone: from the same save and the same steps, with the option off, a classic and a widescreen run save different games (18 parts differ, transfer.dat and contract.dat among them).
+- With 12 rows in classic (no Mental and Physical heading rows) the check passes. Widescreen with 13 rows passes.
