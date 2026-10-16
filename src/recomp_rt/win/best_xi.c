@@ -339,6 +339,11 @@ void views_text(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t text_colo
     text_widget(buf, x1, y1, x2, y2, 0, 0, text_colour, flags, text);
 }
 
+void views_box(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t colour)
+{
+    text_widget(buf, x1, y1, x2, y2, 0x30, colour, colour, 0xc, "");
+}
+
 void views_short_name(uint32_t staff, char *out, size_t size) { short_name(staff, out, size); }
 int views_shown_score(int value) { return shown_score(value); }
 void views_position_text(uint16_t mask, char *out, size_t size) { position_text(mask, out, size); }

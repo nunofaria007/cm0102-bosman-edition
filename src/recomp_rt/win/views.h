@@ -38,13 +38,15 @@ int best_xi_input(uint32_t id, uint32_t data);
  * text widget with no panel (flags 1 left, 0xc centred). The score text is the number of Q156, 1 to 20. */
 int views_formation(uint32_t buf, uint32_t bar, Tactic *chosen);
 void views_text(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t text_colour, uint32_t flags, const char *text);
+/* A box filled with one colour (RGB565) and no text. */
+void views_box(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t colour);
 void views_short_name(uint32_t staff, char *out, size_t size);
 int views_shown_score(int value);
 void views_position_text(uint16_t mask, char *out, size_t size);
 uint32_t views_human_manager(void);
 
-/* Tab 2: the Formation button and a row for each slot of the chosen tactic with its top three players, in
- * the panel x1..y2 (classic numbers). */
+/* Tab 2: the Formation button and a row for each position of the chosen tactic with its top players, on a
+ * dark panel at x1..y2 (classic numbers). */
 void squad_depth_build(uint32_t club, uint32_t team, uint32_t buf, int x1, int y1, int x2, int y2, uint32_t bar);
 
 #endif

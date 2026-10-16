@@ -11,20 +11,23 @@ Formation > 3-5-2 > Best XI > Back; Premier Division table > Liverpool > Squad >
 Squad depth > Best XI. Screen dumps of each step in <out>/<mode>.
 
 The runtime writes a line for each row of the tab (RECOMP_VIEWS_LOG=1):
-    recomp: squad depth row club <club> tactic <i> slot <s> mask <hex> xi <staff of best XI in the slot>
+    recomp: squad depth row club <club> tactic <i> pos <position> slots <s>,... xi <best XI staff of each slot>,...
         players <staff>,<picker value>,<fit>,<cannot play 0/1>,<number on the screen> ...
+a line for the dark panel behind the table, in 800x600 numbers and RGB565:
+    recomp: squad depth panel <x1> <y1> <x2> <y2> colour <c> table <x1> <y1> <x2> <y2>
 and one line when the tab is drawn: recomp: squad depth drawn club <club> tactic <i> rows <n>.
 Best XI writes its line (best_xi_run.py) for each draw of the eleven.
 
 Checks:
-    - three draws of the tab (own club on the current tactic and on another, the other club), each with
-      11 rows, one for each slot, and 1 to 3 players in each row
-    - each row's first available player is best XI's player in that slot, from the Best XI tab of the same
-      club and tactic (no Best XI line in between that differs)
-    - the players after the first available one are in the order of their values; an unavailable player
-      above best XI's player has a higher value than him
+    - three draws of the tab (own club on the current tactic and on another, the other club)
+    - one row for each position (Q161): every slot in exactly one row, no position in two rows
+    - a row of k slots holds k + 2 players (fewer only when the squad has fewer), each player once
+    - the first k available players of a row are best XI's players in its slots, from the Best XI tab of the
+      same club and tactic; an unavailable player above one of them has a higher value than each of them
+    - the players after them are in the order of their values
     - each number on the screen is the picker's score rounded, 1 to 20 (Q156), each fit 1 to 20
-    - a player appears in more than one row somewhere (a check that rows do not share out the squad)
+    - a player appears in more than one row somewhere
+    - a dark panel (each colour channel below a quarter) lies behind the whole table (Q162)
 """
 import os
 import re
@@ -67,8 +70,10 @@ TOUR = [
     "14000 dump {d}/6-other-club-best-xi.bmp",
 ]
 
-ROW = re.compile(r"recomp: squad depth row club (0x[0-9a-f]+) tactic (-?\d+) slot (\d+) mask ([0-9a-f]+) "
-                 r"xi (-?\d+) players([-0-9, ]*)")
+ROW = re.compile(r"recomp: squad depth row club (0x[0-9a-f]+) tactic (-?\d+) pos (\S+) slots ([0-9,]+) "
+                 r"xi ([-0-9,]+) players([-0-9, ]*)")
+PANEL = re.compile(r"recomp: squad depth panel (-?\d+) (-?\d+) (-?\d+) (-?\d+) colour (0x[0-9a-f]+) "
+                   r"table (-?\d+) (-?\d+) (-?\d+) (-?\d+)")
 DRAWN = re.compile(r"recomp: squad depth drawn club (0x[0-9a-f]+) tactic (-?\d+) rows (\d+)")
 
 
@@ -93,20 +98,21 @@ def run(program, game, folder, save, mode, out):
 
 
 def tables(log):
-    """The draws of the tab in log order, without repeats: {club, tactic, rows: {slot: (mask, xi, players)}}."""
-    out, rows = [], {}
+    """The draws of the tab in log order, without repeats: {club, tactic, count, rows: [(pos, slots, xi, players)]}."""
+    out, rows = [], []
     for line in log.splitlines():
         m = ROW.search(line)
         if m:
             players = [tuple(int(v) for v in p.split(",")) for p in m.group(6).split()]
-            rows[int(m.group(3))] = (m.group(4), int(m.group(5)), players)
+            rows.append((m.group(3), [int(v) for v in m.group(4).split(",")], [int(v) for v in m.group(5).split(",")],
+                         players))
             continue
         m = DRAWN.search(line)
         if m:
             t = {"club": m.group(1), "tactic": int(m.group(2)), "count": int(m.group(3)), "rows": rows}
             if not out or out[-1] != t:
                 out.append(t)
-            rows = {}
+            rows = []
     return out
 
 
@@ -116,6 +122,37 @@ def best_xi_after(log, club, tactic):
         if d["club"] == club and d["tactic"] == tactic:
             return d
     return None
+
+
+def check_row(tag, row, xi):
+    pos, slots, picks, players = row
+    problems = []
+    k = len(slots)
+    staffs = [p[0] for p in players]
+    if not 1 <= len(players) <= k + 2 or len(staffs) != len(set(staffs)):
+        return [f"{tag} {pos}: {len(players)} players for {k} slots, or a player twice: {staffs}"]
+    if xi and picks != [xi["staff"][s] for s in slots]:
+        problems.append(f"{tag} {pos}: the row's best XI players {picks} are not Best XI's")
+    for staff, value, fit, out, shown in players:
+        if shown != best_xi_run.shown_score(value):
+            problems.append(f"{tag} {pos}: number {shown} is not the score of value {value}")
+        if not 1 <= fit <= 20:
+            problems.append(f"{tag} {pos}: fit {fit}")
+    want = [s for s in picks if s >= 0]
+    avail = [p for p in players if not p[3]]
+    if sorted(p[0] for p in avail[:len(want)]) != sorted(want):
+        problems.append(f"{tag} {pos}: the first available players {[p[0] for p in avail[:len(want)]]} "
+                        f"are not Best XI's {want}")
+        return problems
+    last = players.index(avail[len(want) - 1]) if want else -1
+    top = max((p[1] for p in avail[:len(want)]), default=-1)
+    for p in players[:last]:
+        if p[3] and p[1] <= top:
+            problems.append(f"{tag} {pos}: unavailable {p[0]} above a pick with a value not higher than {top}")
+    rest = [p[1] for p in players[last + 1:]]
+    if rest != sorted(rest, reverse=True):
+        problems.append(f"{tag} {pos}: the players after the picks are not in value order {rest}")
+    return problems
 
 
 def check(name, code, log):
@@ -128,45 +165,41 @@ def check(name, code, log):
         problems.append(f"{name}: the first two draws are not the own club on tactic 0 and another tactic")
     if club2["club"] == own["club"]:
         problems.append(f"{name}: the last draw is not of another club")
-    twice = False
+    twice, full = False, 0
     for x in t:
         tag = f"{name} club {x['club']} tactic {x['tactic']}"
-        if x["count"] != 11 or sorted(x["rows"]) != list(range(11)):
-            problems.append(f"{tag}: rows {sorted(x['rows'])}, expected the 11 slots")
+        slots = sorted(s for r in x["rows"] for s in r[1])
+        positions = [r[0] for r in x["rows"]]
+        if slots != list(range(11)) or len(positions) != len(set(positions)) or x["count"] != len(x["rows"]):
+            problems.append(f"{tag}: rows {positions} hold the slots {slots}, expected each slot once, "
+                            f"each position once")
             continue
         xi = best_xi_after(log, x["club"], x["tactic"])
         if not xi:
             problems.append(f"{tag}: no Best XI draw of the same club and tactic")
         seen = {}
-        for s, (mask, pick, players) in sorted(x["rows"].items()):
-            if not 1 <= len(players) <= 3:
-                problems.append(f"{tag} slot {s}: {len(players)} players")
-                continue
-            if xi and xi["masks"][s] != mask:
-                problems.append(f"{tag} slot {s}: mask {mask}, Best XI has {xi['masks'][s]}")
-            if xi and pick != xi["staff"][s]:
-                problems.append(f"{tag} slot {s}: the row's best XI player {pick} is not Best XI's {xi['staff'][s]}")
-            for staff, value, fit, out, shown in players:
-                seen.setdefault(staff, set()).add(s)
-                if shown != best_xi_run.shown_score(value):
-                    problems.append(f"{tag} slot {s}: number {shown} is not the score of value {value}")
-                if not 1 <= fit <= 20:
-                    problems.append(f"{tag} slot {s}: fit {fit}")
-            avail = [p for p in players if not p[3]]
-            if xi and xi["staff"][s] >= 0 and (not avail or avail[0][0] != xi["staff"][s]):
-                problems.append(f"{tag} slot {s}: the first available player is "
-                                f"{avail[0][0] if avail else None}, Best XI has {xi['staff'][s]}")
-            first = players.index(avail[0]) if avail else len(players)
-            for p in players[:first]:
-                if avail and p[1] <= avail[0][1]:
-                    problems.append(f"{tag} slot {s}: unavailable {p[0]} above the pick with a value not higher")
-            rest = [p[1] for p in players[first + 1:]]
-            if rest != sorted(rest, reverse=True):
-                problems.append(f"{tag} slot {s}: the players after the pick are not in value order {rest}")
+        for r in x["rows"]:
+            problems += check_row(tag, r, xi)
+            full += len(r[3]) == len(r[1]) + 2
+            for p in r[3]:
+                seen.setdefault(p[0], set()).add(r[0])
+        if not any(len(r[1]) > 1 for r in x["rows"]):
+            problems.append(f"{tag}: no position with more than one slot")
         twice |= any(len(v) > 1 for v in seen.values())
     if not twice:
         problems.append(f"{name}: no player in more than one row")
-    out = sum(p[3] for x in t for _, _, ps in x["rows"].values() for p in ps)
+    if not full:
+        problems.append(f"{name}: no row with k + 2 players")
+    panels = PANEL.findall(log)
+    if not panels:
+        problems.append(f"{name}: no panel line")
+    for px1, py1, px2, py2, colour, tx1, ty1, tx2, ty2 in panels:
+        c = int(colour, 16)
+        if (c >> 11) >= 8 or ((c >> 5) & 0x3f) >= 16 or (c & 0x1f) >= 8:
+            problems.append(f"{name}: the panel colour {colour} is not dark")
+        if int(px1) > int(tx1) or int(py1) > int(ty1) or int(px2) < int(tx2) or int(py2) < int(ty2):
+            problems.append(f"{name}: the panel {px1} {py1} {px2} {py2} does not cover the table")
+    out = sum(p[3] for x in t for r in x["rows"] for p in r[3])
     print(f"{name}: {len(t)} draws, {out} entries of players who cannot play")
     return problems
 

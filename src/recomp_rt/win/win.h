@@ -119,19 +119,20 @@ typedef struct {
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
 int picker_compute_view(uint32_t club, uint32_t team_index, int kind, const uint16_t *formation, uint32_t viewer,
                         Pick *out);
-/* Squad depth (picker.c, for squad_depth.c): for each of the 11 slots of a formation, the three players of
- * the squad with the highest value there, unavailable players too. xi is the best XI of the same formation:
- * its player in a slot comes before every other available player of that slot. */
-#define DEPTH_PLAYERS 3
+/* Squad depth (picker.c, for squad_depth.c; Q106, Q107, Q161): rows of the 11 slots of a formation,
+ * row_of[s] is the row of slot s (0 to rows - 1). Each row lists the k + 2 players of the squad with the
+ * highest value in its k slots, unavailable players too. xi is the best XI of the same formation: its
+ * players in the row's slots come before every other available player of that row. */
+#define DEPTH_PLAYERS (11 + 2)
 typedef struct {
     int n[11];
     uint32_t staff[11][DEPTH_PLAYERS];
     int fit[11][DEPTH_PLAYERS];
-    int score[11][DEPTH_PLAYERS];  /* as Pick.score */
+    int score[11][DEPTH_PLAYERS];  /* as Pick.score: the best of the row's slots */
     int out[11][DEPTH_PLAYERS];    /* 1: the player cannot play the next match */
 } Depth;
 int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, uint32_t viewer, const Pick *xi,
-                 Depth *out);
+                 const int *row_of, int rows, Depth *out);
 int picker_pick(uint32_t club, uint32_t team_index, int kind);
 int picker_check_turn(void);                   /* at each human turn: the picker check; 1 when done */
 /* The Team views screen (views.c): pushes it for a club and team (0 = first team) of a squad screen. */

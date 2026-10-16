@@ -512,13 +512,14 @@ int picker_compute_view(uint32_t club, uint32_t team_index, int kind, const uint
     return n;
 }
 
-/* Squad depth (Q106, Q107): for each of the 11 slots, every player of the squad who can take it (value 0
- * or more), unavailable players too, by value, then fit, then staff address. xi's player in the slot ranks
- * as the best available player (his value raised to theirs, and first on a tie), so the first available
- * player of a row is best XI's player there. An unavailable player with a higher value stays above him.
- * Keeps the first DEPTH_PLAYERS of each row. Returns the number of players in the squad. */
+/* Squad depth (Q106, Q107, Q161): for each row, every player of the squad who can take one of its slots,
+ * unavailable players too, with his best value over the row's slots (and the fit there). xi's players in
+ * the row's slots rank as the best available players (their value raised to the highest value of the
+ * available players; among them by their own value), so the first available players of a row are best
+ * XI's players there. An unavailable player with a higher value stays above them. The others by value,
+ * then fit, then staff address. Keeps the first k + 2 of a row of k slots. Returns the number of players. */
 int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, uint32_t viewer, const Pick *xi,
-                 Depth *out)
+                 const int *row_of, int rows, Depth *out)
 {
     memset(out, 0, sizeof *out);
     picking = 1;
@@ -526,24 +527,31 @@ int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, 
     int cannot[50];
     int n = load(club, team_index ? 0 : next_fixture(club), viewer, c, cannot);
     picking = 0;
-    for (int s = 0; s < SLOTS; s++) {
-        /* key: the value; for xi's player the highest value of the available players, and he wins a tie. */
-        int order[50], values[50], fits[50], keys[50], picks[50], k = 0, top = -1;
+    for (int r = 0; r < rows && r < SLOTS; r++) {
+        int order[50], values[50], fits[50], keys[50], picks[50], k = 0, top = -1, slots = 0;
+        for (int s = 0; s < SLOTS; s++) slots += row_of[s] == r;
         for (int i = 0; i < n; i++) {
-            int v = value(&c[i], formation[s]);
+            int v = -1, f = 0, pick = 0;
+            for (int s = 0; s < SLOTS; s++) {
+                if (row_of[s] != r) continue;
+                int vs = value(&c[i], formation[s]), fs = fit(&c[i], formation[s]);
+                if (vs > v || (vs == v && fs > f)) { v = vs; f = fs; }
+                pick |= !cannot[i] && xi && c[i].staff == xi->staff[s];
+            }
             if (v < 0) continue;
             order[k] = i;
             values[k] = v;
-            fits[k] = fit(&c[i], formation[s]);
-            picks[k] = !cannot[i] && xi && c[i].staff == xi->staff[s];
+            fits[k] = f;
+            picks[k] = pick;
             if (!cannot[i] && v > top) top = v;
             k++;
         }
         for (int j = 0; j < k; j++) keys[j] = picks[j] ? top : values[j];
-        for (int i = 1; i < k; i++)            /* insertion sort: key, the pick, fit, staff address */
+        for (int i = 1; i < k; i++)            /* insertion sort: key, the picks, value, fit, staff address */
             for (int j = i; j > 0; j--) {
                 int x = j, y = j - 1;
                 int above = keys[x] != keys[y] ? keys[x] > keys[y] : picks[x] != picks[y] ? picks[x]
+                          : values[x] != values[y] ? values[x] > values[y]
                           : fits[x] != fits[y] ? fits[x] > fits[y] : c[order[x]].staff < c[order[y]].staff;
                 if (!above) break;
                 int t;
@@ -553,12 +561,13 @@ int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, 
                 t = keys[x]; keys[x] = keys[y]; keys[y] = t;
                 t = picks[x]; picks[x] = picks[y]; picks[y] = t;
             }
-        out->n[s] = k < DEPTH_PLAYERS ? k : DEPTH_PLAYERS;
-        for (int j = 0; j < out->n[s]; j++) {
-            out->staff[s][j] = c[order[j]].staff;
-            out->score[s][j] = values[j];
-            out->fit[s][j] = fits[j];
-            out->out[s][j] = cannot[order[j]];
+        int keep = slots + 2;
+        out->n[r] = k < keep ? k : keep;
+        for (int j = 0; j < out->n[r]; j++) {
+            out->staff[r][j] = c[order[j]].staff;
+            out->score[r][j] = values[j];
+            out->fit[r][j] = fits[j];
+            out->out[r][j] = cannot[order[j]];
         }
     }
     return n;
