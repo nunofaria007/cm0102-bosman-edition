@@ -12,7 +12,7 @@
 #define RECOMP_OPTIONS_H
 
 typedef enum {
-    OPT_DISPLAY,               /* enum: widescreen (default), classic */
+    OPT_DISPLAY,               /* enum: widescreen (default), classic, hd */
     OPT_SPACE_TO_CONTINUE,     /* switch, on */
     OPT_SHORTCUTS,             /* switch, on */
     OPT_SHARP_PICTURE,         /* switch, on */
@@ -31,7 +31,7 @@ typedef enum {
 } OptionId;
 
 /* Values of OPT_DISPLAY for options_enum. */
-enum { DISPLAY_WIDESCREEN = 0, DISPLAY_CLASSIC = 1 };
+enum { DISPLAY_WIDESCREEN = 0, DISPLAY_CLASSIC = 1, DISPLAY_HD = 2 };
 
 /* Values of OPT_DATABASE for options_enum. */
 enum { DATABASE_3968 = 0, DATABASE_3960 = 1, DATABASE_3965 = 2 };

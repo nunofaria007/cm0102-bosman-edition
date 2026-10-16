@@ -120,3 +120,19 @@ Fault (Max): the confirm "The file ... already exists. Replace this file ?" (str
 Cause: the text box helper `0x5ed070` passes the box (110,145)-(780,535) to the text with links `0x4aeaf0` (comp_text.cpp), x1 + 5 and x2 - 5. `0x4aeaf0` wraps the text at x2 - x1 + 1 (`0x4aedf7`) and, with flag 1, centres each line at x1 + (x2 - x1 + 1 - width) / 2 (`0x4af17d`). The widths are screen pixels (TRUE_WIDTH), the box was classic, and then the widget create scaled the line x. So each line wrapped at 660 screen pixels and moved right of its centre. The same fault moved the news headline left of the centre.
 
 Fix: `RT_WRAP` of `0x4aeaf0` in `display.c` gives it x1 and x2 in screen pixels, and the widget create scales only the y of the widgets that `0x4aeaf0` makes (return address in `0x4aeaf0..0x4afa30`). This replaces the line shift of the link buttons (section 9). In widescreen mode the confirm is now one line centred in its box (centre x 712), and news text wraps at the width of its box. Checked: the link under "Thierry Henry" on the bid news lands on the name. Classic mode does not change.
+
+## 11. HD mode, part 1 (2026-10-15)
+
+Slice 9 of `docs/specs/2026-10-15-features-0.4.0-spec.md`. The line `display = hd` in `settings.txt` sets the screen to 1920x1080 (`display.c` `HD_W`, `HD_H`). Every rule of sections 6 to 10 reads `rt_screen_w` and `rt_screen_h`, so HD uses them with no new code:
+- areas and widgets scale by 1920/800 across and 1080/600 down;
+- the nine limits of `widescreen.py` and the row size of the circle plot read the screen size;
+- a background is scaled by 2.4 and cut to 1920x1080 (about 76 classic rows off the top and the bottom); the left bar becomes 216x1080;
+- the progress box, the possession bar, the text widths and the text with links use the same scale.
+
+Text and pictures keep their pixel size (Q127).
+
+Checked on screen in HD from saved games: the setup, leagues and news screens, the side bar popups, the squad, Player & Staff Search, Manager Stats, Job Information, Transfers, History, the "CD Not Required" box, the progress box of a load, the match screens (Overview with the possession bar, Match Stats, Action Zones, Match Report, Player Ratings, Latest Scores, the club stats), the Commentary Speed popup and the tactics screen with its pitch. No fault found.
+
+Popups keep their item size, so the scripted runs need their own HD positions for the items: Go on Holiday (270, 541), Very Fast (260, 451), Fastest (260, 430), and the Ok of the centred box (959, 328). `tests/smoke/smoke_run.py` takes them after a second "|".
+
+Known limit, the same as in widescreen (section 7): the message box of `0x5e8290` keeps its classic y (242..357). In HD it sits in the top third of the screen. Its fix needs about 30 y constants of `0x5e8290`, some of them in mouse tests (`0x5e85f6`…`0x5e870b`). Not done in part 1.

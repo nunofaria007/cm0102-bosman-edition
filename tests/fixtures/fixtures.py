@@ -4,7 +4,7 @@
 Usage:
     python3 tests/fixtures/fixtures.py make <cm0102_recomp> <game folder> [--dir <fixtures folder>]
     python3 tests/fixtures/fixtures.py play <cm0102_recomp> <game folder> <save name> <steps file> <out folder>
-        [--dir <fixtures folder>] [--mode classic|widescreen] [--set key=value]... [--days n]
+        [--dir <fixtures folder>] [--mode classic|widescreen|hd] [--set key=value]... [--days n]
 
 The saves stay outside git, because they hold the original's data. The default folder is
 /Users/max/Projects/cm0102/test-fixtures (FIXTURES_DIR in the environment changes it).
@@ -53,8 +53,8 @@ LOAD_STEPS = [
     "4000 click 445 257",                   # the first save in the list
     "5000 click 705 573",                   # Ok
     "wait box",
-    "1000 move 399 330 | 638 328",
-    "2000 click 399 330 | 638 328",         # "CD Not Required": Ok (the box is not scaled in widescreen)
+    "1000 move 399 330 | 638 328 | 959 328",
+    "2000 click 399 330 | 638 328 | 959 328",         # "CD Not Required": Ok (the box is not scaled in widescreen or HD)
     "wait first-news",
 ]
 
@@ -156,7 +156,7 @@ def main(argv):
             rest.append(args[i])
             i += 1
     if opts["--mode"] not in smoke_run.SIZES:
-        print(f"unknown mode {opts['--mode']}: use classic or widescreen")
+        print(f"unknown mode {opts['--mode']}: use classic, widescreen or hd")
         return 2
     if argv[1] == "make":
         if len(rest) != 2:

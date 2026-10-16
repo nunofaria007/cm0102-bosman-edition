@@ -89,6 +89,7 @@ int main(void)
     }
     CHECK(strstr(get(), "\nfaster_days = on\n") != NULL);
     CHECK(strstr(get(), "\ndisplay = widescreen\n") != NULL);
+    CHECK(strstr(get(), "display = hd draws it at 1920x1080") != NULL);
     CHECK(strstr(get(), "\nsave_folder = \n") != NULL);
     CHECK(strstr(get(), "\nsave_backups = on\n") != NULL);
     static char first[16384];
@@ -155,7 +156,13 @@ int main(void)
     CHECK(options_bool(OPT_SQUAD_VIEWS) == 0);
     CHECK(options_bool(OPT_MATCH_COLUMNS) == 1);
 
-    /* 6. The database option: its values, a bad value, and the Setup Game choice that writes the file. */
+    /* 6. HD mode (0.4.0 spec, slice 9): display = hd, in any case. */
+    put("display = HD\n");
+    options_load(path);
+    CHECK(options_enum(OPT_DISPLAY) == DISPLAY_HD);
+    CHECK(!strcmp(options_string(OPT_DISPLAY), "hd"));
+
+    /* 7. The database option: its values, a bad value, and the Setup Game choice that writes the file. */
     put("database = 3.9.60\n");
     options_load(path);
     CHECK(options_enum(OPT_DATABASE) == DATABASE_3960);
