@@ -3,6 +3,7 @@
 #ifndef RECOMP_VIEWS_H
 #define RECOMP_VIEWS_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define VIEWS_TEXT_SIZE 0x80u       /* the text buffer that views.c gives best_xi_build */
@@ -31,5 +32,19 @@ int best_xi_build(uint32_t club, uint32_t team, uint32_t buf, int x1, int y1, in
                   int lx2, int ly2, uint32_t bar, uint32_t fg);
 /* A click on a widget of id and data: 1 when it was a Formation item (rebuild the screen). */
 int best_xi_input(uint32_t id, uint32_t data);
+
+/* Parts of best_xi.c for the Squad depth tab. views_formation builds the Formation button and list and
+ * gives the chosen tactic; it returns 1 + its index in the list, 0 when there is none. views_text: a
+ * text widget with no panel (flags 1 left, 0xc centred). The score text is the number of Q156, 1 to 20. */
+int views_formation(uint32_t buf, uint32_t bar, Tactic *chosen);
+void views_text(uint32_t buf, int x1, int y1, int x2, int y2, uint32_t text_colour, uint32_t flags, const char *text);
+void views_short_name(uint32_t staff, char *out, size_t size);
+int views_shown_score(int value);
+void views_position_text(uint16_t mask, char *out, size_t size);
+uint32_t views_human_manager(void);
+
+/* Tab 2: the Formation button and a row for each slot of the chosen tactic with its top three players, in
+ * the panel x1..y2 (classic numbers). */
+void squad_depth_build(uint32_t club, uint32_t team, uint32_t buf, int x1, int y1, int x2, int y2, uint32_t bar);
 
 #endif

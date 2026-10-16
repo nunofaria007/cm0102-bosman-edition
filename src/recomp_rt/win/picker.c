@@ -361,6 +361,41 @@ static void staff_name(uint32_t staff, char *out, size_t size)
                   second ? (const char *)(g_mem + second) : "");
 }
 
+/* The candidates of a club's squad (club +0xd7) into c, returns their count. Without out, only the
+ * players who can play the next match (fixture, 0 for none). With out, every player, and out[i] is 1 for
+ * a player who cannot play. */
+static int load(uint32_t club, uint32_t fixture, uint32_t viewer, Candidate *c, int *out)
+{
+    int n = 0;
+    for (uint32_t i = 0; i < 50; i++) {
+        uint32_t staff = rd32(g_mem, club + SQUAD + 4 * i);
+        if (!staff || !rd32(g_mem, staff + PLAYER_DATA)) continue;
+        uint32_t s1[1] = {staff}, s2[2] = {staff, 1};
+        /* Without a fixture 0x45cbe0 answers yes at once, so test injury and national duty here too. */
+        uint32_t intl[5] = {staff, TODAY, club, 0, 0};
+        uint32_t av[4] = {staff, fixture, club, TODAY};
+        int cannot = (call_this(0x62c400u, rd32(g_mem, FITNESS), 1, s1) & 0xff) == 2   /* al */
+                  || call_this(0x7757d0u, rd32(g_mem, NATIONS), 5, intl)
+                  || (fixture && !(call_cdecl(AVAILABLE, 4, av) & 0xff));
+        if (cannot && !out) continue;
+        if (out) out[n] = cannot;
+        c[n].staff = staff;
+        c[n].data = rd32(g_mem, staff + PLAYER_DATA);
+        c[n].condition = (int16_t)call_this(0x62c590u, rd32(g_mem, FITNESS), 2, s2);
+        c[n].age = (int16_t)rd16(g_mem, staff + AGE);
+        c[n].ability = (int16_t)rd16(g_mem, c[n].data + ABILITY);    /* for the picker check only */
+        for (uint32_t k = 1; k <= ATTRIBUTES; k++) {    /* cdecl (staff, index): the shown value, 1 to 20 */
+            uint32_t a[2] = {staff, k};
+            uint32_t v = call_cdecl(0x5431e0u, 2, a) & 0xff;
+            c[n].attr[k] = (uint8_t)(v > 20 ? 20 : v);
+            uint32_t q[3] = {viewer, staff, k};
+            if (viewer && !(call_cdecl(KNOWN, 3, q) & 0xff)) c[n].attr[k] = 0;
+        }
+        n++;
+    }
+    return n;
+}
+
 static int compute(uint32_t club, uint32_t team_index, int kind, const uint16_t *formation, uint32_t viewer,
                    Pick *out)
 {
@@ -379,31 +414,7 @@ static int compute(uint32_t club, uint32_t team_index, int kind, const uint16_t 
                  : formation ? formation[s] : (uint16_t)rd16(g_mem, tactic + 0x12d + 2 * (uint32_t)s);
 
     Candidate c[50];
-    int n = 0;
-    for (uint32_t i = 0; i < 50; i++) {
-        uint32_t staff = rd32(g_mem, club + SQUAD + 4 * i);
-        if (!staff || !rd32(g_mem, staff + PLAYER_DATA)) continue;
-        uint32_t s1[1] = {staff}, s2[2] = {staff, 1};
-        /* Without a fixture 0x45cbe0 answers yes at once, so test injury and national duty here too. */
-        if ((call_this(0x62c400u, rd32(g_mem, FITNESS), 1, s1) & 0xff) == 2) continue;   /* al */
-        uint32_t intl[5] = {staff, TODAY, club, 0, 0};
-        if (call_this(0x7757d0u, rd32(g_mem, NATIONS), 5, intl)) continue;
-        uint32_t av[4] = {staff, fixture, club, TODAY};
-        if (fixture && !(call_cdecl(AVAILABLE, 4, av) & 0xff)) continue;
-        c[n].staff = staff;
-        c[n].data = rd32(g_mem, staff + PLAYER_DATA);
-        c[n].condition = (int16_t)call_this(0x62c590u, rd32(g_mem, FITNESS), 2, s2);
-        c[n].age = (int16_t)rd16(g_mem, staff + AGE);
-        c[n].ability = (int16_t)rd16(g_mem, c[n].data + ABILITY);    /* for the picker check only */
-        for (uint32_t k = 1; k <= ATTRIBUTES; k++) {    /* cdecl (staff, index): the shown value, 1 to 20 */
-            uint32_t a[2] = {staff, k};
-            uint32_t v = call_cdecl(0x5431e0u, 2, a) & 0xff;
-            c[n].attr[k] = (uint8_t)(v > 20 ? 20 : v);
-            uint32_t q[3] = {viewer, staff, k};
-            if (viewer && !(call_cdecl(KNOWN, 3, q) & 0xff)) c[n].attr[k] = 0;
-        }
-        n++;
-    }
+    int n = load(club, fixture, viewer, c, NULL);
     qsort(c, (size_t)n, sizeof *c, by_condition);
 
     int first[50], n_first = 0, gk = 0;
@@ -498,6 +509,58 @@ int picker_compute_view(uint32_t club, uint32_t team_index, int kind, const uint
     picking = 1;
     int n = compute(club, team_index, kind, formation, viewer, out);
     picking = 0;
+    return n;
+}
+
+/* Squad depth (Q106, Q107): for each of the 11 slots, every player of the squad who can take it (value 0
+ * or more), unavailable players too, by value, then fit, then staff address. xi's player in the slot ranks
+ * as the best available player (his value raised to theirs, and first on a tie), so the first available
+ * player of a row is best XI's player there. An unavailable player with a higher value stays above him.
+ * Keeps the first DEPTH_PLAYERS of each row. Returns the number of players in the squad. */
+int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, uint32_t viewer, const Pick *xi,
+                 Depth *out)
+{
+    memset(out, 0, sizeof *out);
+    picking = 1;
+    Candidate c[50];
+    int cannot[50];
+    int n = load(club, team_index ? 0 : next_fixture(club), viewer, c, cannot);
+    picking = 0;
+    for (int s = 0; s < SLOTS; s++) {
+        /* key: the value; for xi's player the highest value of the available players, and he wins a tie. */
+        int order[50], values[50], fits[50], keys[50], picks[50], k = 0, top = -1;
+        for (int i = 0; i < n; i++) {
+            int v = value(&c[i], formation[s]);
+            if (v < 0) continue;
+            order[k] = i;
+            values[k] = v;
+            fits[k] = fit(&c[i], formation[s]);
+            picks[k] = !cannot[i] && xi && c[i].staff == xi->staff[s];
+            if (!cannot[i] && v > top) top = v;
+            k++;
+        }
+        for (int j = 0; j < k; j++) keys[j] = picks[j] ? top : values[j];
+        for (int i = 1; i < k; i++)            /* insertion sort: key, the pick, fit, staff address */
+            for (int j = i; j > 0; j--) {
+                int x = j, y = j - 1;
+                int above = keys[x] != keys[y] ? keys[x] > keys[y] : picks[x] != picks[y] ? picks[x]
+                          : fits[x] != fits[y] ? fits[x] > fits[y] : c[order[x]].staff < c[order[y]].staff;
+                if (!above) break;
+                int t;
+                t = order[x]; order[x] = order[y]; order[y] = t;
+                t = values[x]; values[x] = values[y]; values[y] = t;
+                t = fits[x]; fits[x] = fits[y]; fits[y] = t;
+                t = keys[x]; keys[x] = keys[y]; keys[y] = t;
+                t = picks[x]; picks[x] = picks[y]; picks[y] = t;
+            }
+        out->n[s] = k < DEPTH_PLAYERS ? k : DEPTH_PLAYERS;
+        for (int j = 0; j < out->n[s]; j++) {
+            out->staff[s][j] = c[order[j]].staff;
+            out->score[s][j] = values[j];
+            out->fit[s][j] = fits[j];
+            out->out[s][j] = cannot[order[j]];
+        }
+    }
     return n;
 }
 

@@ -11,10 +11,11 @@
  * bar with Best XI, Squad depth and Compare players, and the Back/Next bar. The tabs hold empty panels
  * in this slice; slices 4 to 6 fill them. The Best XI tab draws a pitch (draw.c) over a panel widget,
  * after the game draws that widget (views_widget_drawn, from the widget draw wrap in names.c), and the
- * eleven over it (best_xi.c).
+ * eleven over it (best_xi.c). The Squad depth tab is in squad_depth.c.
  *
- * Node slots of the screen: 0 club, 1 team (0 = first team), 2 the chosen tactic of Best XI, 4 tab (1 to
- * 3), 5 and 6 the heading colours. Only numbers, so the screen needs no leave function (inventory section 5).
+ * Node slots of the screen: 0 club, 1 team (0 = first team), 2 the chosen tactic of Best XI and Squad
+ * depth, 4 tab (1 to 3), 5 and 6 the heading colours. Only numbers, so the screen needs no leave function
+ * (inventory section 5).
  *
  * The screen only reads the game. It never changes the team or any other data. */
 #include "win.h"
@@ -182,6 +183,9 @@ static void views_build(void)
         panel(450, top, 790, bottom);
         best_xi_build(club, team, scratch + TEXT_AT, x1, y1, x2, y2, 460, top + 6, 780, bottom - 6, node_slot(6),
                       node_slot(5));
+    } else if (tab == 2) {
+        panel(100, top, 790, bottom);
+        squad_depth_build(club, team, scratch + TEXT_AT, 110, top + 6, 780, bottom - 6, node_slot(6));
     } else {
         panel(100, top, 790, bottom);
     }
