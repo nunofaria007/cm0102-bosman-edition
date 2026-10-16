@@ -11,12 +11,14 @@ such check, so a wrong address would only fail at run time. This list closes the
 import os
 import re
 
-CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c", "views.c", "print_pdf.c")      # in src/recomp_rt/win
+CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c", "views.c", "print_pdf.c", "best_xi.c",
+                  "tactics.c")      # in src/recomp_rt/win
 
 # address: (bytes of the first eight, name)
 CALLBACKS = {
     0x45CBE0: ("5355568b74241085", "can the player play the fixture (squad screen test)"),
     0x5431E0: ("8b44240481ec0002", "shown attribute of a player (staff, index 1 to 31)"),
+    0x543280: ("8b4424045685c00f", "is an attribute shown to a manager (manager, staff, index)"),
     0x54C5B0: ("83ec10a06924ae00", "date plus days"),
     0x55F990: ("81ec00020000568b", "popup item create"),
     0x55FBA0: ("a10c29ae008b1510", "popup area create"),
@@ -44,6 +46,7 @@ CALLBACKS = {
     0x7FEBB0: ("0fbf812a38000081", "screen stack: at the end"),
     0x7FE600: ("81ec08020000538b", "screen push"),
     0x7FF270: ("81ec00020000538b", "set a screen node slot"),
+    0x804030: ("8b4424308b54242c", "button with its own rectangle"),
     0x803F30: ("8b44240c8b542408", "screen heading"),
     0x75DB00: ("81ec640300000fbf", "side bar build"),
     0x7615D0: ("81eca4020000538b", "side bar input"),

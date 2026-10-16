@@ -9,15 +9,17 @@
  * The frame copies the club screen 0x454900 (docs/research/2026-10-15-team-views-frame-inventory.md):
  * the club's background picture, the heading with the club's name in its colours, the side bar, a tab
  * bar with Best XI, Squad depth and Compare players, and the Back/Next bar. The tabs hold empty panels
- * in this slice; slices 4 to 6 fill them. The Best XI tab draws an empty pitch (draw.c) over a panel
- * widget, after the game draws that widget (views_widget_drawn, from the widget draw wrap in names.c).
+ * in this slice; slices 4 to 6 fill them. The Best XI tab draws a pitch (draw.c) over a panel widget,
+ * after the game draws that widget (views_widget_drawn, from the widget draw wrap in names.c), and the
+ * eleven over it (best_xi.c).
  *
- * Node slots of the screen: 0 club, 1 team (0 = first team), 4 tab (1 to 3), 5 and 6 the heading
- * colours. Only numbers, so the screen needs no leave function (inventory section 5).
+ * Node slots of the screen: 0 club, 1 team (0 = first team), 2 the chosen tactic of Best XI, 4 tab (1 to
+ * 3), 5 and 6 the heading colours. Only numbers, so the screen needs no leave function (inventory section 5).
  *
  * The screen only reads the game. It never changes the team or any other data. */
 #include "win.h"
 #include "draw.h"
+#include "views.h"
 #include "options.h"
 
 #include <stdio.h>
@@ -55,7 +57,8 @@
 #define REBUILD 0xfffffff5u         /* -0xb */
 
 static uint32_t scratch;            /* a block of the game's heap for the calls that write through pointers */
-#define SCRATCH_SIZE (TABS * TAB_ENTRY + 0x200u)
+#define TEXT_AT (TABS * TAB_ENTRY + 0x200u)   /* the text buffer of the Best XI tab */
+#define SCRATCH_SIZE (TEXT_AT + VIEWS_TEXT_SIZE)
 
 static int pitch_widget = -1;       /* the panel that the pitch covers, on the screen built last */
 
@@ -170,10 +173,15 @@ static void views_build(void)
 
     pitch_widget = -1;
     if (tab == 1) {
-        /* Best XI: the pitch on the left, the table on the right. */
+        /* Best XI: the pitch on the left, the table on the right. The players' widgets come after the
+         * pitch widget, so the game draws them over the pitch. */
         panel(100, top, 440, bottom);
-        pitch_widget = plain_widget(160, top + 10, 380, bottom - 10);
+        int x1 = 104, y1 = top + 8, x2 = 436, y2 = bottom - 8;
+        pitch_widget = plain_widget(x1, y1, x2, y2);
+        views_pitch_rect(&x1, &y1, &x2, &y2);
         panel(450, top, 790, bottom);
+        best_xi_build(club, team, scratch + TEXT_AT, x1, y1, x2, y2, 460, top + 6, 780, bottom - 6, node_slot(6),
+                      node_slot(5));
     } else {
         panel(100, top, 790, bottom);
     }
@@ -194,6 +202,10 @@ static void views_input(void)
     int16_t w = (int16_t)rt_arg(0);
     if (w >= 0) {
         uint32_t at = display() + WIDGETS + 8 + (uint32_t)w * WIDGET_SIZE;
+        if (best_xi_input(rd32(g_mem, at), rd32(g_mem, at + 0x40))) {
+            rt_ret_cdecl(REBUILD);
+            return;
+        }
         if ((int16_t)rd32(g_mem, at) == (int16_t)TAB_ID) {
             uint32_t data = rd32(g_mem, at + 0x40);
             if (data != node_slot(4)) {
@@ -217,6 +229,37 @@ static int on_top(void)
     return node && rd32(g_mem, node) == build_fn();
 }
 
+/* The largest pitch of 68 by 105 that fits the box (screen pixels), in its middle, but at least as wide as
+ * five name boxes and their gaps (Q154) when the box allows: then the pitch is wider than 68 by 105. */
+#define MIN_PITCH_W (5 * (VIEWS_BOX_PX + 4) + 4)
+static void fit_pitch(int *x1, int *y1, int *x2, int *y2)
+{
+    int bw = *x2 - *x1, bh = *y2 - *y1;
+    if (bw * 105 > bh * 68) {
+        int pw = bh * 68 / 105;
+        if (pw < MIN_PITCH_W) pw = MIN_PITCH_W < bw ? MIN_PITCH_W : bw;
+        *x1 += (bw - pw) / 2;
+        *x2 = *x1 + pw;
+    } else {
+        int ph = bw * 105 / 68;
+        *y1 += (bh - ph) / 2;
+        *y2 = *y1 + ph;
+    }
+}
+
+/* The pitch of a box in classic numbers, back in classic numbers: the box scales to the screen as the
+ * widget create does (display.c), the pitch fits it there, and its edges scale back. */
+void views_pitch_rect(int *x1, int *y1, int *x2, int *y2)
+{
+    int w = (int)rt_screen_w, h = (int)rt_screen_h;
+    int sx1 = *x1 * w / 800, sy1 = *y1 * h / 600, sx2 = (*x2 + 1) * w / 800 - 1, sy2 = (*y2 + 1) * h / 600 - 1;
+    fit_pitch(&sx1, &sy1, &sx2, &sy2);
+    *x1 = sx1 * 800 / w;
+    *y1 = sy1 * 600 / h;
+    *x2 = sx2 * 800 / w;
+    *y2 = sy2 * 600 / h;
+}
+
 /* The widget draw wrap (names.c) calls this after the game draws widget w (an address). The pitch goes
  * on the game's draw surface inside the panel's box, so the screen dumps hold it too. */
 void views_widget_drawn(uint32_t w)
@@ -229,17 +272,7 @@ void views_widget_drawn(uint32_t w)
                     (int)rd32(g_mem, surface + 8), (int)rd32(g_mem, surface + 0xc)};
     int x1 = (int32_t)rd32(g_mem, w + 0x10), y1 = (int32_t)rd32(g_mem, w + 0x14);
     int x2 = (int32_t)rd32(g_mem, w + 0x18), y2 = (int32_t)rd32(g_mem, w + 0x1c);
-    /* The largest pitch of 68 by 105 that fits the box, in its middle. */
-    int bw = x2 - x1, bh = y2 - y1;
-    if (bw * 105 > bh * 68) {
-        int pw = bh * 68 / 105;
-        x1 += (bw - pw) / 2;
-        x2 = x1 + pw;
-    } else {
-        int ph = bw * 105 / 68;
-        y1 += (bh - ph) / 2;
-        y2 = y1 + ph;
-    }
+    fit_pitch(&x1, &y1, &x2, &y2);
     draw_pitch(&t, x1, y1, x2, y2);
 }
 

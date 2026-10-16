@@ -106,12 +106,21 @@ typedef struct {
     uint32_t staff[PICK_SLOTS];    /* 0 for an empty slot */
     int fit[PICK_SLOTS];           /* 1 to 20 */
     int score[PICK_SLOTS];         /* key attribute average x fit / 20, times 1200 */
+    /* The candidates outside the eleven: the subs in slot order, then the others by their best value. For
+     * each, the best of the 11 slots: the fit and the slot's position bit with its side bits. */
+    int bench;
+    uint32_t bench_staff[50];
+    int bench_fit[50];
+    uint16_t bench_mask[50];
 } Pick;
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
+int picker_compute_view(uint32_t club, uint32_t team_index, int kind, const uint16_t *formation, uint32_t viewer,
+                        Pick *out);
 int picker_pick(uint32_t club, uint32_t team_index, int kind);
 int picker_check_turn(void);                   /* at each human turn: the picker check; 1 when done */
 /* The Team views screen (views.c): pushes it for a club and team (0 = first team) of a squad screen. */
 void views_open(uint32_t club, uint32_t team);
+uint32_t columns_attribute_colour(int value);   /* 1 to 20: the attribute colour (RGB565), else 0 */
 void views_widget_drawn(uint32_t widget);      /* after the game draws a widget: the pitch */
 /* Faster commentary (commentary.c): at each widget create, before the rect is scaled. */
 void commentary_widget_before(void);

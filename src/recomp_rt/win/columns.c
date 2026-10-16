@@ -83,7 +83,14 @@ static uint32_t attribute_colour(const char *s)
     while (*s == ' ') s++;
     for (; *s >= '0' && *s <= '9' && n < 3; s++, n++) v = v * 10 + (*s - '0');
     while (*s == ' ') s++;
-    if (!n || *s || v < 1 || v > 20) return 0;
+    if (!n || *s) return 0;
+    return columns_attribute_colour(v);
+}
+
+/* The attribute colour of a value 1 to 20, or 0 for any other value. The Best XI tab uses it too. */
+uint32_t columns_attribute_colour(int v)
+{
+    if (v < 1 || v > 20) return 0;
     return v <= 5 ? COLOUR_LOW : v <= 10 ? COLOUR_MID : v <= 15 ? COLOUR_GOOD : COLOUR_TOP;
 }
 
