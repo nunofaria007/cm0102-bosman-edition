@@ -64,6 +64,20 @@ static int widget_index(uint32_t w)
 
 void o_005ee590(void);
 void o_005e6d80(void);
+void o_0055f7c0(void);
+
+/* The reset of a Display to empty (0x55f7c0, thiscall, 1 stack argument): the game does it when it builds
+ * a screen again. The pictures that widget i showed on the old screen are gone with it: a new widget i
+ * that the game has not drawn yet must not be compared with the old hash (Q150). */
+RT_WRAP(0055f7c0, display_reset)
+{
+    if (cpu.ecx == DISPLAY) {
+        memset(hashed, 0, sizeof hashed);
+        memset(drawn_hash, 0, sizeof drawn_hash);
+        for (int i = 0; i < MAX_WIDGETS; i++) places[i].set = 0;
+    }
+    o_0055f7c0();
+}
 
 /* FNV-1a over the pixels of the box x1..x2, y1..y2 of a surface; 0 when the box is not on it. */
 static uint32_t box_hash(uint32_t px, uint32_t pitch, int x1, int y1, int x2, int y2)

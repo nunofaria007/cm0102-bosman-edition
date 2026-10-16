@@ -31,6 +31,58 @@ static char *extract(const char *pdf, size_t n)
     return out;
 }
 
+/* The structure of a PDF: each "N 0 obj" has its "endobj" before the next object, the objects count
+ * 1 up, the xref offsets point at the objects, the trailer size is right, "/Type /Page" matches only the
+ * page objects and each stream has the length that it gives. */
+static void structure(const char *pdf, size_t sheets)
+{
+    size_t objs = 0, off[64] = {0};
+    for (const char *p = pdf; (p = strstr(p, " 0 obj\n")); p += 7) {
+        const char *s = p;
+        while (s > pdf && s[-1] != '\n') s--;
+        size_t id = (size_t)strtoul(s, NULL, 10);
+        CHECK(id == objs + 1);
+        if (id < 64) off[id] = (size_t)(s - pdf);
+        const char *e = strstr(p, "endobj\n"), *next = strstr(p + 7, " 0 obj\n");
+        CHECK(e != NULL && (!next || e < next));
+        objs++;
+    }
+    CHECK(objs == 3 + 2 * sheets);
+    const char *x = strstr(pdf, "\nxref\n");
+    CHECK(x != NULL);
+    if (x) {
+        size_t count = 0;
+        CHECK(sscanf(x + 6, "0 %zu\n", &count) == 1 && count == objs + 1);
+        const char *line = strstr(x + 6, "\n") + 1;
+        CHECK(!strncmp(line, "0000000000 65535 f \n", 20));
+        line += 20;
+        for (size_t i = 1; i <= objs && i < 64; i++, line += 20) {
+            size_t o = (size_t)strtoul(line, NULL, 10);
+            char want[32];
+            snprintf(want, sizeof want, "%zu 0 obj\n", i);
+            CHECK(o == off[i] && !strncmp(pdf + o, want, strlen(want)));
+            CHECK(line[17] == 'n');
+        }
+        size_t start = 0;
+        const char *sx = strstr(line, "startxref\n");
+        CHECK(sx && sscanf(sx + 10, "%zu", &start) == 1 && start == (size_t)(x + 1 - pdf));
+        char size[40];
+        snprintf(size, sizeof size, "/Size %zu ", objs + 1);
+        CHECK(strstr(line, size) != NULL);
+    }
+    size_t pages = 0, kinds = 0;
+    for (const char *p = pdf; (p = strstr(p, "/Type /Page")); p += 11) {
+        if (p[11] == 's') kinds++;
+        else pages++;
+    }
+    CHECK(pages == sheets && kinds == 1);
+    for (const char *p = pdf; (p = strstr(p, "<< /Length ")); p += 11) {
+        size_t len = (size_t)strtoul(p + 11, NULL, 10);
+        const char *s = strstr(p, "stream\n") + 7;
+        CHECK(!strncmp(s + len, "endstream\nendobj\n", 17));
+    }
+}
+
 static void roundtrip(const char *text, int per_page, const char *expect)
 {
     size_t n;
@@ -39,6 +91,9 @@ static void roundtrip(const char *text, int per_page, const char *expect)
     if (!pdf) return;
     CHECK(!strncmp(pdf, "%PDF-1.4", 8));
     CHECK(n > 20 && !strncmp(pdf + n - 6, "%%EOF\n", 6));
+    size_t pages = 1;
+    for (const char *p = expect; *p; p++) pages += *p == '\f';
+    structure(pdf, pages);
     char *back = extract(pdf, n);
     if (strcmp(back, expect)) printf("got:\n%s\nexpected:\n%s\n", back, expect);
     CHECK(!strcmp(back, expect));

@@ -42,6 +42,7 @@
  * the pick the runtime wraps 0x62c680 and skips it, so the pick only reads what the records hold. A
  * record that no screen has updated today shows the value of its last update. */
 #include "win.h"
+#include "pick_score.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -69,7 +70,6 @@ _Static_assert(SLOTS + MAX_SUBS <= PICK_SLOTS, "a Pick holds the eleven and the 
 #define FIT 90                   /* condition in % for "most match-fit" */
 #define NATURAL 15               /* the game's "natural" rating (0x5b7d20) */
 #define ABLE 10
-#define MIDDLE 10                /* the value of a player whose key attributes are all hidden (inference: neutral) */
 #define KNOWN 0x543280u          /* cdecl (viewer manager, staff, index): 0 when the viewer's screens hide it */
 
 /* The positions of the substitutes. The original draws them at random (0x6dd108); the runtime uses a
@@ -196,24 +196,30 @@ static int fit_bit(const Candidate *c, uint16_t mask, uint16_t *bit)
 
 static int fit(const Candidate *c, uint16_t mask) { return fit_bit(c, mask, NULL); }
 
+/* The key attributes of a slot's position, for a player: the role and the fit, as value() takes them. */
+static int role_of(const Candidate *c, uint16_t mask, int *f)
+{
+    uint16_t bit;
+    *f = fit_bit(c, mask, &bit);
+    int wide = (mask & 0x880) != 0;
+    return bit == 0x1 ? ROLE_GK : bit == 0x2 ? ROLE_DC : bit == 0x4 ? (wide ? ROLE_DLR : ROLE_DC)
+         : bit == 0x8 ? ROLE_DMC : bit == 0x10 ? (wide ? ROLE_MLR : ROLE_MC) : bit == 0x20 ? ROLE_AM
+         : ROLE_FC;
+}
+
 /* The value of a player in a slot: the sum of the key attributes of the position times fit times 60
  * divided by their count (5 or 6), an exact integer. The score shown is value / 1200: the average of the
  * key attributes times fit / 20. -1 when the player cannot take the slot: a goalkeeper slot needs a
- * goalkeeper rating of 10 or more. */
+ * goalkeeper rating of 10 or more. PICK_UNSCORED when every key attribute is hidden from the viewer: he
+ * has no score, and ranks after every player with one (rank_of). */
 static int value(const Candidate *c, uint16_t mask)
 {
     if ((mask & 1) && rd8(g_mem, c->data + 0x0f) < ABLE) return -1;
-    uint16_t bit;
-    int f = fit_bit(c, mask, &bit), wide = (mask & 0x880) != 0;
-    int role = bit == 0x1 ? ROLE_GK : bit == 0x2 ? ROLE_DC : bit == 0x4 ? (wide ? ROLE_DLR : ROLE_DC)
-             : bit == 0x8 ? ROLE_DMC : bit == 0x10 ? (wide ? ROLE_MLR : ROLE_MC) : bit == 0x20 ? ROLE_AM
-             : ROLE_FC;
-    int sum = 0, n = 0;
-    for (const uint8_t *k = keys[role]; *k; k++)
-        if (c->attr[*k]) { sum += c->attr[*k]; n++; }
-    if (!n) return MIDDLE * f * 60;      /* every key attribute hidden: the middle of the scale */
-    return sum * f * 60 / n;
+    int f, role = role_of(c, mask, &f);
+    return pick_value(c->attr, keys[role], f);
 }
+
+static int rank_of(int v) { return pick_rank(v); }
 
 /* The order of a pick, as weights of one player in one slot: an empty slot is worst, then a player with a
  * fit below 10, then a player from outside the pick's first group (kinds 2 and 3), then the score. Each
@@ -228,9 +234,11 @@ static int value(const Candidate *c, uint16_t mask)
 
 static long long weight(const Candidate *c, int first, uint16_t mask)
 {
-    int v = value(c, mask);
-    if (v < 0) return -W_EMPTY;
-    return v - (fit(c, mask) < ABLE ? W_LOW : 0) - (first ? 0 : W_OUT);
+    int r = rank_of(value(c, mask));
+    if (r < 0) return -W_EMPTY;
+    /* The rank less 1: a player with no score weighs -1, after every player with a score, with the same fit
+     * and group. */
+    return r - 1 - (fit(c, mask) < ABLE ? W_LOW : 0) - (first ? 0 : W_OUT);
 }
 
 /* The assignment of rows (slots) to columns of the highest total weight, exactly: the Hungarian method
@@ -303,14 +311,15 @@ static void solve(const Candidate *c, int n, const int *first, const uint16_t *m
  * Returns the value there (-1 when no slot takes him). */
 static int best_slot(const Candidate *c, const uint16_t *masks, int *best_fit, uint16_t *mask)
 {
-    int best = -1;
+    int best = -1, best_rank = -1;
     *best_fit = 0;
     *mask = 0;
     for (int s = 0; s < SLOTS; s++) {
         uint16_t bit;
-        int f = fit_bit(c, masks[s], &bit), v = value(c, masks[s]);
-        if (v < 0 || v < best || (v == best && f <= *best_fit)) continue;
+        int f = fit_bit(c, masks[s], &bit), v = value(c, masks[s]), r = rank_of(v);
+        if (r < 0 || r < best_rank || (r == best_rank && f <= *best_fit)) continue;
         best = v;
+        best_rank = r;
         *best_fit = f;
         *mask = (uint16_t)(bit | (masks[s] & 0xf80));
     }
@@ -333,7 +342,7 @@ static void bench(const Candidate *c, int n, const uint16_t *masks, int slots, c
     for (int i = 0; i < k; i++) {
         int f;
         uint16_t m;
-        values[i] = best_slot(&c[order[i]], masks, &f, &m);
+        values[i] = rank_of(best_slot(&c[order[i]], masks, &f, &m));
     }
     for (int i = subs + 1; i < k; i++)          /* insertion sort of the others */
         for (int j = i; j > subs && (values[j] > values[j - 1] ||
@@ -361,6 +370,40 @@ static void staff_name(uint32_t staff, char *out, size_t size)
                   second ? (const char *)(g_mem + second) : "");
 }
 
+/* The one rule for an attribute that another club's player shows to a viewer, for best XI, squad depth and
+ * the comparison: the value that the player's screens show (0x5431e0, 1 to 20), or 0 when the game hides
+ * it from the viewer's manager. The game's test 0x543280 reads the masking flag [0x9cc270] itself, and
+ * answers "shown" at once when the flag is 0, when there is no unknown-player table [0xae2a60], or when the
+ * viewer does not hide the player. The viewer 0 hides nothing. 0x543440, the profile's getter, calls the
+ * same 0x543280 and then 0x543540, which 0x5431e0 also reaches, so this gives the profile's numbers. */
+int picker_attribute_known(uint32_t viewer, uint32_t staff, uint32_t k)
+{
+    uint32_t q[3] = {viewer, staff, k};
+    return !viewer || (call_cdecl(KNOWN, 3, q) & 0xff);
+}
+
+int picker_shown_attribute(uint32_t viewer, uint32_t staff, uint32_t k)
+{
+    if (!picker_attribute_known(viewer, staff, k)) return 0;
+    uint32_t a[2] = {staff, k};
+    uint32_t v = call_cdecl(0x5431e0u, 2, a) & 0xff;
+    return (int)(v > 20 ? 20 : v);
+}
+
+/* RECOMP_VIEWS_LOG=1: what the viewer sees of a player: the 31 values (0 hidden) and the game's own answer
+ * of 0x543280 for each (1 hidden), for the check that no hidden value is shown (tests/smoke). */
+static void log_hidden(uint32_t viewer, uint32_t staff, const uint8_t *attr)
+{
+    static int on = -1;
+    if (on < 0) on = getenv("RECOMP_VIEWS_LOG") != NULL;
+    if (!on) return;
+    fprintf(stderr, "recomp: picker attributes staff %d values", (int32_t)rd32(g_mem, staff));
+    for (uint32_t k = 1; k <= ATTRIBUTES; k++) fprintf(stderr, " %d", attr[k]);
+    fprintf(stderr, " hidden");
+    for (uint32_t k = 1; k <= ATTRIBUTES; k++) fprintf(stderr, " %d", !picker_attribute_known(viewer, staff, k));
+    fprintf(stderr, "\n");
+}
+
 /* The candidates of a club's squad (club +0xd7) into c, returns their count. Without out, only the
  * players who can play the next match (fixture, 0 for none). With out, every player, and out[i] is 1 for
  * a player who cannot play. */
@@ -384,13 +427,8 @@ static int load(uint32_t club, uint32_t fixture, uint32_t viewer, Candidate *c, 
         c[n].condition = (int16_t)call_this(0x62c590u, rd32(g_mem, FITNESS), 2, s2);
         c[n].age = (int16_t)rd16(g_mem, staff + AGE);
         c[n].ability = (int16_t)rd16(g_mem, c[n].data + ABILITY);    /* for the picker check only */
-        for (uint32_t k = 1; k <= ATTRIBUTES; k++) {    /* cdecl (staff, index): the shown value, 1 to 20 */
-            uint32_t a[2] = {staff, k};
-            uint32_t v = call_cdecl(0x5431e0u, 2, a) & 0xff;
-            c[n].attr[k] = (uint8_t)(v > 20 ? 20 : v);
-            uint32_t q[3] = {viewer, staff, k};
-            if (viewer && !(call_cdecl(KNOWN, 3, q) & 0xff)) c[n].attr[k] = 0;
-        }
+        for (uint32_t k = 1; k <= ATTRIBUTES; k++) c[n].attr[k] = (uint8_t)picker_shown_attribute(viewer, staff, k);
+        if (viewer) log_hidden(viewer, staff, c[n].attr);
         n++;
     }
     return n;
@@ -534,7 +572,7 @@ int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, 
             int v = -1, f = 0, pick = 0;
             for (int s = 0; s < SLOTS; s++) {
                 if (row_of[s] != r) continue;
-                int vs = value(&c[i], formation[s]), fs = fit(&c[i], formation[s]);
+                int vs = rank_of(value(&c[i], formation[s])), fs = fit(&c[i], formation[s]);
                 if (vs > v || (vs == v && fs > f)) { v = vs; f = fs; }
                 pick |= !cannot[i] && xi && c[i].staff == xi->staff[s];
             }
@@ -565,7 +603,7 @@ int picker_depth(uint32_t club, uint32_t team_index, const uint16_t *formation, 
         out->n[r] = k < keep ? k : keep;
         for (int j = 0; j < out->n[r]; j++) {
             out->staff[r][j] = c[order[j]].staff;
-            out->score[r][j] = values[j];
+            out->score[r][j] = values[j] ? values[j] - 1 : PICK_UNSCORED;
             out->fit[r][j] = fits[j];
             out->out[r][j] = cannot[order[j]];
         }

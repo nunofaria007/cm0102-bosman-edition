@@ -28,6 +28,12 @@ Checks:
       goalkeepers get the goalkeeper axes
     - the prompts choose the same two goalkeepers for the comparison screen, which opens from the profile
       and from the side bar, and its name box opens the profile
+    - a goalkeeper against an outfield player: each side lists its own player's attributes (the goalkeeper's
+      side Handling and Reflexes, not Tackling; the other side the reverse), and the polygon has the outfield axes
+    - no hidden attribute of another club's player is shown: the Compare tab of Liverpool's Team views screen
+      holds every flagged attribute as 0 (hidden_check.py)
+    - after the Compare tab, the Best XI tab has no pixel of the polygon colours (4b dump), while the Compare
+      tab's dump has them
 """
 import os
 import re
@@ -40,6 +46,7 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures"))
 import fixtures  # noqa: E402
 import smoke_run  # noqa: E402
+import hidden_check  # noqa: E402
 
 # Positions for 800x600; "| x y | x y" gives the widescreen and HD positions where the game does not scale
 # (popups).
@@ -62,7 +69,9 @@ TOUR = [
     # Classic: Rami Shaaban on page 2. Widescreen and HD: a click beside the list closes it.
     "18500 click 720 223 | 712 365 | 1069 521",
     "20500 dump {d}/4-two-keepers.bmp",
-    "21500 click 358 573",                  # Back
+    "21500 click 215 97",                   # the Best XI tab: no polygon may stay on it
+    "24000 dump {d}/4b-best-xi-after-compare.bmp",
+    "25000 click 358 573",                  # Back
     "wait screen:0x454900",
     # The original's prompts on the profile's Action drop-down > Compare Players.
     "1500 click 210 234",                   # David Seaman
@@ -103,6 +112,28 @@ TOUR = [
     "3000 click 200 88 | 220 117 | 300 158",  # the first name box: a link to the profile
     "wait screen:0x870700",
     "2000 dump {d}/7-name-link.bmp",
+    # Liverpool's Compare tab: another club's players, so the game hides some attributes.
+    "1500 click 45 165",                    # the manager's menu
+    "4000 click 150 156 | 199 203 | 270 270",  # Arsenal Squad
+    "wait screen:0x454900",
+    "1500 click 584 527",                   # Premier Division
+    "wait screen:0x48fcd0",
+    "1500 click 215 462",                   # Liverpool
+    "3500 click 169 97",                    # Squad
+    "5500 click 592 135",                   # Assistant
+    "7000 click 540 159 | 928 205 | 1460 274",  # Team views, the only item
+    "9000 click 675 97",                    # Compare players
+    "11000 dump {d}/8-other-club-compare.bmp",
+]
+
+# Classic only (a popup's rows are at other places in the other modes): a Liverpool reserve of whom the game
+# hides 11 attributes (John Welsh), from page 2 of the first drop-down of the start.sav.
+HIDDEN_CLASSIC = [
+    "12000 click 160 137",                  # the first name box
+    "13500 click 160 557",                  # More players
+    "15000 click 160 137",                  # the first name box again
+    "16500 click 160 244",                  # John Welsh
+    "18000 dump {d}/9-hidden-attributes.bmp",
 ]
 
 # The attributes of each axis (src/recomp_rt/win/compare_layout.c), by the getter's numbers 1 to 31.
@@ -119,7 +150,8 @@ KEEPER = [["reflexes", "agility"], ["handling"], ["jumping", "bravery"], ["posit
           ["decisions", "anticipation", "work_rate", "teamwork", "determination"]]
 
 LINE = re.compile(r"recomp: compare staff (-?\d+) (-?\d+) keepers (\d) columns (\d) rows (\d+) attr1 ([\d ]+) "
-                  r"attr2 ([\d ]+) axes1 ([-\d ]+) axes2 ([-\d ]+) marks (\d+)")
+                  r"attr2 ([\d ]+) axes1 ([-\d ]+) axes2 ([-\d ]+) marks (\d+) sides (\d) (\d) "
+                  r"hidden1 ([01 ]+) hidden2 ([01 ]+) listed1 ([01 ]+) listed2 ([01 ]+)")
 
 
 def run(program, game, folder, mode, out):
@@ -129,8 +161,9 @@ def run(program, game, folder, mode, out):
     os.makedirs(user)
     shutil.copyfile(os.path.join(folder, "start.sav"), os.path.join(user, "start.sav"))
     fixtures.write_settings(user, mode, [])
-    steps = smoke_run.scaled_steps(mode, out, fixtures.LOAD_STEPS) + smoke_run.scaled_steps(mode, out, TOUR)
-    steps.append("4000 quit")
+    tour = TOUR + (HIDDEN_CLASSIC if mode == "classic" else [])
+    steps = smoke_run.scaled_steps(mode, out, fixtures.LOAD_STEPS) + smoke_run.scaled_steps(mode, out, tour)
+    steps.append("20000 quit" if mode == "classic" else "13000 quit")
     r, took = fixtures.run(program, game, mode, user, steps, {"RECOMP_SCREEN_LOG": "1", "RECOMP_VIEWS_LOG": "1"},
                            1200)
     with open(os.path.join(out, "stderr.txt"), "w") as f:
@@ -150,7 +183,9 @@ def builds(log):
              "rows": int(m.group(5)), "attr": ([int(v) for v in m.group(6).split()],
                                                [int(v) for v in m.group(7).split()]),
              "axes": ([int(v) for v in m.group(8).split()], [int(v) for v in m.group(9).split()]),
-             "marks": int(m.group(10))}
+             "marks": int(m.group(10)), "sides": (int(m.group(11)), int(m.group(12))),
+             "hidden": ([int(v) for v in m.group(13).split()], [int(v) for v in m.group(14).split()]),
+             "listed": ([int(v) for v in m.group(15).split()], [int(v) for v in m.group(16).split()])}
         if not out or out[-1] != b:
             out.append(b)
     return out
@@ -177,7 +212,59 @@ def check_values(name, b):
     return problems
 
 
-def check(name, code, log):
+HANDLING, REFLEXES, TACKLING = A["handling"], A["reflexes"], A["tackling"]
+
+
+def check_sides(name, bs):
+    """A goalkeeper against an outfield player: each side has the layout of its own player (item 6)."""
+    mixed = [b for b in bs if b["sides"] in ((1, 0), (0, 1))]
+    if not mixed:
+        return [f"{name}: no comparison of a goalkeeper against an outfield player in the log"]
+    problems = []
+    for b in mixed:
+        for side in (0, 1):
+            listed, keeper = b["listed"][side], b["sides"][side]
+            if bool(listed[HANDLING - 1]) != bool(keeper) or bool(listed[REFLEXES - 1]) != bool(keeper):
+                problems.append(f"{name}: side {side + 1} (keeper {keeper}) lists Handling/Reflexes "
+                                f"{listed[HANDLING - 1]}/{listed[REFLEXES - 1]}")
+            if bool(listed[TACKLING - 1]) == bool(keeper):
+                problems.append(f"{name}: side {side + 1} (keeper {keeper}) lists Tackling {listed[TACKLING - 1]}")
+        if b["keepers"]:
+            problems.append(f"{name}: a goalkeeper against an outfield player has the goalkeeper axes")
+    return problems
+
+
+def colour_pixels(path, rgb, tol=6):
+    """The pixels of a dump within tol of an RGB colour in each channel."""
+    w, h, bpp, rows = smoke_run.read_bmp(path)
+    n = 0
+    for row in rows:
+        for i in range(0, len(row), bpp):
+            if (abs(row[i + 2] - rgb[0]) <= tol and abs(row[i + 1] - rgb[1]) <= tol and
+                    abs(row[i] - rgb[2]) <= tol):
+                n += 1
+    return n
+
+
+POLYGON_COLOURS = ((74, 155, 255), (255, 154, 46))      # player 1 and player 2 (compare.c BLUE, ORANGE)
+
+
+def check_polygon_gone(name, folder):
+    """The Compare tab's dump holds the polygon colours; the Best XI tab after it holds none."""
+    problems = []
+    tab, after = os.path.join(folder, "4-two-keepers.bmp"), os.path.join(folder, "4b-best-xi-after-compare.bmp")
+    if not (os.path.exists(tab) and os.path.exists(after)):
+        return [f"{name}: the dumps of the Compare tab and the Best XI tab after it are missing"]
+    for rgb in POLYGON_COLOURS:
+        shown, stale = colour_pixels(tab, rgb), colour_pixels(after, rgb)
+        if shown < 50:
+            problems.append(f"{name}: the Compare tab has {shown} pixels of {rgb}, expected the polygon")
+        if stale > 4:
+            problems.append(f"{name}: the Best XI tab after the Compare tab has {stale} pixels of {rgb}")
+    return problems
+
+
+def check(name, code, log, folder=None):
     problems = []
     if code != 0:
         problems.append(f"{name}: exit code {code}")
@@ -186,7 +273,18 @@ def check(name, code, log):
         return problems + [f"{name}: no comparison in the log"]
     for b in bs:
         problems += check_values(name, b)
-    first, keepers = bs[0], bs[-1]
+        for side in (0, 1):
+            for k, (v, h) in enumerate(zip(b["attr"][side], b["hidden"][side])):
+                if h and v:
+                    problems.append(f"{name}: player {side + 1} shows {v} for attribute {k + 1}, which the game hides")
+    problems += check_sides(name, bs)
+    if name == "classic" and not any(any(h) for b in bs for h in b["hidden"]):
+        problems.append(f"{name}: no comparison of a player with a hidden attribute (another club's)")
+    if folder:
+        problems += check_polygon_gone(name, folder)
+    first = bs[0]
+    two_keepers = [b for b in bs if b["keepers"]]
+    keepers = two_keepers[-1] if two_keepers else bs[-1]
     if first["keepers"] or first["staff"][0] < 0 or first["staff"][1] < 0 or first["staff"][0] == first["staff"][1]:
         problems.append(f"{name}: the Compare tab did not open on two outfield players: {first['staff']}")
     if not keepers["keepers"] or first["staff"][0] in keepers["staff"] or first["staff"][1] in keepers["staff"]:
@@ -195,7 +293,7 @@ def check(name, code, log):
     if screens < 2:
         problems.append(f"{name}: the comparison screen was built {screens} times, expected 2 (profile, side bar)")
     tail = log[log.find("recomp: comparison screen built") - 2000:] if screens else ""
-    shown = builds(tail)
+    shown = [b for b in builds(tail) if b["keepers"]]
     if not shown or shown[-1]["staff"] != keepers["staff"] or not shown[-1]["keepers"]:
         problems.append(f"{name}: the comparison screen does not show the two chosen goalkeepers "
                         f"{keepers['staff']}: {[b['staff'] for b in shown]}")
@@ -226,7 +324,7 @@ def main(argv):
         results = {m: f.result() for m, f in futures.items()}
     problems = []
     for m in modes:
-        problems += check(m, *results[m])
+        problems += check(m, *results[m], os.path.join(out, m))
     for p in problems:
         print("FAIL:", p)
     print("compare: " + ("FAIL" if problems else "all checks passed") + f" (dumps in {out})")

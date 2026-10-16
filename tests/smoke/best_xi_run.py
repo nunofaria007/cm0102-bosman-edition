@@ -31,7 +31,11 @@ Checks:
     - every name box lies inside the pitch (Q154)
     - the list on the right starts with the pick's subs, holds no player of the eleven and no player twice,
       shows every player, and each fit is 1 to 20 (Q155)
-    - each number on the screen, in the eleven and the list, is the picker's score rounded, 1 to 20 (Q156)
+    - each number on the screen, in the eleven and the list, is the picker's score rounded, 1 to 20 (Q156), and
+      "-" (0) for a player whose key attributes are all hidden
+    - no hidden attribute of another club's player feeds a score (hidden_check.py)
+    - a Formation list that does not fit is paged: with RECOMP_VIEWS_FORMATION_PAGE=5 (a classic run), "More
+      formations" opens page 2 and its first item draws the sixth tactic
 """
 import os
 import re
@@ -44,6 +48,7 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures"))
 import fixtures  # noqa: E402
 import smoke_run  # noqa: E402
+import hidden_check  # noqa: E402
 
 # Positions for 800x600; "| x y | x y" gives the widescreen and HD positions where the game does not scale
 # (popups).
@@ -76,21 +81,38 @@ TOUR = [
     "9000 dump {d}/5-other-club.bmp",
 ]
 
+# The Formation list in pages of 5 (RECOMP_VIEWS_FORMATION_PAGE=5), classic positions: item k of the popup is
+# at y = 48 + 21 k.
+TOUR_PAGED = [
+    "2500 click 45 165",                    # the manager's menu
+    "4000 click 150 156",                   # Arsenal Squad
+    "wait screen:0x454900",
+    "1500 click 592 135",                   # Assistant
+    "3000 click 540 241",                   # Team views
+    "5000 click 712 25",                    # Formation
+    "6500 dump {d}/1-page-1.bmp",
+    "7500 click 720 153",                   # More formations (after the 5 tactics of page 1)
+    "9500 click 712 25",                    # Formation
+    "11000 dump {d}/2-page-2.bmp",
+    "12000 click 720 69",                   # the first tactic of page 2 (after Earlier formations)
+    "14000 dump {d}/3-page-2-chosen.bmp",
+]
+
 LINE = re.compile(r'recomp: best xi club (0x[0-9a-f]+) tactic (\d+) "([^"]*)" masks ([0-9a-f ]+) staff '
                   r'([-0-9 ]+) fit ([-0-9 ]+) selection ([-0-9 ]+) score ([-0-9 ]+) shown ([-0-9 ]+)')
 
 
-def run(program, game, folder, mode, out):
+def run(program, game, folder, mode, out, tour=None, env=None):
     os.makedirs(out, exist_ok=True)
     work = tempfile.mkdtemp(prefix="cm0102-bestxi-")
     user = os.path.join(work, "user")
     os.makedirs(user)
     shutil.copyfile(os.path.join(folder, "start.sav"), os.path.join(user, "start.sav"))
     fixtures.write_settings(user, mode, [])
-    steps = smoke_run.scaled_steps(mode, out, fixtures.LOAD_STEPS) + smoke_run.scaled_steps(mode, out, TOUR)
-    steps.append("12000 quit")          # after the last step of the last block
-    r, took = fixtures.run(program, game, mode, user, steps, {"RECOMP_SCREEN_LOG": "1", "RECOMP_VIEWS_LOG": "1"},
-                           1200)
+    steps = smoke_run.scaled_steps(mode, out, fixtures.LOAD_STEPS) + smoke_run.scaled_steps(mode, out, tour or TOUR)
+    steps.append("16000 quit" if tour else "12000 quit")          # after the last step of the last block
+    r, took = fixtures.run(program, game, mode, user, steps,
+                           dict({"RECOMP_SCREEN_LOG": "1", "RECOMP_VIEWS_LOG": "1"}, **(env or {})), 1200)
     with open(os.path.join(out, "stderr.txt"), "w") as f:
         f.write(r.stderr)
     for f in sorted(os.listdir(out)):
@@ -119,7 +141,10 @@ BENCH = re.compile(r"recomp: best xi bench subs ([-0-9 ]*) list ([-0-9 ]*) fit (
 
 
 def shown_score(value):
-    """The number on the screen for a picker value (Q156): the score value / 1200, rounded, 1 to 20."""
+    """The number on the screen for a picker value (Q156): the score value / 1200, rounded, 1 to 20. 0 for a
+    player with no score: the screen shows "-"."""
+    if value == -2:                         # PICK_UNSCORED
+        return 0
     return max(1, min(20, (value + 600) // 1200))
 
 
@@ -141,16 +166,24 @@ def check_layout(name, log):
             if left < int(x1) or right > int(x2):
                 problems.append(f"{name}: a name box {left}..{right} sticks out of the pitch {x1}..{x2}")
                 break
-    elevens = [set(d["staff"]) for d in draws(log)]
-    for subs, staff, fit, values, numbers, shown in benches:
+    # Each list belongs to the draw of the eleven that the log wrote just before it.
+    events = sorted([(m.start(), "draw", m) for m in LINE.finditer(log)] +
+                    [(m.start(), "list", m) for m in BENCH.finditer(log)], key=lambda e: e[0])
+    pairs, eleven = [], None
+    for _, kind, m in events:
+        if kind == "draw":
+            eleven = {int(x) for x in m.group(5).split()}
+        else:
+            pairs.append((eleven, m.groups()))
+    for eleven, (subs, staff, fit, values, numbers, shown) in pairs:
         subs, staff, fit, values, numbers = ([int(v) for v in t.split()] for t in (subs, staff, fit, values, numbers))
         problems += score_problems(name + " list", values, numbers[:len(values)])
         if staff[:len(subs)] != subs:
             problems.append(f"{name}: the list starts {staff[:len(subs)]}, not with the subs {subs}")
         if len(staff) != len(set(staff)):
             problems.append(f"{name}: a player twice in the list {staff}")
-        if not any(not (set(staff) & e) for e in elevens):
-            problems.append(f"{name}: the list holds a player of the eleven")
+        if eleven is None or set(staff) & eleven:
+            problems.append(f"{name}: the list {staff} holds a player of its eleven {sorted(eleven or [])}")
         if int(shown) != len(staff) or not staff:
             problems.append(f"{name}: the list shows {shown} of {len(staff)} players")
         if any(not 1 <= f <= 20 for f in fit):
@@ -174,6 +207,7 @@ def check(name, code, log):
         problems += score_problems(name + " eleven", x["score"], x["shown"])
     if len(d) < 4:
         return problems + [f"{name}: {len(d)} draws of the eleven, expected 4: {d}"]
+    problems += hidden_check.check_flags(name, log) + hidden_check.check_draw_scores(name, log, d)
     first, other, after, club2 = d[0], d[1], d[2], d[-1]
     lists = re.findall(r"recomp: best xi tactics (\d+) current (\d+)", log)
     if not lists or int(lists[0][0]) < 2:
@@ -194,6 +228,19 @@ def check(name, code, log):
     return problems
 
 
+def check_paged(code, log):
+    """The Formation list in pages of 5: More formations, then the first tactic of page 2."""
+    problems = []
+    if code != 0:
+        problems.append(f"paged: exit code {code}")
+    d = draws(log)
+    if len(d) < 2:
+        return problems + [f"paged: {len(d)} draws of the eleven, expected 2 (before and after the choice)"]
+    if d[0]["tactic"] != 0 or d[-1]["tactic"] != 5 or d[-1]["masks"] == d[0]["masks"]:
+        problems.append(f"paged: the tactics drawn are {[x['tactic'] for x in d]}, expected 0 and then 5")
+    return problems
+
+
 def main(argv):
     args = argv[1:]
     folder = fixtures.DEFAULT_DIR
@@ -211,12 +258,16 @@ def main(argv):
         return 2
     modes = modes or ["classic", "widescreen", "hd"]
     program, game, out = (os.path.abspath(a) for a in args)
-    with ThreadPoolExecutor(len(modes)) as pool:
+    with ThreadPoolExecutor(len(modes) + 1) as pool:
         futures = {m: pool.submit(run, program, game, folder, m, os.path.join(out, m)) for m in modes}
+        paged = pool.submit(run, program, game, folder, "classic", os.path.join(out, "paged"), TOUR_PAGED,
+                            {"RECOMP_VIEWS_FORMATION_PAGE": "5"})
         results = {m: f.result() for m, f in futures.items()}
+        paged = paged.result()
     problems = []
     for m in modes:
         problems += check(m, *results[m])
+    problems += check_paged(*paged)
     for p in problems:
         print("FAIL:", p)
     print("best xi: " + ("FAIL" if problems else "all checks passed") + f" (dumps in {out})")

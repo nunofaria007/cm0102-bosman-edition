@@ -12,7 +12,8 @@ import os
 import re
 
 CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c", "views.c", "print_pdf.c", "best_xi.c",
-                  "tactics.c")      # in src/recomp_rt/win
+                  "tactics.c", "groups.c", "compare.c", "compare_screen.c", "squad_depth.c", "names.c", "pdf.c", "dbfolders.c")
+                                # in src/recomp_rt/win
 
 # address: (bytes of the first eight, name)
 CALLBACKS = {
@@ -54,6 +55,15 @@ CALLBACKS = {
     0x896A90: ("81ec000200005355", "store a selection slot"),
     0x896FE0: ("81ec00020000538b", "clear a selection"),
     0x897760: ("8b44240481ec0002", "store the captain"),
+    0x5428A0: ("8a4c240481ec0002", "name of an attribute (1 to 31, text, size, 0)"),
+    0x53EE50: ("b8a4110000e8b667", "positions text of a player (data, text, size, 1)"),
+    0x543440: ("81ec000200005355", "shown value of an attribute, masked (viewer, staff, attribute)"),
+    0x543540: ("8b54240481ec0402", "shown value of an attribute (staff, data, attribute)"),
+    0x5E5AD0: ("b804200000e836fb", "width of a text in screen pixels (font, text)"),
+    0x7F7920: ("0fbf057a7cb70081", "player of the comparison (scout manager, 1 or 2)"),
+    0x8B1750: ("81ec340400005355", "training manager: train a player"),
+    0x41C790: ("5657b95044b700e8", "staff picture as the screen's picture"),
+    0x53DBA0: ("81ec000200005355", "full name of a staff record"),
 }
 
 

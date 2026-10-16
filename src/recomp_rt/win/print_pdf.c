@@ -32,8 +32,12 @@
 #define NAME_CHARS 30
 #define CLUB_UTF8 128
 
-static char kind[32];              /* of the last printout writer that started */
-static char name[CLUB_UTF8];
+#define PLAYER_MANAGER 0xb74c26u   /* per player slot, 0x300 bytes apart: the manager */
+#define PLAYER_SLOT 0xb77c7au      /* s16: the player slot that has the turn */
+#define STAFF_CLUB 0x39u           /* staff: the club */
+
+static char kind[32];              /* of the printout writer that started this print, else empty */
+static char name[CLUB_UTF8];       /* its club or competition, else empty */
 
 void o_00823950(void);
 void o_007d7c80(void);
@@ -59,6 +63,7 @@ static const char *kind_of(unsigned flags, unsigned mask, const char *const *nam
 static void note(uint32_t record, uint32_t name_at, const char *k)
 {
     snprintf(kind, sizeof kind, "%s", k);
+    name[0] = 0;
     cp1252_file_name(name, sizeof name, (const char *)(g_mem + record + name_at), NAME_CHARS);
 }
 
@@ -68,6 +73,7 @@ RT_WRAP(007d7c80, competition_printout)
     static const char *const kinds[] = {"Table", "Goals", "Assists", "Average rating", "Man of the match", NULL};
     note(rt_arg(0), 4, kind_of(rt_arg(1) & 0xff, 1, kinds));
     o_007d7c80();
+    kind[0] = name[0] = 0;          /* the note belongs to this writer's print only */
 }
 
 /* Club printout (squad, stats, transfers, fixtures). */
@@ -78,36 +84,42 @@ RT_WRAP(007d4460, club_printout)
     note(club, 0x38, kind_of(rt_arg(2) & 0xff, 1, kinds));
     if (!name[0]) cp1252_file_name(name, sizeof name, (const char *)(g_mem + club + 4), NAME_CHARS);
     o_007d4460();
+    kind[0] = name[0] = 0;
 }
 
-/* A UTF-8 text as code page 1252 for the game's message box; a character outside it becomes '?'. */
-static void to_cp1252(char *out, size_t room, const char *in)
-{
-    size_t n = 0;
-    while (*in && n + 1 < room) {
-        unsigned char c = (unsigned char)*in;
-        if (c < 0x80) { out[n++] = (char)c; in++; continue; }
-        unsigned cp = c >= 0xe0 ? ((c & 0x0f) << 12 | ((unsigned char)in[1] & 0x3f) << 6 | ((unsigned char)in[2] & 0x3f))
-                                : ((c & 0x1f) << 6 | ((unsigned char)in[1] & 0x3f));
-        size_t len = c >= 0xe0 ? 3 : 2;
-        char b = '?';
-        if (cp >= 0xa0 && cp < 0x100) b = (char)cp;
-        for (int i = 0; i < 32; i++) if (cp1252_high[i] && cp1252_high[i] == cp) b = (char)(0x80 + i);
-        out[n++] = b;
-        in += len;
-    }
-    out[n] = 0;
-}
+/* The texts of the message box are in runtime memory, as in compare_screen.c, not on the game's heap:
+ * a block of the heap that the game does not know changes the addresses of every later allocation,
+ * and so the later days of the game (Q152). */
+#define BOX_TITLE_SIZE 16u
+#define BOX_TEXT_SIZE 600u
 
 static void box(const char *title, const char *text)
 {
-    char t[600];
-    to_cp1252(t, sizeof t, text);
-    uint32_t a = rt_alloc_zero((uint32_t)strlen(title) + 1), b = rt_alloc_zero((uint32_t)strlen(t) + 1);
-    memcpy(g_mem + a, title, strlen(title) + 1);
-    memcpy(g_mem + b, t, strlen(t) + 1);
-    uint32_t args[3] = {a, b, 0};
+    /* Test runs only (tests/smoke/same_save_views.py): no box, to see what the box does to the game. */
+    if (getenv("RECOMP_TEST_NO_PDF_BOX")) return;
+    static uint32_t title_at, text_at;
+    if (!title_at) {
+        title_at = win_static_alloc(BOX_TITLE_SIZE);
+        text_at = win_static_alloc(BOX_TEXT_SIZE);
+    }
+    char t[BOX_TEXT_SIZE];
+    cp1252_from_utf8(t, sizeof t, text);
+    snprintf((char *)g_mem + title_at, BOX_TITLE_SIZE, "%s", title);
+    snprintf((char *)g_mem + text_at, BOX_TEXT_SIZE, "%s", t);
+    uint32_t args[3] = {title_at, text_at, 0};
     rt_callback(MESSAGE_BOX, 3, args);
+}
+
+/* The club of the human manager, for a print that no printout writer named: its short name, else its
+ * long name, in the file name form. */
+static void club_of_manager(char *out, size_t size)
+{
+    out[0] = 0;
+    uint32_t manager = rd32(g_mem, PLAYER_MANAGER + (uint32_t)(int32_t)(int16_t)rd16(g_mem, PLAYER_SLOT) * 0x300u);
+    uint32_t club = manager ? rd32(g_mem, manager + STAFF_CLUB) : 0;
+    if (!club) return;
+    cp1252_file_name(out, size, (const char *)(g_mem + club + 0x38), NAME_CHARS);
+    if (!out[0]) cp1252_file_name(out, size, (const char *)(g_mem + club + 4), NAME_CHARS);
 }
 
 /* Makes the folder and its parents. */
@@ -154,14 +166,28 @@ RT_REPLACE(0084c830, print_job)
     char *text = job_text(lines, count, &len);
     char *pdf = text ? pdf_build(text, len, 0, &size) : NULL;
     free(text);
-    if (!pdf) { box("Print", "The PDF could not be made."); rt_ret_stdcall(0, 3); return; }
+    if (!pdf) {
+        kind[0] = name[0] = 0;
+        box("Print", "The PDF could not be made.");
+        rt_ret_stdcall(0, 3);
+        return;
+    }
 
     char dir[1100], base[200], path[1400];
     int year = 0, month = 0, day = 0;
     win_game_date(&year, &month, &day);
     snprintf(dir, sizeof dir, "%s/Prints", win_save_folder());
     make_dirs(dir);
-    if (!pdf_file_name(base, sizeof base, kind[0] ? kind : "Printout", name[0] ? name : "Game", year, month, day))
+    /* A print that no writer named (another path of the game) gets "Print - <club> <date>.pdf". The
+     * kind and the name belong to this print only: the next print starts clean. */
+    char club[CLUB_UTF8];
+    if (!name[0]) club_of_manager(club, sizeof club);
+    else snprintf(club, sizeof club, "%s", name);
+    char what[sizeof kind];
+    snprintf(what, sizeof what, "%s", kind[0] ? kind : "Print");
+    kind[0] = 0;
+    name[0] = 0;
+    if (!pdf_file_name(base, sizeof base, what, club[0] ? club : "Game", year, month, day))
         snprintf(base, sizeof base, "Printout.pdf");
     snprintf(path, sizeof path, "%s/%s", dir, base);
     for (int k = 2; k < 100; k++) {                /* a second print on the same day keeps the first */

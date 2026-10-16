@@ -40,4 +40,34 @@ static inline void cp1252_file_name(char *out, size_t size, const char *in, int 
     out[n] = 0;
 }
 
+/* A UTF-8 text as code page 1252 (for the game's message box): a character outside the code page, a
+ * 4-byte sequence, a stray continuation byte and a cut sequence each become one '?'. A cut sequence ends
+ * at the first byte that does not continue it, so the terminating zero is never passed. At most
+ * room - 1 bytes. */
+static inline void cp1252_from_utf8(char *out, size_t room, const char *in)
+{
+    size_t n = 0;
+    if (!room) return;
+    while (*in && n + 1 < room) {
+        unsigned char c = (unsigned char)*in;
+        if (c < 0x80) { out[n++] = (char)c; in++; continue; }
+        int len = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1;
+        unsigned cp = len == 4 ? c & 0x07 : len == 3 ? c & 0x0f : len == 2 ? c & 0x1f : 0;
+        int used = 1, whole = len > 1;
+        for (; used < len; used++) {
+            unsigned char b = (unsigned char)in[used];
+            if ((b & 0xc0) != 0x80) { whole = 0; break; }      /* includes the terminating zero */
+            cp = cp << 6 | (b & 0x3f);
+        }
+        char b = '?';
+        if (whole && len < 4) {
+            if (cp >= 0xa0 && cp < 0x100) b = (char)cp;
+            for (int i = 0; i < 32; i++) if (cp1252_high[i] && cp1252_high[i] == cp) b = (char)(0x80 + i);
+        }
+        out[n++] = b;
+        in += used;
+    }
+    out[n] = 0;
+}
+
 #endif

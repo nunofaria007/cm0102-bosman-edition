@@ -87,6 +87,7 @@ RT_WRAP(00876520, compare_screen_build)
 {
     uint32_t p1 = player(1), p2 = player(2);
     if (!options_bool(OPT_SQUAD_VIEWS) || !has_table(p1, p2)) {
+        compare_clear();            /* the old polygon must not draw on the original's screen */
         o_00876520();
         return;
     }

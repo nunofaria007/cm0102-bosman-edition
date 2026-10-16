@@ -24,6 +24,11 @@ import smoke_run  # noqa: E402
 PRINT_SQUAD = ["click 45 165", "click 148 156", "click 750 25", "click 700 49"]   # manager menu, squad, Print, Squad
 PRINT_TABLE = ["click 45 165", "click 148 156", "click 580 527", "click 750 25", "click 700 49"]
                                                 # ... the Premier Division button, Print, Table
+PRINT_SEQUENCE = PRINT_SQUAD + ["click 399 330", "click 580 527", "click 750 25", "click 700 49"]
+                                                # the squad, Ok, then the Premier Division's table: two PDFs
+PRINT_FIXTURES_TAB = ["click 45 165", "click 148 156", "click 580 527", "click 530 97", "click 750 25",
+                      "click 700 49"]           # the Fixtures tab of the competition screen, Print, Table
+PRINT_RESULTS_TAB = PRINT_FIXTURES_TAB[:3] + ["click 358 97"] + PRINT_FIXTURES_TAB[4:]
 OPTION_CLICK = {"pdf": None, "file": "522 474", "both": "601 474"}                # Print To in Game Settings
 
 
@@ -103,9 +108,12 @@ def main(argv):
     fix_dir = argv[argv.index("--dir") + 1] if "--dir" in argv else fixtures.DEFAULT_DIR
     runs = {"pdf": ("pdf", ()), "file": ("file", ()), "both": ("both", ()),
             "folder": ("pdf", (("save_folder", "{w}/Sav Ünï ✓ folder"),)),
-            "table": ("pdf", ()), "table_both": ("both", ())}
-    with concurrent.futures.ThreadPoolExecutor(3) as ex:
-        res = {k: f for k, f in ((k, ex.submit(run, program, game, fix_dir, c, o, PRINT_TABLE if k.startswith('table') else PRINT_SQUAD)) for k, (c, o) in runs.items())}
+            "table": ("pdf", ()), "table_both": ("both", ()), "sequence": ("pdf", ()),
+            "fixtures": ("pdf", ()), "results": ("pdf", ())}
+    navs = {"table": PRINT_TABLE, "table_both": PRINT_TABLE, "sequence": PRINT_SEQUENCE,
+            "fixtures": PRINT_FIXTURES_TAB, "results": PRINT_RESULTS_TAB}
+    with concurrent.futures.ThreadPoolExecutor(4) as ex:
+        res = {k: f for k, f in ((k, ex.submit(run, program, game, fix_dir, c, o, navs.get(k, PRINT_SQUAD))) for k, (c, o) in runs.items())}
         res = {k: f.result() for k, f in res.items()}
     bad = []
     def check(cond, text):
@@ -138,6 +146,15 @@ def main(argv):
     check(len(r["txt"]) == 1 and len(r["pdf"]) == 1, "table both: the .txt file and the PDF")
     if r["txt"] and r["pdf"]:
         check(squeeze(r["text"][0].split("\n")) == squeeze(r["lines"][0]), "table both: the text of the PDF equals the .txt printout")
+    # A print takes its name from its own writer, never from an earlier print.
+    r = res["sequence"]
+    names = sorted(os.path.basename(f) for f in r["pdf_rel"])
+    check(names == ["Squad - Arsenal 2001-07-14.pdf", "Table - English Premier Division 2001-07-14.pdf"],
+          f"sequence: a squad print and then a table print have their own names ({names})")
+    for tab in ("fixtures", "results"):
+        r = res[tab]
+        check(len(r["pdf"]) == 1 and r["pdf_rel"][0].endswith("Prints/Table - English Premier Division 2001-07-14.pdf"),
+              f"{tab}: the Print drop-down of the {tab} tab gives a PDF named by the competition ({r['pdf_rel']})")
     print("FAILED" if bad else "all ok")
     return 1 if bad else 0
 

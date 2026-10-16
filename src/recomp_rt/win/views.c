@@ -175,6 +175,7 @@ static void views_build(void)
     int top = tab_bar(tab), bottom = 545;
 
     pitch_widget = -1;
+    compare_clear();                /* the Compare tab builds its own again below */
     if (tab == 1) {
         /* Best XI: the pitch on the left, the table on the right. The players' widgets come after the
          * pitch widget, so the game draws them over the pitch. */

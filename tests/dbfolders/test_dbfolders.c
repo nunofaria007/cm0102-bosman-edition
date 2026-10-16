@@ -99,6 +99,51 @@ int main(void)
     CHECK(dbfolders_list(none, names, DBFOLDER_MAX) == 0);
     rmdir(none);
 
+    /* 49 folders (the Update Team zips): all are listed, in order, and a smaller list keeps the first by name. */
+    {
+        char big[] = "/tmp/dbfolders_big_XXXXXX";
+        if (!mkdtemp(big)) return 2;
+        char bdb[1100];
+        snprintf(bdb, sizeof bdb, "%s/Databases", big);
+        mkdir(bdb, 0755);
+        char saved[1024];
+        snprintf(saved, sizeof saved, "%s", root);
+        snprintf(root, sizeof root, "%s", bdb);
+        for (int i = 49; i >= 1; i--) {         /* made in reverse, so the disk order is not the name order */
+            char nm[32];
+            snprintf(nm, sizeof nm, "Update %02d", i);
+            make_set(nm, NULL, 0);
+        }
+        static char all[DBFOLDER_MAX][DBFOLDER_NAME];
+        int count = dbfolders_list(big, all, DBFOLDER_MAX);
+        CHECK(count == 49);
+        for (int i = 0; i < count; i++) {
+            char nm[32];
+            snprintf(nm, sizeof nm, "Update %02d", i + 1);
+            CHECK(!strcmp(all[i], nm));
+        }
+        static char few[10][DBFOLDER_NAME];
+        CHECK(dbfolders_list(big, few, 10) == 10);
+        for (int i = 0; i < 10; i++) {
+            char nm[32];
+            snprintf(nm, sizeof nm, "Update %02d", i + 1);
+            CHECK(!strcmp(few[i], nm));
+        }
+        for (int i = 1; i <= 49; i++) {
+            char dir[1300];
+            snprintf(dir, sizeof dir, "%s/Update %02d", bdb, i);
+            for (size_t f = 0; f < sizeof files / sizeof *files; f++) {
+                char fp[1500];
+                snprintf(fp, sizeof fp, "%s/%s", dir, files[f]);
+                unlink(fp);
+            }
+            rmdir(dir);
+        }
+        rmdir(bdb);
+        rmdir(big);
+        snprintf(root, sizeof root, "%s", saved);
+    }
+
     /* The button text: code page 1252, "e with diaeresis" is the byte 0xeb. */
     char text[64];
     dbfolders_label("Zo\xc3\xab Update", text, sizeof text);
