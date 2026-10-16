@@ -107,10 +107,12 @@ typedef struct {
     int fit[PICK_SLOTS];           /* 1 to 20 */
     int score[PICK_SLOTS];         /* key attribute average x fit / 20, times 1200 */
     /* The candidates outside the eleven: the subs in slot order, then the others by their best value. For
-     * each, the best of the 11 slots: the fit and the slot's position bit with its side bits. */
+     * each, the slot of the 11 with his highest value: the value (as score), the fit and the slot's position
+     * bit with its side bits. */
     int bench;
     uint32_t bench_staff[50];
     int bench_fit[50];
+    int bench_score[50];
     uint16_t bench_mask[50];
 } Pick;
 int picker_compute(uint32_t club, uint32_t team_index, int kind, Pick *out);
