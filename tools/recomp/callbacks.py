@@ -11,7 +11,7 @@ such check, so a wrong address would only fail at run time. This list closes the
 import os
 import re
 
-CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c")      # in src/recomp_rt/win
+CALLBACK_FILES = ("picker.c", "assistant.c", "commentary.c", "holiday_next.c", "views.c")      # in src/recomp_rt/win
 
 # address: (bytes of the first eight, name)
 CALLBACKS = {
@@ -34,6 +34,20 @@ CALLBACKS = {
     0x6E1CF0: ("558bec83e4f883ec", "captain value"),
     0x7757D0: ("6aff68f0de950064", "international duty"),
     0x7FF010: ("0fbf812a38000081", "screen node slot"),
+    0x8040A0: ("8b4424048b54242c", "cell button create"),
+    0x41C250: ("5657b95044b700e8", "club background picture"),
+    0x53B640: ("66a1f0bdae0081ec", "club colours"),
+    0x542100: ("8b44241081ec0002", "club name"),
+    0x5ED780: ("64a1000000006aff", "tab bar"),
+    0x5EDCC0: ("81ecd4070000566a", "Back and Next bar"),
+    0x7FEC60: ("0fbf812a38000081", "screen stack: cannot go back"),
+    0x7FEBB0: ("0fbf812a38000081", "screen stack: at the end"),
+    0x7FE600: ("81ec08020000538b", "screen push"),
+    0x7FF270: ("81ec00020000538b", "set a screen node slot"),
+    0x803F30: ("8b44240c8b542408", "screen heading"),
+    0x75DB00: ("81ec640300000fbf", "side bar build"),
+    0x7615D0: ("81eca4020000538b", "side bar input"),
+    0x7643D0: ("83ec5866a17a7cb7", "game actions input (Back, profiles)"),
     0x896A90: ("81ec000200005355", "store a selection slot"),
     0x896FE0: ("81ec00020000538b", "clear a selection"),
     0x897760: ("8b44240481ec0002", "store the captain"),

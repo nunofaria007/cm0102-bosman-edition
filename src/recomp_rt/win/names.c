@@ -64,6 +64,7 @@ RT_WRAP(005ee590, widget_draw)
     uint32_t outer = drawn_widget;
     drawn_widget = cpu.ecx;
     o_005ee590();
+    views_widget_drawn(drawn_widget);
     drawn_widget = outer;
 }
 
