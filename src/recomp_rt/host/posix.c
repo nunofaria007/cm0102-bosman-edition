@@ -17,6 +17,13 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#define PERSIST() EM_ASM({ if (Module.persist) Module.persist(); })
+#else
+#define PERSIST() ((void)0)
+#endif
+
 void *host_reserve(size_t size)
 {
     void *m = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
@@ -27,8 +34,18 @@ int host_open(const char *path, int flags, int mode) { return open(path, flags, 
 long host_read(int fd, void *buf, uint32_t n) { return (long)read(fd, buf, n); }
 long host_write(int fd, const void *buf, uint32_t n) { return (long)write(fd, buf, n); }
 int64_t host_seek(int fd, int64_t off, int whence) { return (int64_t)lseek(fd, (off_t)off, whence); }
-int host_truncate(int fd, int64_t size) { return ftruncate(fd, (off_t)size); }
-int host_close(int fd) { return close(fd); }
+int host_truncate(int fd, int64_t size) 
+{ 
+    int result = ftruncate(fd, (off_t)size); 
+    PERSIST();
+    return result;
+}
+int host_close(int fd)
+{
+    int result = close(fd);
+    PERSIST();
+    return result;
+}
 
 int host_stat(const char *path, HostStat *out)
 {
@@ -40,9 +57,24 @@ int host_stat(const char *path, HostStat *out)
     return 0;
 }
 
-int host_mkdir(const char *path) { return mkdir(path, 0755); }
-int host_unlink(const char *path) { return unlink(path); }
-int host_rename(const char *from, const char *to) { return rename(from, to); }
+int host_mkdir(const char *path) 
+{ 
+    int result = mkdir(path, 0755);
+    PERSIST();
+    return result;
+ }
+int host_unlink(const char *path)
+{
+    int result = unlink(path);
+    PERSIST();
+    return result;
+}
+int host_rename(const char *from, const char *to) 
+{ 
+    int result = rename(from, to); 
+    PERSIST();
+    return result;
+}
 
 HostDir *host_opendir(const char *path) { return (HostDir *)opendir(path); }
 
