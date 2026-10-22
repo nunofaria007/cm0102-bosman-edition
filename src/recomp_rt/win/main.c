@@ -73,6 +73,9 @@ int main(int argc, char **argv)
 {
     char game[1024] = "";
     int first = 1;
+#if defined(__EMSCRIPTEN__) && defined(CM0102_WASM_GAME_ASSETS)
+    snprintf(game, sizeof game, "/game");
+#else
     if (argc > 1 && !strcmp(argv[1], "--game")) {
         if (argc < 3) {
             fprintf(stderr, "cm0102_recomp: --game needs the folder of the original game.\n");
@@ -83,6 +86,7 @@ int main(int argc, char **argv)
     } else {
         default_game_dir(game, sizeof game);
     }
+#endif
     char exe_path[1100];
     snprintf(exe_path, sizeof exe_path, "%s/cm0102.exe", game);
     if (!host_realpath(game, win_game_dir, sizeof win_game_dir)

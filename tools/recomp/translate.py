@@ -762,6 +762,8 @@ class FunctionWriter:
     # String instructions
     def string(self, insn, prefix, m):
         kind, size = m[:4], {"b": 1, "w": 2, "d": 4}[m[4]]
+        if size == 4 and len(insn.prefix) > 2 and insn.prefix[2] == 0x66:
+         size = 2   # capstone 4.x descodifica 66 f3 ab/a5 como stosd/movsd
         self.features.add("string instructions")
         step = f"(cpu.df ? -{size}u : {size}u)"
         acc = {1: "(eax & 0xffu)", 2: "(eax & 0xffffu)", 4: "eax"}[size]

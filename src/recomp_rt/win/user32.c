@@ -25,6 +25,10 @@
 #include <stdlib.h>
 #include <strings.h>
 
+#ifdef __EMSCRIPTEN__
+    #include <emscripten.h>
+#endif
+
 #define WM_KEYDOWN 0x100u
 #define WM_KEYUP 0x101u
 #define WM_CHAR 0x102u
@@ -687,6 +691,9 @@ void win_poll_events(void)
     while (SDL_PollEvent(&e))
         handle_event(&e);
     if (window) run_script();
+    #ifdef __EMSCRIPTEN__
+    emscripten_sleep(0);
+     #endif
 }
 
 /* PeekMessageA(msg, hwnd, first, last, remove) */
