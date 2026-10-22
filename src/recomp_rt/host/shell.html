@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CM 01/02: Bosman Edition</title>
+<style>
+  :root {
+    --navy-0: #04061a;
+    --navy-1: #0a1040;
+    --navy-2: #121a5c;
+    --navy-3: #1e2a86;
+    --edge-hi: #6f7de0;
+    --edge-lo: #02031a;
+    --gold: #f2c230;
+    --paper: #e8ecff;
+    --muted: #8d97d6;
+    --pitch: #1f7a2e;
+    --pitch-2: #278f38;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 48px, transparent 48px 96px),
+      linear-gradient(180deg, var(--navy-1), var(--navy-0));
+    color: var(--paper);
+    font: 13px/1.35 Verdana, Tahoma, "DejaVu Sans", sans-serif;
+    display: flex; flex-direction: column;
+  }
+
+  /* Raised / sunken bevels, as in the original dialogs. */
+  .raised { border: 2px solid; border-color: var(--edge-hi) var(--edge-lo) var(--edge-lo) var(--edge-hi); background: var(--navy-2); }
+  .sunken { border: 2px solid; border-color: var(--edge-lo) var(--edge-hi) var(--edge-hi) var(--edge-lo); background: var(--navy-0); }
+
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 8px 12px;
+    background: linear-gradient(180deg, var(--navy-3), var(--navy-2));
+    border-bottom: 2px solid var(--edge-lo);
+    box-shadow: 0 2px 0 var(--edge-hi) inset;
+  }
+  #logo { display: block; width: min(420px, 70%); height: auto; }
+  .spacer { flex: 1; }
+
+  button {
+    font: inherit; color: var(--paper); cursor: pointer; padding: 6px 14px;
+    background: var(--navy-3); border: 2px solid; border-color: var(--edge-hi) var(--edge-lo) var(--edge-lo) var(--edge-hi);
+  }
+  button:hover { background: #2b3aa8; color: #fff; }
+  button:active { border-color: var(--edge-lo) var(--edge-hi) var(--edge-hi) var(--edge-lo); padding: 7px 13px 5px 15px; }
+  button:focus-visible { outline: 2px dotted var(--gold); outline-offset: 2px; }
+
+  main { flex: 1; min-height: 0; display: flex; padding: 12px; }
+  #stage { position: relative; flex: 1; min-width: 0; background: #000; overflow: hidden; }
+  #stage:fullscreen { border: 0; }
+  /* The canvas fills the stage. SDL keeps the picture's shape inside it (bars at the sides or at the
+     top and bottom) and sizes its own buffer to this box, so every pixel of the game stays sharp. */
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #000; }
+
+  /* Loading screen */
+  #loading {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background: radial-gradient(ellipse at 50% 40%, var(--navy-3), var(--navy-0) 70%);
+    transition: opacity .4s;
+  }
+  #loading.done { opacity: 0; pointer-events: none; }
+  #bar { width: min(420px, 70%); height: 22px; padding: 2px; }
+  #fill { height: 100%; width: 0%; background: repeating-linear-gradient(90deg, var(--gold) 0 10px, #c99d12 10px 12px); transition: width .15s; }
+  #status { color: var(--muted); min-height: 1.4em; text-align: center; padding: 0 12px; }
+
+
+</style>
+</head>
+<body>
+<header>
+  <div class="spacer"></div>
+  <button id="fs" type="button" title="Toggle fullscreen (F11 also works)">Fullscreen</button>
+</header>
+
+<main>
+  <div id="stage" class="sunken">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="loading">
+      <img id="logo" src="https://maxevans60.github.io/cm0102-bosman-edition/assets/logo-sm.png" alt="CM 01/02: Bosman Edition">
+      <div id="bar" class="sunken"><div id="fill"></div></div>
+      <div id="status">Downloading...</div>
+    </div>
+  </div>
+</main>
+
+
+<script>
+  const stage = document.getElementById('stage');
+  const loading = document.getElementById('loading');
+  const fill = document.getElementById('fill');
+  const statusEl = document.getElementById('status');
+
+  document.getElementById('fs').onclick = () =>
+    document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen();
+  // SDL sizes the canvas buffer when the page sends a resize. Send one whenever the stage changes
+  // size (window resize, entering or leaving fullscreen) so that the buffer matches the box.
+  let pending = 0;
+  const nudge = () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(() => window.dispatchEvent(new Event('resize'))); };
+  new ResizeObserver(nudge).observe(stage);
+  document.addEventListener('fullscreenchange', () => setTimeout(nudge, 50));
+
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    print: (...a) => console.log(...a),
+    printErr: (...a) => console.warn(...a),
+    totalDependencies: 0,
+    setStatus(text) {
+      const m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+      if (m) {
+        fill.style.width = (100 * (+m[2]) / (+m[4])) + '%';
+        statusEl.textContent = m[1].trim() + '...';
+      } else {
+        statusEl.textContent = text;
+        if (!text) loading.classList.add('done');
+      }
+    },
+    monitorRunDependencies(left) {
+      this.totalDependencies = Math.max(this.totalDependencies, left);
+      Module.setStatus(left
+        ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
+        : '');
+    },
+  };
+  Module.setStatus('Downloading...');
+  Module.canvas.addEventListener('webglcontextlost', e => { alert('WebGL context lost; reload the page.'); e.preventDefault(); });
+  window.onerror = () => { statusEl.textContent = 'Something went wrong; see the browser console.'; loading.classList.remove('done'); };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

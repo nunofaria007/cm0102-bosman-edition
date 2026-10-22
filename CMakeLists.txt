@@ -220,6 +220,9 @@ if(EXISTS "${CM0102_EXE}")
         target_compile_definitions(cm0102_recomp PRIVATE CM0102_WASM64=1)
         target_compile_options(cm0102_recomp PRIVATE "-sUSE_SDL=2" "-sMEMORY64=1")
         target_link_options(cm0102_recomp PRIVATE
+            "-lidbfs.js"
+            "--pre-js" "${CMAKE_SOURCE_DIR}/src/recomp_rt/host/persist.js"
+            "--shell-file" "${CMAKE_SOURCE_DIR}/src/recomp_rt/host/shell.html"
             "-O2"
             "-sUSE_SDL=2"
             "-sMEMORY64=1"
