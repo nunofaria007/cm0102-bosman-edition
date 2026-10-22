@@ -3,136 +3,140 @@ project(cm0102-mac VERSION 0.4.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 
-find_package(SDL2 REQUIRED)
+if(EMSCRIPTEN)
+    set(CM0102_WASM_GAME_DIR "" CACHE PATH "Optional clean files folder to embed in the browser build")
+else()
+    find_package(SDL2 REQUIRED)
 
-add_executable(cm0102
-    src/main.c
-    src/demo.c
-    src/si/display.c
-    src/si/os_compat.c
-    src/si/sound.c
-    src/si/input.c
-    src/si/rgn_loader.c
-    src/si/gui_utils.c
-    src/si/gui_glyphs.c
-    src/si/gui_font.c
-    src/si/gui_text.c
-    src/si/guio.c
-    src/si/area.c
-    src/si/scrman.c
-    src/si/screen_stack.c
-    src/si/scrman_input.c
-    src/si/langlib.c
-    src/si/gui_menu.c
-    src/si/progress_box.c
-    src/si/utils.c
-    src/si/date.c
-    src/si/exe_image.c
-    src/si/random.c
-    src/cm3/background.c
-    src/cm3/menubar.c
-    src/cm3/file_screens.c
-    src/cm3/setup.c
-    src/cm3/database.c
-    src/cm3/database_links.c
-    src/cm3/key_index.c
-    src/cm3/key_ids_table.c
-    src/cm3/key_nation.c
-)
-
-target_include_directories(cm0102 PRIVATE include ${SDL2_INCLUDE_DIRS})
-target_link_libraries(cm0102 PRIVATE ${SDL2_LIBRARIES})
-
-# Runs functions of the port for the differential test in tests/diff.
-add_executable(port_driver
-    tests/diff/port_driver.c
-    tests/diff/port_scene.c
-    tests/diff/port_stack.c
-    tests/diff/port_helpers.c
-    tests/diff/port_start.c
-    tests/diff/port_leagues.c
-    tests/diff/port_progress.c
-    tests/diff/port_scroll.c
-    tests/diff/port_select.c
-    tests/diff/port_dates.c
-    tests/diff/port_entry.c
-    tests/diff/port_database.c
-    src/si/display.c
-    src/si/rgn_loader.c
-    src/si/gui_utils.c
-    src/si/gui_glyphs.c
-    src/si/gui_font.c
-    src/si/gui_text.c
-    src/si/os_compat.c
-    src/si/guio.c
-    src/si/input.c
-    src/si/area.c
-    src/si/scrman.c
-    src/si/screen_stack.c
-    src/si/scrman_input.c
-    src/si/langlib.c
-    src/si/gui_menu.c
-    src/si/progress_box.c
-    src/si/utils.c
-    src/si/date.c
-    src/si/exe_image.c
-    src/si/random.c
-    src/cm3/background.c
-    src/cm3/menubar.c
-    src/cm3/file_screens.c
-    src/cm3/setup.c
-    src/cm3/database.c
-    src/cm3/database_links.c
-    src/cm3/key_index.c
-    src/cm3/key_ids_table.c
-    src/cm3/key_nation.c
-)
-target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})
-target_link_libraries(port_driver PRIVATE ${SDL2_LIBRARIES})
-
-if(APPLE)
-    set_target_properties(cm0102 PROPERTIES
-        MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "Championship Manager 01/02"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "uk.co.sigames.cm0102"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    add_executable(cm0102
+        src/main.c
+        src/demo.c
+        src/si/display.c
+        src/si/os_compat.c
+        src/si/sound.c
+        src/si/input.c
+        src/si/rgn_loader.c
+        src/si/gui_utils.c
+        src/si/gui_glyphs.c
+        src/si/gui_font.c
+        src/si/gui_text.c
+        src/si/guio.c
+        src/si/area.c
+        src/si/scrman.c
+        src/si/screen_stack.c
+        src/si/scrman_input.c
+        src/si/langlib.c
+        src/si/gui_menu.c
+        src/si/progress_box.c
+        src/si/utils.c
+        src/si/date.c
+        src/si/exe_image.c
+        src/si/random.c
+        src/cm3/background.c
+        src/cm3/menubar.c
+        src/cm3/file_screens.c
+        src/cm3/setup.c
+        src/cm3/database.c
+        src/cm3/database_links.c
+        src/cm3/key_index.c
+        src/cm3/key_ids_table.c
+        src/cm3/key_nation.c
     )
-endif()
 
-# Test of the settings file reader of the recompiled game: ctest, or build and run options_test.
-if(NOT WIN32)
-    enable_testing()
-    add_executable(options_test tests/options/test_options.c src/recomp_rt/win/options.c
-        src/recomp_rt/host/posix.c)
-    target_include_directories(options_test PRIVATE src/recomp_rt/win)
-    add_test(NAME options COMMAND options_test)
-    add_executable(dbfolders_test tests/dbfolders/test_dbfolders.c src/recomp_rt/win/dbfolders.c
-        src/recomp_rt/host/posix.c)
-    target_include_directories(dbfolders_test PRIVATE src/recomp_rt/win)
-    add_test(NAME dbfolders COMMAND dbfolders_test)
-    add_executable(winfit_test tests/winfit/test_winfit.c)
-    target_include_directories(winfit_test PRIVATE src/recomp_rt/win)
-    add_test(NAME winfit COMMAND winfit_test)
-    add_executable(savename_test tests/savename/test_cp1252.c)
-    target_include_directories(savename_test PRIVATE src/recomp_rt/win)
-    add_test(NAME savename COMMAND savename_test)
-    add_executable(draw_test tests/draw/test_draw.c src/recomp_rt/win/draw.c)
-    target_include_directories(draw_test PRIVATE src/recomp_rt/win)
-    add_test(NAME draw COMMAND draw_test)
-    add_executable(pickscore_test tests/picker/test_pick_score.c)
-    target_include_directories(pickscore_test PRIVATE src/recomp_rt/win)
-    add_test(NAME pickscore COMMAND pickscore_test)
-    add_executable(pdf_test tests/pdfprint/test_pdf.c src/recomp_rt/win/pdf.c)
-    target_include_directories(pdf_test PRIVATE src/recomp_rt/win)
-    add_test(NAME pdf COMMAND pdf_test)
-    add_executable(groups_test tests/groups/test_groups.c src/recomp_rt/win/groups_layout.c)
-    target_include_directories(groups_test PRIVATE src/recomp_rt/win)
-    add_test(NAME groups COMMAND groups_test)
-    add_executable(compare_test tests/compare/test_compare.c src/recomp_rt/win/compare_layout.c
-        src/recomp_rt/win/groups_layout.c)
-    target_include_directories(compare_test PRIVATE src/recomp_rt/win)
-    target_link_libraries(compare_test PRIVATE m)
-    add_test(NAME compare COMMAND compare_test)
+    target_include_directories(cm0102 PRIVATE include ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(cm0102 PRIVATE ${SDL2_LIBRARIES})
+
+    # Runs functions of the port for the differential test in tests/diff.
+    add_executable(port_driver
+        tests/diff/port_driver.c
+        tests/diff/port_scene.c
+        tests/diff/port_stack.c
+        tests/diff/port_helpers.c
+        tests/diff/port_start.c
+        tests/diff/port_leagues.c
+        tests/diff/port_progress.c
+        tests/diff/port_scroll.c
+        tests/diff/port_select.c
+        tests/diff/port_dates.c
+        tests/diff/port_entry.c
+        tests/diff/port_database.c
+        src/si/display.c
+        src/si/rgn_loader.c
+        src/si/gui_utils.c
+        src/si/gui_glyphs.c
+        src/si/gui_font.c
+        src/si/gui_text.c
+        src/si/os_compat.c
+        src/si/guio.c
+        src/si/input.c
+        src/si/area.c
+        src/si/scrman.c
+        src/si/screen_stack.c
+        src/si/scrman_input.c
+        src/si/langlib.c
+        src/si/gui_menu.c
+        src/si/progress_box.c
+        src/si/utils.c
+        src/si/date.c
+        src/si/exe_image.c
+        src/si/random.c
+        src/cm3/background.c
+        src/cm3/menubar.c
+        src/cm3/file_screens.c
+        src/cm3/setup.c
+        src/cm3/database.c
+        src/cm3/database_links.c
+        src/cm3/key_index.c
+        src/cm3/key_ids_table.c
+        src/cm3/key_nation.c
+    )
+    target_include_directories(port_driver PRIVATE include ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(port_driver PRIVATE ${SDL2_LIBRARIES})
+
+    if(APPLE)
+        set_target_properties(cm0102 PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_BUNDLE_NAME "Championship Manager 01/02"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "uk.co.sigames.cm0102"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        )
+    endif()
+
+    # Test of the settings file reader of the recompiled game: ctest, or build and run options_test.
+    if(NOT WIN32)
+        enable_testing()
+        add_executable(options_test tests/options/test_options.c src/recomp_rt/win/options.c
+            src/recomp_rt/host/posix.c)
+        target_include_directories(options_test PRIVATE src/recomp_rt/win)
+        add_test(NAME options COMMAND options_test)
+        add_executable(dbfolders_test tests/dbfolders/test_dbfolders.c src/recomp_rt/win/dbfolders.c
+            src/recomp_rt/host/posix.c)
+        target_include_directories(dbfolders_test PRIVATE src/recomp_rt/win)
+        add_test(NAME dbfolders COMMAND dbfolders_test)
+        add_executable(winfit_test tests/winfit/test_winfit.c)
+        target_include_directories(winfit_test PRIVATE src/recomp_rt/win)
+        add_test(NAME winfit COMMAND winfit_test)
+        add_executable(savename_test tests/savename/test_cp1252.c)
+        target_include_directories(savename_test PRIVATE src/recomp_rt/win)
+        add_test(NAME savename COMMAND savename_test)
+        add_executable(draw_test tests/draw/test_draw.c src/recomp_rt/win/draw.c)
+        target_include_directories(draw_test PRIVATE src/recomp_rt/win)
+        add_test(NAME draw COMMAND draw_test)
+        add_executable(pickscore_test tests/picker/test_pick_score.c)
+        target_include_directories(pickscore_test PRIVATE src/recomp_rt/win)
+        add_test(NAME pickscore COMMAND pickscore_test)
+        add_executable(pdf_test tests/pdfprint/test_pdf.c src/recomp_rt/win/pdf.c)
+        target_include_directories(pdf_test PRIVATE src/recomp_rt/win)
+        add_test(NAME pdf COMMAND pdf_test)
+        add_executable(groups_test tests/groups/test_groups.c src/recomp_rt/win/groups_layout.c)
+        target_include_directories(groups_test PRIVATE src/recomp_rt/win)
+        add_test(NAME groups COMMAND groups_test)
+        add_executable(compare_test tests/compare/test_compare.c src/recomp_rt/win/compare_layout.c
+            src/recomp_rt/win/groups_layout.c)
+        target_include_directories(compare_test PRIVATE src/recomp_rt/win)
+        target_link_libraries(compare_test PRIVATE m)
+        add_test(NAME compare COMMAND compare_test)
+    endif()
 endif()
 
 # The recompiled original (docs/specs/2026-10-14-recompile-spec.md). tools/recomp translates the
@@ -206,11 +210,45 @@ if(EXISTS "${CM0102_EXE}")
     target_compile_definitions(cm0102_recomp PRIVATE CM0102_DEFAULT_EXE="${CM0102_EXE}"
         CM0102_VERSION="${PROJECT_VERSION}")
     # The generated C: exact integer wrap, no strict aliasing, no warnings (it is not read by people).
-    set_source_files_properties(${RECOMP_GEN} PROPERTIES GENERATED TRUE COMPILE_OPTIONS "-O1;-w")
+    set(CM0102_GEN_OPT "-O1" CACHE STRING "Optimization of the generated C")
+    set_source_files_properties(${RECOMP_GEN} PROPERTIES GENERATED TRUE COMPILE_OPTIONS "${CM0102_GEN_OPT};-w")
     target_compile_options(cm0102_recomp PRIVATE -fno-strict-aliasing -fwrapv -O1)
     # Every call of the original is a host call: give the main thread a deep stack.
     if(WIN32)
         include(packaging/windows/windows.cmake)
+    elseif(EMSCRIPTEN)
+        target_compile_definitions(cm0102_recomp PRIVATE CM0102_WASM64=1)
+        target_compile_options(cm0102_recomp PRIVATE "-sUSE_SDL=2" "-sMEMORY64=1")
+        target_link_options(cm0102_recomp PRIVATE
+            "-O2"
+            "-sUSE_SDL=2"
+            "-sMEMORY64=1"
+            "-sMAXIMUM_MEMORY=8589934592"
+            "-sALLOW_MEMORY_GROWTH=1"
+            "-sJSPI=1"
+            "-sFORCE_FILESYSTEM=1"
+            "-sEXIT_RUNTIME=0"
+            "-sSTACK_SIZE=67108864"
+            "-sINITIAL_MEMORY=4563402752"
+        )
+        if(CM0102_WASM_GAME_DIR)
+            if(NOT IS_DIRECTORY "${CM0102_WASM_GAME_DIR}/Data" OR
+               NOT EXISTS "${CM0102_WASM_GAME_DIR}/cm0102.exe")
+                message(FATAL_ERROR
+                    "CM0102_WASM_GAME_DIR must contain Data/ and cm0102.exe")
+            endif()
+            target_compile_definitions(cm0102_recomp PRIVATE CM0102_WASM_GAME_ASSETS=1)
+            target_link_options(cm0102_recomp PRIVATE
+                "--preload-file"
+                "${CM0102_WASM_GAME_DIR}@/game"
+            )
+        endif()
+        set_target_properties(cm0102_recomp PROPERTIES SUFFIX ".html")
+        add_custom_command(TARGET cm0102_recomp POST_BUILD
+            COMMAND "${RECOMP_PYTHON}" -c
+                "import pathlib; p = pathlib.Path('${CMAKE_CURRENT_BINARY_DIR}/cm0102_recomp.js'); p.is_file() and p.write_text(p.read_text().replace('wasmMemory.grow(pages)', 'wasmMemory.grow(BigInt(Math.ceil(pages)))'))"
+            COMMENT "Patching Emscripten 3.1.58 Memory64 growMemory for BigInt support"
+            VERBATIM)
     else()
         if(APPLE)
             target_link_options(cm0102_recomp PRIVATE "LINKER:-stack_size,0x10000000")

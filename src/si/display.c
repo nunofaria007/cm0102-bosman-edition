@@ -29,10 +29,12 @@ bool display_init(const char *title, bool fullscreen)
         return false;
     }
 
-    g_display.renderer = SDL_CreateRenderer(
-        g_display.window, -1,
-        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-    );
+#ifdef __EMSCRIPTEN__
+    u32 renderer_flags = SDL_RENDERER_SOFTWARE;
+#else
+    u32 renderer_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+#endif
+    g_display.renderer = SDL_CreateRenderer(g_display.window, -1, renderer_flags);
     if (!g_display.renderer) {
         SDL_Log("SDL_CreateRenderer failed: %s", SDL_GetError());
         return false;
