@@ -25,7 +25,12 @@ static uint16_t u16_at(const uint8_t *p) { uint16_t v; memcpy(&v, p, 2); return 
 void rt_init(const char *exe_path)
 {
     /* 4 GB and a page, so that an access at the top of the 32-bit space stays inside. */
+#ifdef __EMSCRIPTEN__
+    /* Browser build: nothing is mapped above the heap, so reserve only up to its end (about 2.75 GB). */
+    size_t span = (size_t)RT_HEAP_BASE + RT_HEAP_SIZE;
+#else
     size_t span = (size_t)1 << 32;
+#endif
     void *m = host_reserve(span + 0x10000);
     if (!m) rt_fatal("cannot reserve 4 GB of address space");
     g_mem = m;

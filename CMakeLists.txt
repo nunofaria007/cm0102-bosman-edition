@@ -217,22 +217,28 @@ if(EXISTS "${CM0102_EXE}")
     if(WIN32)
         include(packaging/windows/windows.cmake)
     elseif(EMSCRIPTEN)
-        target_compile_definitions(cm0102_recomp PRIVATE CM0102_WASM64=1)
-        target_compile_options(cm0102_recomp PRIVATE "-sUSE_SDL=2" "-sMEMORY64=1")
+        # wasm32 by default: the browser then needs no bounds check on each access of the flat memory, and
+        # the 2.75 GB that rt_init reserves fits. -DCM0102_WASM_MEMORY64=ON gives back the old wasm64 build.
+        option(CM0102_WASM_MEMORY64 "Build the browser version as wasm64" OFF)
+        if(CM0102_WASM_MEMORY64)
+            target_compile_definitions(cm0102_recomp PRIVATE CM0102_WASM64=1)
+            set(CM0102_WASM_MEM_FLAGS "-sMEMORY64=1" "-sMAXIMUM_MEMORY=8589934592" "-sINITIAL_MEMORY=4563402752")
+        else()
+            set(CM0102_WASM_MEM_FLAGS "-sMAXIMUM_MEMORY=4294967296" "-sINITIAL_MEMORY=3221225472")
+        endif()
+        target_compile_options(cm0102_recomp PRIVATE "-sUSE_SDL=2" ${CM0102_WASM_MEM_FLAGS})
         target_link_options(cm0102_recomp PRIVATE
             "-lidbfs.js"
             "--pre-js" "${CMAKE_SOURCE_DIR}/src/recomp_rt/host/persist.js"
             "--shell-file" "${CMAKE_SOURCE_DIR}/src/recomp_rt/host/shell.html"
             "-O2"
             "-sUSE_SDL=2"
-            "-sMEMORY64=1"
-            "-sMAXIMUM_MEMORY=8589934592"
+            ${CM0102_WASM_MEM_FLAGS}
             "-sALLOW_MEMORY_GROWTH=1"
             "-sJSPI=1"
             "-sFORCE_FILESYSTEM=1"
             "-sEXIT_RUNTIME=0"
             "-sSTACK_SIZE=67108864"
-            "-sINITIAL_MEMORY=4563402752"
         )
         if(CM0102_WASM_GAME_DIR)
             if(NOT IS_DIRECTORY "${CM0102_WASM_GAME_DIR}/Data" OR
@@ -247,11 +253,14 @@ if(EXISTS "${CM0102_EXE}")
             )
         endif()
         set_target_properties(cm0102_recomp PROPERTIES SUFFIX ".html")
+        # Only the wasm64 build needs this patch; in wasm32 it would break the growth of the memory.
+        if(CM0102_WASM_MEMORY64)
         add_custom_command(TARGET cm0102_recomp POST_BUILD
             COMMAND "${RECOMP_PYTHON}" -c
                 "import pathlib; p = pathlib.Path('${CMAKE_CURRENT_BINARY_DIR}/cm0102_recomp.js'); p.is_file() and p.write_text(p.read_text().replace('wasmMemory.grow(pages)', 'wasmMemory.grow(BigInt(Math.ceil(pages)))'))"
             COMMENT "Patching Emscripten 3.1.58 Memory64 growMemory for BigInt support"
             VERBATIM)
+        endif()
     else()
         if(APPLE)
             target_link_options(cm0102_recomp PRIVATE "LINKER:-stack_size,0x10000000")

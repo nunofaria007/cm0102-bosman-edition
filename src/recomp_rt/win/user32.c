@@ -229,6 +229,9 @@ static void present_now(void)
     uint32_t px = win_primary_pixels();
     if (!renderer || !px) return;
     SDL_UpdateTexture(texture, NULL, g_mem + px, (int)rt_screen_w * 2);
+    /* Clear to black: the bars around the picture show the draw colour, and the overlay of names_draw
+     * leaves it at another colour. */
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     names_draw(renderer);

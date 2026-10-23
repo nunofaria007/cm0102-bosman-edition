@@ -17,6 +17,12 @@ static uint32_t heap_top = RT_HEAP_BASE;
 
 uint32_t rt_heap_top(void) { return heap_top; }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* For the browser console: Module._rt_heap_used_mb() is the high-water mark of the game's heap in MB. */
+EMSCRIPTEN_KEEPALIVE unsigned rt_heap_used_mb(void) { return (heap_top - RT_HEAP_BASE) >> 20; }
+#endif
+
 /* Bump mode: block sizes for realloc, an open hash from address to size. */
 static uint32_t *size_keys, *size_vals;
 static uint32_t size_cap, size_count;
