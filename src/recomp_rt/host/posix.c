@@ -24,11 +24,30 @@
 #define PERSIST() ((void)0)
 #endif
 
+#ifdef __EMSCRIPTEN__
+/* The browser's mmap of anonymous memory clears every page, which touches the whole block and makes the
+ * tab use all of it. Fresh WebAssembly memory is already zero, so take the block from the allocator and
+ * leave untouched pages untouched. A few probes check that the block really reads as zero; if one does
+ * not, clear the block (correct, but it then uses all the memory). */
+void *host_reserve(size_t size)
+{
+    uint8_t *m = aligned_alloc(65536, size);
+    if (!m) return NULL;
+    for (size_t off = 0; off < size; off += (size_t)1 << 24) {
+        size_t n = size - off < 4096 ? size - off : 4096;
+        for (size_t i = 0; i < n; i++) {
+            if (m[off + i]) { memset(m, 0, size); return m; }
+        }
+    }
+    return m;
+}
+#else
 void *host_reserve(size_t size)
 {
     void *m = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
     return m == MAP_FAILED ? NULL : m;
 }
+#endif
 
 int host_open(const char *path, int flags, int mode) { return open(path, flags, mode); }
 long host_read(int fd, void *buf, uint32_t n) { return (long)read(fd, buf, n); }
