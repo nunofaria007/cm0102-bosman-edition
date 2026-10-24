@@ -64,6 +64,11 @@
     transition: opacity .4s;
   }
   #loading.done { opacity: 0; pointer-events: none; }
+  #closed {
+    position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background: radial-gradient(ellipse at 50% 40%, var(--navy-3), var(--navy-0) 70%); text-align: center; padding: 12px;
+  }
+  #closed.show { display: flex; }
   #bar { width: min(420px, 70%); height: 22px; padding: 2px; }
   #fill { height: 100%; width: 0%; background: repeating-linear-gradient(90deg, var(--gold) 0 10px, #c99d12 10px 12px); transition: width .15s; }
   #status { color: var(--muted); min-height: 1.4em; text-align: center; padding: 0 12px; }
@@ -84,6 +89,10 @@
       <img id="logo" src="https://maxevans60.github.io/cm0102-bosman-edition/assets/logo-sm.png" alt="CM 01/02: Bosman Edition">
       <div id="bar" class="sunken"><div id="fill"></div></div>
       <div id="status">Downloading...</div>
+    </div>
+    <div id="closed">
+      <div>Game closed. Your saves and settings are stored in this browser.</div>
+      <button id="again" type="button">Play again</button>
     </div>
   </div>
 </main>
@@ -126,9 +135,19 @@
         : '');
     },
   };
+  // The game has exited and persist.js has saved everything: take the picture away and offer a restart.
+  // A reload is what starts a clean copy of the game; the memory of this one is released by the browser.
+  let gameClosed = false;
+  Module.onClosed = () => {
+    gameClosed = true;
+    if (document.fullscreenElement) document.exitFullscreen();
+    Module.canvas.remove();
+    document.getElementById('closed').classList.add('show');
+  };
+  document.getElementById('again').onclick = () => location.reload();
   Module.setStatus('Downloading...');
   Module.canvas.addEventListener('webglcontextlost', e => { alert('WebGL context lost; reload the page.'); e.preventDefault(); });
-  window.onerror = () => { statusEl.textContent = 'Something went wrong; see the browser console.'; loading.classList.remove('done'); };
+  window.onerror = () => { if (gameClosed) return; statusEl.textContent = 'Something went wrong; see the browser console.'; loading.classList.remove('done'); };
 </script>
 {{{ SCRIPT }}}
 </body>

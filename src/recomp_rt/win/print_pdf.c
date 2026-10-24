@@ -27,6 +27,28 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* Browser build: the PDF is written to the save folder, read back and downloaded by the browser, then
+ * deleted, so that prints do not pile up in browser storage (persist.js). */
+EM_JS_DEPS(web_download_deps, "$FS,$UTF8ToString");
+EM_JS(void, web_download_pdf, (const char *path, const char *name), {
+    try {
+        const data = FS.readFile(UTF8ToString(path));
+        const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = UTF8ToString(name);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+        console.error('PDF download', e);
+    }
+});
+#endif
+
 #define LABEL_PRINTER 0xa80a88u    /* "Printer", 8 bytes with the end */
 #define MESSAGE_BOX 0x5e8290u      /* cdecl (title, text, 0) */
 #define NAME_CHARS 30
@@ -205,7 +227,13 @@ RT_REPLACE(0084c830, print_job)
     char msg[1600];
     if (ok) {
         fprintf(stderr, "recomp: printout PDF: %s\n", path);
+#ifdef __EMSCRIPTEN__
+        web_download_pdf(path, strrchr(path, '/') + 1);
+        snprintf(msg, sizeof msg, "The PDF is downloaded as %s", strrchr(path, '/') + 1);
+        host_unlink(path);                          /* the download has its own copy: keep nothing in browser storage */
+#else
         snprintf(msg, sizeof msg, "The PDF is saved in %s", path);
+#endif
     } else {
         fprintf(stderr, "recomp: printout PDF failed: %s\n", path);
         snprintf(msg, sizeof msg, "The PDF could not be saved in %s", path);

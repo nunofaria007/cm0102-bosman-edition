@@ -210,9 +210,10 @@ if(EXISTS "${CM0102_EXE}")
     target_compile_definitions(cm0102_recomp PRIVATE CM0102_DEFAULT_EXE="${CM0102_EXE}"
         CM0102_VERSION="${PROJECT_VERSION}")
     # The generated C: exact integer wrap, no strict aliasing, no warnings (it is not read by people).
-    set(CM0102_GEN_OPT "-O1" CACHE STRING "Optimization of the generated C")
+    set(CM0102_GEN_OPT "-O2" CACHE STRING "Optimization of the generated C")
+    set(CM0102_RT_OPT "-O2" CACHE STRING "Optimization of the runtime (rt.c, heap.c, host and win)")
     set_source_files_properties(${RECOMP_GEN} PROPERTIES GENERATED TRUE COMPILE_OPTIONS "${CM0102_GEN_OPT};-w")
-    target_compile_options(cm0102_recomp PRIVATE -fno-strict-aliasing -fwrapv -O1)
+    target_compile_options(cm0102_recomp PRIVATE -fno-strict-aliasing -fwrapv ${CM0102_RT_OPT})
     # Every call of the original is a host call: give the main thread a deep stack.
     if(WIN32)
         include(packaging/windows/windows.cmake)
@@ -220,13 +221,17 @@ if(EXISTS "${CM0102_EXE}")
         # wasm32 by default: the browser then needs no bounds check on each access of the flat memory, and
         # the 2.75 GB that rt_init reserves fits. -DCM0102_WASM_MEMORY64=ON gives back the old wasm64 build.
         option(CM0102_WASM_MEMORY64 "Build the browser version as wasm64" OFF)
+        # MAXIMUM_MEMORY and INITIAL_MEMORY are link settings: only the link gets them (the compiler warns
+        # when it sees them). MEMORY64 changes the code, so the compile gets it too.
+        set(CM0102_WASM_COMPILE_FLAGS "")
         if(CM0102_WASM_MEMORY64)
             target_compile_definitions(cm0102_recomp PRIVATE CM0102_WASM64=1)
+            set(CM0102_WASM_COMPILE_FLAGS "-sMEMORY64=1")
             set(CM0102_WASM_MEM_FLAGS "-sMEMORY64=1" "-sMAXIMUM_MEMORY=8589934592" "-sINITIAL_MEMORY=4563402752")
         else()
             set(CM0102_WASM_MEM_FLAGS "-sMAXIMUM_MEMORY=4294967296" "-sINITIAL_MEMORY=3221225472")
         endif()
-        target_compile_options(cm0102_recomp PRIVATE "-sUSE_SDL=2" ${CM0102_WASM_MEM_FLAGS})
+        target_compile_options(cm0102_recomp PRIVATE "-sUSE_SDL=2" ${CM0102_WASM_COMPILE_FLAGS})
         target_link_options(cm0102_recomp PRIVATE
             "-lidbfs.js"
             "--pre-js" "${CMAKE_SOURCE_DIR}/src/recomp_rt/host/persist.js"
@@ -251,6 +256,12 @@ if(EXISTS "${CM0102_EXE}")
                 "--preload-file"
                 "${CM0102_WASM_GAME_DIR}@/game"
             )
+        endif()
+        # -DCM0102_WASM_PROFILE=ON keeps the function names in the .wasm, so that the Performance panel of
+        # the browser shows f_00xxxxxx instead of numbers. It makes the file larger, not slower.
+        option(CM0102_WASM_PROFILE "Keep function names in the browser build, for profiling" OFF)
+        if(CM0102_WASM_PROFILE)
+            target_link_options(cm0102_recomp PRIVATE "--profiling-funcs")
         endif()
         set_target_properties(cm0102_recomp PROPERTIES SUFFIX ".html")
         # Only the wasm64 build needs this patch; in wasm32 it would break the growth of the memory.
