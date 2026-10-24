@@ -22,8 +22,11 @@ uint32_t rt_image_size(void) { return image_size; }
 static uint32_t u32_at(const uint8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
 static uint16_t u16_at(const uint8_t *p) { uint16_t v; memcpy(&v, p, 2); return v; }
 
+static void build_entry_hash(void);
+
 void rt_init(const char *exe_path)
 {
+    build_entry_hash();
     /* 4 GB and a page, so that an access at the top of the 32-bit space stays inside. */
 #ifdef __EMSCRIPTEN__
     /* Browser build: nothing is mapped above the heap, so reserve only up to its end (about 2.75 GB). */
@@ -143,8 +146,41 @@ static int is_host_fn(uint32_t target)
 }
 
 /* Calls through an address. */
+/* Every call through an address (rt_call, rt_jump) looks the target up. The profile of a new game in the
+ * browser put 28% of the time in rt_call itself, so the lookup is an open hash from address to table
+ * index (plus one; 0 is empty), not a binary search of the whole table. The table is sorted by address
+ * and the search finds the first entry of an address: the hash keeps that first entry too. */
+static uint32_t *entry_hash;
+static uint32_t hash_shift;
+
+static inline uint32_t hash_of(uint32_t a) { return (a * 0x9E3779B1u) >> hash_shift; }
+
+static void build_entry_hash(void)
+{
+    uint32_t bits = 4;
+    while ((1u << bits) < rt_table_size * 2) bits++;
+    hash_shift = 32 - bits;
+    entry_hash = calloc((size_t)1 << bits, sizeof *entry_hash);
+    if (!entry_hash) return;                        /* find_entry then searches the table */
+    uint32_t mask = (1u << bits) - 1;
+    for (uint32_t i = 0; i < rt_table_size; i++) {
+        for (uint32_t h = hash_of(rt_table[i].addr);; h = (h + 1) & mask) {
+            if (!entry_hash[h]) { entry_hash[h] = i + 1; break; }
+            if (rt_table[entry_hash[h] - 1].addr == rt_table[i].addr) break;
+        }
+    }
+}
+
 static const RtEntry *find_entry(uint32_t target)
 {
+    if (entry_hash) {
+        uint32_t mask = (1u << (32 - hash_shift)) - 1;
+        for (uint32_t h = hash_of(target);; h = (h + 1) & mask) {
+            uint32_t i = entry_hash[h];
+            if (!i) return NULL;
+            if (rt_table[i - 1].addr == target) return &rt_table[i - 1];
+        }
+    }
     uint32_t lo = 0, hi = rt_table_size;
     while (lo < hi) {
         uint32_t mid = (lo + hi) / 2;
