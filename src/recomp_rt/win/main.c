@@ -27,6 +27,9 @@ int win_trace;
 #define GAME_STACK_TOP (GAME_STACK_BASE + GAME_STACK_SIZE - 0x100u)
 
 void f_00947a13(void);
+#ifdef __EMSCRIPTEN__
+void win_web_closed(uint32_t code);
+#endif
 
 static void at_end(void)
 {
@@ -150,5 +153,8 @@ int main(int argc, char **argv)
     at_end();
     win_save_window();
     SDL_Quit();
+#ifdef __EMSCRIPTEN__
+    win_web_closed(cpu.eax);
+#endif
     return (int)cpu.eax;
 }

@@ -34,8 +34,21 @@ RT_IMPORT(GetVersionExA)
 RT_IMPORT(HeapCreate) { rt_ret_stdcall(HEAP_HANDLE, 3); }
 RT_IMPORT(HeapDestroy) { rt_ret_stdcall(1, 1); }
 
+/* The database load and the days of a new game run for many seconds without a message pump, so the
+ * window would show "not responding" (Windows) or freeze (browser). The game allocates all the time
+ * in these phases: every 1024th allocation lets the runtime pump the events. win_poll_events has its
+ * own time limit and only queues messages and draws the screen: it does not change the game. */
+void win_poll_events(void);
+static void keep_alive(void)
+{
+    static uint32_t count;
+    if (++count & 0x3ffu) return;
+    win_poll_events();
+}
+
 RT_IMPORT(HeapAlloc)
 {
+    keep_alive();
     uint32_t flags = rt_arg(1), size = rt_arg(2);
     rt_ret_stdcall(flags & HEAP_ZERO_MEMORY ? rt_alloc_zero(size) : rt_alloc(size), 3);
 }
@@ -244,6 +257,15 @@ RT_IMPORT(CreateMutexA)
 
 RT_IMPORT(GetLastError) { rt_ret_stdcall(win_last_error, 0); }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* The game has ended: the page saves the browser storage and shows the closed screen (persist.js). */
+void win_web_closed(uint32_t code)
+{
+    EM_ASM({ if (Module.onGameExit) Module.onGameExit($0); }, code);
+}
+#endif
+
 RT_IMPORT(ExitProcess)
 {
     uint32_t code = rt_arg(0);
@@ -251,6 +273,9 @@ RT_IMPORT(ExitProcess)
     win_save_window();
     if (rt_on_fatal) rt_on_fatal();
     SDL_Quit();
+#ifdef __EMSCRIPTEN__
+    win_web_closed(code);
+#endif
     exit((int)code);
 }
 RT_IMPORT(GetCurrentProcess) { rt_ret_stdcall(0xffffffffu, 0); }
@@ -258,6 +283,9 @@ RT_IMPORT(TerminateProcess)
 {
     uint32_t code = rt_arg(1);
     SDL_Quit();
+#ifdef __EMSCRIPTEN__
+    win_web_closed(code);
+#endif
     exit((int)code);
 }
 

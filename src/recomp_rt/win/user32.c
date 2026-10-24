@@ -27,6 +27,51 @@
 
 #ifdef __EMSCRIPTEN__
     #include <emscripten.h>
+/* Every wait of the game is SDL_Delay. Under JSPI it suspends the game's call stack until a timer
+ * fires. If the page is left (a reload, a closed tab) that timer never fires, and the browser keeps
+ * the suspended stack, and with it the whole game (about 600 MB), for good. So the wait can be woken:
+ * persist.js sets Module.closing and calls Module.wake on pagehide, the wait returns 1, and the game
+ * exits, which unwinds the stack. */
+EM_ASYNC_JS(int, web_sleep, (int ms), {
+    if (Module.closing) return 1;
+    return await new Promise(function (done) {
+        let over = false;
+        const finish = function (r) { if (over) return; over = true; Module.wake = null; done(r); };
+        Module.wake = function () { finish(1); };
+        if (ms > 0) {
+            setTimeout(function () { finish(0); }, ms);
+        } else {
+            /* A yield with no delay: a message to ourselves. setTimeout(0) waits at least 4 ms once it is
+             * nested, which is a lot for a game that yields at every input poll. */
+            if (!Module.yieldChannel) {
+                Module.yieldChannel = new MessageChannel();
+                Module.yieldChannel.port1.onmessage = function () {
+                    const f = Module.yieldNext;
+                    Module.yieldNext = null;
+                    if (f) f();
+                };
+            }
+            Module.yieldNext = function () { finish(0); };
+            Module.yieldChannel.port2.postMessage(0);
+        }
+    });
+});
+/* The yield of the input poll (ms = 0) happens at most every YIELD_EVERY ms: the browser needs a turn to
+ * deliver input and to paint about once per frame, not at each poll (up to every 2 ms). A real wait
+ * (SDL_Delay(1) of an idle loop) always yields. */
+#define YIELD_EVERY 10u
+static void web_delay(uint32_t ms)
+{
+    static uint64_t last_yield;
+    uint64_t now = SDL_GetTicks64();
+    if (ms == 0 && now - last_yield < YIELD_EVERY) return;
+    if (web_sleep((int)ms)) exit(0);
+    last_yield = SDL_GetTicks64();
+}
+    #undef SDL_Delay
+    #define SDL_Delay(ms) web_delay(ms)
+    /* The yield of win_poll_events is a wait too, and has to be wakeable in the same way. */
+    #define emscripten_sleep(ms) web_delay(ms)
 #endif
 
 #define WM_KEYDOWN 0x100u
@@ -580,7 +625,11 @@ static void handle_event(SDL_Event *e)
     }
     case SDL_WINDOWEVENT:
         if (e->window.event == SDL_WINDOWEVENT_EXPOSED) win_screen_dirty = 1;
-        if (e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) { update_scaling(); note_windowed(); }
+        if (e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+            update_scaling();
+            note_windowed();
+            win_screen_dirty = 1;     /* a new size clears the canvas of the browser: show the picture again */
+        }
         if (e->window.event == SDL_WINDOWEVENT_MOVED) note_windowed();
         if (e->window.event == SDL_WINDOWEVENT_FOCUS_LOST) win_sound_focus(0);
         if (e->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) win_sound_focus(1);
@@ -686,6 +735,13 @@ static void run_script(void)
 void win_poll_events(void)
 {
     uint64_t now = SDL_GetTicks64();
+#ifdef __EMSCRIPTEN__
+    /* The browser clears the canvas when its size is set, also without a size event for SDL (the page
+     * sends a resize on each change of the box, and on entering and leaving full screen). The picture
+     * then stays black until the game happens to draw. So show it again at least 4 times a second. */
+    static uint64_t last_refresh;
+    if (now - last_refresh >= 250) { last_refresh = now; win_screen_dirty = 1; }
+#endif
     if (win_screen_dirty && now - last_present >= 16) present_now();
     if (now - last_poll < 2) return;              /* the game pumps very often; SDL needs less */
     last_poll = now;
