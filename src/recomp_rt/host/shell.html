@@ -138,8 +138,10 @@
   // The game has exited and persist.js has saved everything: take the picture away and offer a restart.
   // A reload is what starts a clean copy of the game; the memory of this one is released by the browser.
   let gameClosed = false;
-  Module.onClosed = () => {
+  // Restart Game ends the game with restart set: everything is saved, so start the new copy at once.
+  Module.onClosed = (code, restart) => {
     gameClosed = true;
+    if (restart) { location.reload(); return; }
     if (document.fullscreenElement) document.exitFullscreen();
     Module.canvas.remove();
     document.getElementById('closed').classList.add('show');

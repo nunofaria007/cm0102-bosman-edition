@@ -259,10 +259,23 @@ RT_IMPORT(GetLastError) { rt_ret_stdcall(win_last_error, 0); }
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-/* The game has ended: the page saves the browser storage and shows the closed screen (persist.js). */
+/* Set by WinExec: the original starts a new copy of itself and ends (Restart Game, 0x68dbc0). */
+static int web_restart;
+/* The game has ended: the page saves the browser storage and shows the closed screen (persist.js).
+ * After a restart it starts a new copy of the page instead. */
 void win_web_closed(uint32_t code)
 {
-    EM_ASM({ if (Module.onGameExit) Module.onGameExit($0); }, code);
+    EM_ASM({ if (Module.onGameExit) Module.onGameExit($0, $1); }, code, web_restart);
+}
+
+/* WinExec(command line, show): the only caller is the restart. The page cannot start a process, so the game
+ * ends as for Exit Game, with the restart flag, and the page reloads once the saves are stored. A value over 31
+ * means that it worked. */
+RT_IMPORT(WinExec)
+{
+    WIN_TRACE("WinExec(%s)\n", win_str(rt_arg(0)));
+    web_restart = 1;
+    rt_ret_stdcall(33, 2);
 }
 #endif
 
