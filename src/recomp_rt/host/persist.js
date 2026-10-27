@@ -54,9 +54,10 @@ const onHide = (e) => {
 addEventListener('pagehide', onHide);
 addEventListener('visibilitychange', onVisibility);
 
+// restart: o jogo pediu para recomeçar (Restart Game, WinExec): shell.html recarrega a página.
 // Chamado pelo jogo quando o utilizador sai (ExitProcess, TerminateProcess ou fim do ponto de entrada).
 // Grava tudo no IndexedDB, para de reagir à página e entrega o ecrã a Module.onClosed (shell.html).
-Module.onGameExit = function (code) {
+Module.onGameExit = function (code, restart) {
   if (closed) return;
   closed = true;
   clearTimeout(timer);
@@ -64,6 +65,6 @@ Module.onGameExit = function (code) {
   removeEventListener('visibilitychange', onVisibility);
   flush(function () {
     try { if (Module.canvas) { Module.canvas.width = 1; Module.canvas.height = 1; } } catch (e) {}
-    if (Module.onClosed) Module.onClosed(code);
+    if (Module.onClosed) Module.onClosed(code, !!restart);
   });
 };
