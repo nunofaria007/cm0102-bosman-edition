@@ -128,13 +128,15 @@ static inline int32_t f_sext(Flags f, uint32_t v)
 {
     return f.op & SZ1 ? (int8_t)v : f.op & SZ2 ? (int16_t)v : (int32_t)v;
 }
-static inline int cc_l(Flags f)
+/* cc_l and cc_le are forced inline: in the browser profile (2026-10-29) cc_l was a function of its own with 4.6%
+ * of the run, because the compiler left it out of the very large generated functions. */
+static inline __attribute__((always_inline)) int cc_l(Flags f)
 {
     if ((f.op & 15) == K_SUB && f.c == 0) return f_sext(f, f.a) < f_sext(f, f.b);
     if ((f.op & 15) == K_RES) return f_sf(f) != ((f.c >> 1) & 1);
     return f_sf(f) != f_of(f);
 }
-static inline int cc_le(Flags f)
+static inline __attribute__((always_inline)) int cc_le(Flags f)
 {
     if ((f.op & 15) == K_SUB && f.c == 0) return f_sext(f, f.a) <= f_sext(f, f.b);
     return f_zf(f) | (f_sf(f) != f_of(f));
