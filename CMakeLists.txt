@@ -179,6 +179,21 @@ if(EXISTS "${CM0102_EXE}")
     foreach(f ${RECOMP_WIN})
         list(APPEND RECOMP_RUNTIME_ARGS --runtime "${f}")
     endforeach()
+    # Entries of functions whose blocks are counted at run time (src/recomp_rt/win/bbcount.c), for example
+    # -DCM0102_COUNT_BLOCKS=0x83f3a0,0x83b6e0. A file holds the value so that a change runs the recompiler again.
+    set(CM0102_COUNT_BLOCKS "" CACHE STRING "Entries (hex, comma separated) of functions with counted blocks, for profiling")
+    set(RECOMP_COUNT_FILE "${RECOMP_OUT}/count_blocks.txt")
+    set(RECOMP_COUNT_OLD "")
+    if(EXISTS "${RECOMP_COUNT_FILE}")
+        file(READ "${RECOMP_COUNT_FILE}" RECOMP_COUNT_OLD)
+    endif()
+    if(NOT EXISTS "${RECOMP_COUNT_FILE}" OR NOT "${RECOMP_COUNT_OLD}" STREQUAL "${CM0102_COUNT_BLOCKS}")
+        file(MAKE_DIRECTORY "${RECOMP_OUT}")
+        file(WRITE "${RECOMP_COUNT_FILE}" "${CM0102_COUNT_BLOCKS}")
+    endif()
+    if(CM0102_COUNT_BLOCKS)
+        list(APPEND RECOMP_RUNTIME_ARGS --count-blocks "${CM0102_COUNT_BLOCKS}")
+    endif()
     add_custom_command(
         OUTPUT "${RECOMP_OUT}/recomp.stamp"
         BYPRODUCTS ${RECOMP_GEN}
@@ -186,7 +201,7 @@ if(EXISTS "${CM0102_EXE}")
             --exe "${CM0102_EXE}" --out "${RECOMP_OUT}"
             --functions "${CMAKE_SOURCE_DIR}/tools/recomp/functions.txt" --all --entries 0x947a13
             --shards ${RECOMP_SHARDS} ${RECOMP_RUNTIME_ARGS} --stamp "${RECOMP_OUT}/recomp.stamp"
-        DEPENDS ${RECOMP_TOOL} "${CMAKE_SOURCE_DIR}/tools/recomp/functions.txt" ${RECOMP_WIN}
+        DEPENDS ${RECOMP_TOOL} "${CMAKE_SOURCE_DIR}/tools/recomp/functions.txt" ${RECOMP_WIN} "${RECOMP_COUNT_FILE}"
             "${CMAKE_SOURCE_DIR}/src/recomp_rt/rt.c" "${CMAKE_SOURCE_DIR}/src/recomp_rt/heap.c"
         COMMENT "Recompiling cm0102.exe to C"
         VERBATIM)

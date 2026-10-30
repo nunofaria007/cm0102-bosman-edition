@@ -52,6 +52,9 @@ void wrf80(uint8_t *m, uint32_t a, double v);
 #define W32(a, v) wr32(M, (a), (v))
 #define W64(a, v) wr64(M, (a), (v))
 
+/* Block counters of the functions generated with --count-blocks (tools/recomp/recomp.py, win/bbcount.c). */
+extern uint64_t rt_bb[];
+
 #define SYNC() (cpu.eax = eax, cpu.ecx = ecx, cpu.edx = edx, cpu.ebx = ebx, \
                 cpu.esp = esp, cpu.ebp = ebp, cpu.esi = esi, cpu.edi = edi)
 #define LOAD() (eax = cpu.eax, ecx = cpu.ecx, edx = cpu.edx, ebx = cpu.ebx, \
