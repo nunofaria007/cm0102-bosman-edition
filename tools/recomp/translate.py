@@ -43,10 +43,13 @@ def h(v):
 
 
 class FunctionWriter:
-    def __init__(self, func, image, names, own_name=None):
+    def __init__(self, func, image, names, own_name=None, blocks=None):
         """names(addr) gives the C name of the function at a call target. own_name is the name of the
-        C function to write, when it is not names(entry): the body of a wrapped function."""
+        C function to write, when it is not names(entry): the body of a wrapped function. blocks is a list
+        when the blocks of this function are counted (recomp.py --count-blocks): each labelled block gets the
+        next index of the list, as (address, entry), and a counter rt_bb[index] that goes up on entry."""
         self.f = func
+        self.blocks = blocks
         self.own_name = own_name
         self.image = image
         self.names = names
@@ -161,6 +164,9 @@ class FunctionWriter:
             insn = f.insns[a]
             if a in need_label or a in gotos:
                 body.append(f"L_{a:x}:")
+                if self.blocks is not None:
+                    self.e(f"rt_bb[{len(self.blocks)}]++;")
+                    self.blocks.append((a, f.entry))
             text = (insn.mnemonic + " " + insn.op_str).strip().replace("*/", "* /")
             self.e(f"/* {a:x}: {text} */")
             mark = len(body)

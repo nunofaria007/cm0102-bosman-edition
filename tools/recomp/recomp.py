@@ -133,6 +133,9 @@ def main(argv):
     ap.add_argument("--compile")
     ap.add_argument("--runtime", action="append", default=[])
     ap.add_argument("--shards", type=int, default=0)
+    ap.add_argument("--count-blocks", default="",
+                    help="comma-separated entries of functions whose basic blocks are counted at run time "
+                         "(rt_bb_report in src/recomp_rt/win/bbcount.c prints the counts)")
     ap.add_argument("--stamp", help="a file to touch when the run ends (for a build system)")
     ap.add_argument("--opt", default="-O1")
     ap.add_argument("--jobs", type=int, default=os.cpu_count())
@@ -196,11 +199,16 @@ def main(argv):
         referenced.add(addr)
         return fname(addr)
 
+    count_blocks = {int(x, 16) for x in args.count_blocks.split(",") if x.strip()}
+    for e in sorted(count_blocks - set(funcs)):
+        raise SystemExit(f"--count-blocks: {e:#x} is not a translated function")
+    bb_blocks = []                        # (block address, function entry) of the counted blocks, by counter index
     bodies = {}
     for e in sorted(funcs):
         f = funcs[e]
         # A wrapped function: the translation is o_<address>, and the runtime's f_<address> calls it.
-        w = FunctionWriter(f, image, names, own_name=oname(e) if e in wrapped else None)
+        w = FunctionWriter(f, image, names, own_name=oname(e) if e in wrapped else None,
+                           blocks=bb_blocks if e in count_blocks else None)
         bodies[e] = w.write()
         stats["functions"] += 1
         stats["instructions"] += len(f.insns)
@@ -277,6 +285,11 @@ def main(argv):
         out.write("\n")
         for name, (a, _) in sorted(CALL_SITES.items()):
             out.write(f"const uint32_t rt_site_{name} = 0x{a + 5:x}u;\n")
+        # The block counters of --count-blocks (none: one unused slot, so that the arrays are never empty).
+        out.write(f"\nconst uint32_t rt_bb_count = {len(bb_blocks)};\n")
+        out.write(f"uint64_t rt_bb[{max(1, len(bb_blocks))}];\n")
+        out.write("const uint32_t rt_bb_addr[] = {" + ", ".join("0x%xu" % a for a, _ in bb_blocks or [(0, 0)]) + "};\n")
+        out.write("const uint32_t rt_bb_entry[] = {" + ", ".join("0x%xu" % e for _, e in bb_blocks or [(0, 0)]) + "};\n")
     files.append(os.path.join(gen, "table.c"))
     t_translate = time.time() - t0
     if args.all:
