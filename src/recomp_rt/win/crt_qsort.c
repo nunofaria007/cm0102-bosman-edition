@@ -374,6 +374,9 @@ RT_REPLACE(00945333, crt_qsort)
         memcpy(orig, g_mem + base, num * 6);
         int did = language_sort_fast(base, num);
         if (did) {
+#ifdef CM0102_QSORT_STATS
+            qs_fast++;
+#endif
             memcpy(fast, g_mem + base, num * 6);
             memcpy(g_mem + base, orig, num * 6);
             if (qsort_generic(&c, base, num, width)) { free(orig); free(fast); return; }
