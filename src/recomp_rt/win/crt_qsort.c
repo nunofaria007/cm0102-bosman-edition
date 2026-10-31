@@ -27,6 +27,24 @@
  * the same order of tests as the generated code. With CM0102_QSORT_VERIFY the generated comparator also runs
  * and the two results must agree. */
 #define CMP_LANGUAGE 0x007c6d40u      /* player_stats_compare_language_entries(a, b): 6-byte entries */
+#define CMP_CLUB_LATITUDE 0x0053fd40u /* database_compare_clubs_by_latitude(a, b): elements are club pointers */
+#define CMP_HISTORY_CLUB 0x007c6d90u  /* player_stats_compare_history_by_club(a, b): elements are history records */
+#define CMP_HISTORY_STAFF 0x007c6de0u /* player_stats_compare_history_by_staff(a, b) */
+#define CMP_HOME_REPUTATION 0x00778ed0u /* compare_players_by_home_reputation_desc(a, b): staff pointers */
+
+enum { K_GENERATED, K_LANGUAGE, K_CLUB_LATITUDE, K_HISTORY_CLUB, K_HISTORY_STAFF, K_HOME_REPUTATION };
+
+static inline int cmp_kind(uint32_t comp)
+{
+    switch (comp) {
+    case CMP_LANGUAGE: return K_LANGUAGE;
+    case CMP_CLUB_LATITUDE: return K_CLUB_LATITUDE;
+    case CMP_HISTORY_CLUB: return K_HISTORY_CLUB;
+    case CMP_HISTORY_STAFF: return K_HISTORY_STAFF;
+    case CMP_HOME_REPUTATION: return K_HOME_REPUTATION;
+    default: return K_GENERATED;
+    }
+}
 
 /* Staff id (u32 at +0) and then language (i8 at +4), where language -1 is a wildcard that equals any. A NULL
  * pointer sorts first. The difference is of 32 bits and wraps, as in the original. */
@@ -39,6 +57,61 @@ static inline int32_t cmp_language(uint32_t a, uint32_t b)
     uint8_t la = g_mem[a + 4], lb = g_mem[b + 4];
     if (la == 0xff || lb == 0xff) return 0;
     return (int32_t)(int8_t)la - (int32_t)(int8_t)lb;
+}
+
+/* Profile of a new game with one and with three leagues (2026-10-31, CM0102_QSORT_STATS): the comparators of the
+ * clubs by latitude (0x53fd40: 108 million comparisons for one league, 153 million for three), of the history
+ * records (0x7c6d90, 0x7c6de0: one sort of 385846 records each) and of the players by home reputation
+ * (0x778ed0: 99111 sorts) are the biggest of the sorts that still call the generated code. Each is a pure
+ * function of the memory it reads, so the C below does what the generated code does, test by test.
+ * Returns 0 when the generated code has to run (a club that is NULL shows a message in the original). */
+static inline int cmp_native(int kind, uint32_t a, uint32_t b, int32_t *r)
+{
+    const uint8_t *m = g_mem;
+    switch (kind) {
+    case K_LANGUAGE:
+        *r = cmp_language(a, b);
+        return 1;
+    case K_CLUB_LATITUDE: {
+        /* a and b point at club pointers; the latitude is the double at +0x23 of the city (+0x38 of the stadium,
+         * +0x69 of the club), 0.0 without a stadium or a city. x87 compare: below or unordered is -1. */
+        uint32_t ca = rd32(m, a), cb = rd32(m, b);
+        if (!ca || !cb) return 0;
+        uint32_t sa = rd32(m, ca + 0x69), sb = rd32(m, cb + 0x69);
+        uint32_t ya = sa ? rd32(m, sa + 0x38) : 0, yb = sb ? rd32(m, sb + 0x38) : 0;
+        double la = 0.0, lb = 0.0;
+        if (ya) memcpy(&la, m + ya + 0x23, 8);
+        if (yb) memcpy(&lb, m + yb + 0x23, 8);
+        *r = !(la >= lb) ? -1 : (la == lb ? 0 : 1);
+        return 1;
+    }
+    case K_HISTORY_CLUB: {
+        if (a == 0) { *r = 1; return 1; }
+        if (b == 0) { *r = -1; return 1; }
+        uint32_t x = rd32(m, a + 0x0a), y = rd32(m, b + 0x0a);
+        if (x != y) { *r = x > y ? 1 : -1; return 1; }
+        x = rd32(m, a + 4); y = rd32(m, b + 4);
+        *r = x > y ? 1 : (x < y ? -1 : 0);
+        return 1;
+    }
+    case K_HISTORY_STAFF: {
+        if (a == 0) { *r = 1; return 1; }
+        if (b == 0) { *r = -1; return 1; }
+        uint32_t x = rd32(m, a + 4), y = rd32(m, b + 4);
+        if (x != y) { *r = x > y ? 1 : -1; return 1; }
+        int32_t ya = (int16_t)rd16(m, a + 8), yb = (int16_t)rd16(m, b + 8);
+        if (ya != yb) { *r = ya > yb ? 1 : -1; return 1; }
+        *r = (int32_t)(rd32(m, a) - rd32(m, b));
+        return 1;
+    }
+    case K_HOME_REPUTATION: {
+        int32_t ra = (int16_t)rd16(m, rd32(m, rd32(m, a) + 0x61) + 9);
+        int32_t rb = (int16_t)rd16(m, rd32(m, rd32(m, b) + 0x61) + 9);
+        *r = rb - ra;
+        return 1;
+    }
+    }
+    return 0;
 }
 
 #ifdef CM0102_QSORT_STATS
@@ -97,6 +170,7 @@ typedef struct {
     uint32_t target;                  /* the comparator's address (rt_call_target, for host functions) */
     uint32_t esp0;                    /* esp at the entry: for the unwinding check of RT_AFTER_CALL */
     int native;                       /* 1 when the comparison is done by cmp_language (CMP_LANGUAGE) */
+    int kind;                         /* K_*: the comparison cmp_native does, or K_GENERATED */
 } Cmp;
 
 static void swap_bytes(uint32_t a, uint32_t b, uint32_t width)
@@ -139,16 +213,18 @@ static inline __attribute__((always_inline)) int32_t compare(const Cmp *c, uint3
 #ifdef CM0102_QSORT_STATS
     qs_cmp_count++;
 #endif
-    if (c->native) {
+    if (c->kind) {
+        int32_t got;
+        if (cmp_native(c->kind, a, b, &got)) {
 #ifdef CM0102_QSORT_VERIFY
-        int32_t want = compare_generated(c, a, b, gone);
-        if (*gone) return 0;
-        int32_t got = cmp_language(a, b);
-        if (got != want) rt_fatal("qsort/bsearch: native language comparison %d, generated %d (%#x, %#x)", got, want, a, b);
-        return want;
+            int32_t want = compare_generated(c, a, b, gone);
+            if (*gone) return 0;
+            if (got != want) rt_fatal("qsort/bsearch: native comparison %#x gives %d, generated %d (%#x, %#x)", c->target, got, want, a, b);
+            return want;
 #else
-        return cmp_language(a, b);
+            return got;
 #endif
+        }
     }
     return compare_generated(c, a, b, gone);
 }
@@ -274,7 +350,7 @@ RT_REPLACE(00945333, crt_qsort)
     uint32_t base = rt_arg(0), num = rt_arg(1), width = rt_arg(2), comp = rt_arg(3);
     if (num < 2 || width == 0) { rt_ret_cdecl(cpu.eax); return; }
 
-    Cmp c = { rt_lookup(comp), comp, cpu.esp, comp == CMP_LANGUAGE };
+    Cmp c = { rt_lookup(comp), comp, cpu.esp, comp == CMP_LANGUAGE, cmp_kind(comp) };
     if (!c.fn) rt_fatal("qsort: the comparison %#x is not a recompiled function", comp);
 #ifdef CM0102_QSORT_STATS
     const int sb = num > 8 ? 9 : (int)num, sn = c.native;
@@ -335,7 +411,7 @@ RT_REPLACE(00945333, crt_qsort)
 RT_REPLACE(00946464, crt_bsearch)
 {
     uint32_t key = rt_arg(0), base = rt_arg(1), num = rt_arg(2), width = rt_arg(3), comp = rt_arg(4);
-    Cmp c = { rt_lookup(comp), comp, cpu.esp, comp == CMP_LANGUAGE };
+    Cmp c = { rt_lookup(comp), comp, cpu.esp, comp == CMP_LANGUAGE, cmp_kind(comp) };
     if (!c.fn) rt_fatal("bsearch: the comparison %#x is not a recompiled function", comp);
 
     uint32_t hi = base + width * (num - 1), found = 0;
