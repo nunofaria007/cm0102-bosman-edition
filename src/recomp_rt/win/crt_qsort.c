@@ -40,6 +40,39 @@ static inline int32_t cmp_language(uint32_t a, uint32_t b)
     return (int32_t)(int8_t)la - (int32_t)(int8_t)lb;
 }
 
+#ifdef CM0102_QSORT_STATS
+/* With -DCM0102_QSORT_STATS (CMAKE_C_FLAGS) the sorts and searches count what they do, to see which of them
+ * is worth a faster path. In the browser console: Module._rt_qsort_reset() before the part to measure and
+ * Module._rt_qsort_report() afterwards (stdout). The rows are the sorts by the count of elements (2 .. 8,
+ * 9 = more than 8), for the native comparator and for the others: how many sorts, how many of them find the
+ * elements already in order (every element above the one before it, as a sort of the native comparator can
+ * tell without moving anything), and the comparisons. */
+#include <stdio.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#define QS_EXPORT EMSCRIPTEN_KEEPALIVE
+#else
+#define QS_EXPORT
+#endif
+static uint64_t qs_calls[2][10], qs_sorted[2][10], qs_cmps[2][10], qs_elems[2][10];
+static uint64_t bs_calls[2], bs_cmps[2], bs_found[2];
+static uint64_t qs_cmp_count;
+QS_EXPORT void rt_qsort_reset(void) { memset(qs_calls, 0, sizeof qs_calls); memset(qs_sorted, 0, sizeof qs_sorted);
+    memset(qs_cmps, 0, sizeof qs_cmps); memset(qs_elems, 0, sizeof qs_elems); memset(bs_calls, 0, sizeof bs_calls);
+    memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; }
+QS_EXPORT void rt_qsort_report(void)
+{
+    for (int n = 0; n < 2; n++) {
+        printf("qsort, %s comparator: elements | sorts | already in order | comparisons | elements in all\n", n ? "language" : "other");
+        for (int b = 2; b < 10; b++)
+            printf("  %s%d | %llu | %llu | %llu | %llu\n", b == 9 ? ">8 (" : "", b, (unsigned long long)qs_calls[n][b],
+                   (unsigned long long)qs_sorted[n][b], (unsigned long long)qs_cmps[n][b], (unsigned long long)qs_elems[n][b]);
+        printf("bsearch, %s comparator: %llu searches, %llu comparisons, %llu found\n", n ? "language" : "other",
+               (unsigned long long)bs_calls[n], (unsigned long long)bs_cmps[n], (unsigned long long)bs_found[n]);
+    }
+}
+#endif
+
 #define CUTOFF 8
 #define STKSIZ 64                     /* the original's is 30: the depth is at most log2 of the count */
 
@@ -87,6 +120,9 @@ static inline int32_t compare_generated(const Cmp *c, uint32_t a, uint32_t b, in
 
 static inline __attribute__((always_inline)) int32_t compare(const Cmp *c, uint32_t a, uint32_t b, int *gone)
 {
+#ifdef CM0102_QSORT_STATS
+    qs_cmp_count++;
+#endif
     if (c->native) {
 #ifdef CM0102_QSORT_VERIFY
         int32_t want = compare_generated(c, a, b, gone);
@@ -125,6 +161,17 @@ RT_REPLACE(00945333, crt_qsort)
 
     Cmp c = { rt_lookup(comp), comp, cpu.esp, comp == CMP_LANGUAGE };
     if (!c.fn) rt_fatal("qsort: the comparison %#x is not a recompiled function", comp);
+#ifdef CM0102_QSORT_STATS
+    const int sb = num > 8 ? 9 : (int)num, sn = c.native;
+    const uint64_t sc0 = qs_cmp_count;
+    qs_calls[sn][sb]++; qs_elems[sn][sb] += num;
+    if (sn && num <= 8) {
+        int ord = 1;
+        for (uint32_t i = 1; i < num; i++)
+            if (cmp_language(base + i * width, base + (i - 1) * width) <= 0) { ord = 0; break; }
+        qs_sorted[sn][sb] += (uint64_t)ord;
+    }
+#endif
 
     uint32_t lostk[STKSIZ], histk[STKSIZ];
     int stkptr = 0, gone = 0;
@@ -169,6 +216,9 @@ RT_REPLACE(00945333, crt_qsort)
         lo = lostk[stkptr];
         hi = histk[stkptr];
     }
+#ifdef CM0102_QSORT_STATS
+    qs_cmps[sn][sb] += qs_cmp_count - sc0;
+#endif
     rt_ret_cdecl(cpu.eax);
 }
 
@@ -185,6 +235,10 @@ RT_REPLACE(00946464, crt_bsearch)
 
     uint32_t hi = base + width * (num - 1), found = 0;
     int gone = 0;
+#ifdef CM0102_QSORT_STATS
+    const uint64_t sc0 = qs_cmp_count;
+    bs_calls[c.native]++;
+#endif
     if (base <= hi) {
         for (;;) {
             uint32_t half = num >> 1;
@@ -206,5 +260,9 @@ RT_REPLACE(00946464, crt_bsearch)
             if (base > hi) break;
         }
     }
+#ifdef CM0102_QSORT_STATS
+    bs_cmps[c.native] += qs_cmp_count - sc0;
+    bs_found[c.native] += found != 0;
+#endif
     rt_ret_cdecl(found);
 }
