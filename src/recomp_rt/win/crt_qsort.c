@@ -18,6 +18,7 @@
  * The comparator is called as comp(a, b) with the arguments pushed b first (cdecl), as in the original.
  * The swap of two elements is by bytes and does nothing when both are the same element. */
 #include "win.h"
+#include <stdlib.h>
 
 /* The comparators that run natively. Profile of a new game in the browser (2026-10-29): 12% of the time in
  * the comparator of the language entries alone (0x7c6d40, PlayerStats), a function of about twenty
@@ -56,12 +57,13 @@ static inline int32_t cmp_language(uint32_t a, uint32_t b)
 #endif
 static uint64_t qs_calls[2][10], qs_sorted[2][10], qs_cmps[2][10], qs_elems[2][10];
 static uint64_t bs_calls[2], bs_cmps[2], bs_found[2];
-static uint64_t qs_cmp_count;
+static uint64_t qs_cmp_count, qs_fast;
 QS_EXPORT void rt_qsort_reset(void) { memset(qs_calls, 0, sizeof qs_calls); memset(qs_sorted, 0, sizeof qs_sorted);
     memset(qs_cmps, 0, sizeof qs_cmps); memset(qs_elems, 0, sizeof qs_elems); memset(bs_calls, 0, sizeof bs_calls);
-    memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; }
+    memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; qs_fast = 0; }
 QS_EXPORT void rt_qsort_report(void)
 {
+    printf("qsort: %llu sorts of language entries done by the shortcut (language_sort_fast)\n", (unsigned long long)qs_fast);
     for (int n = 0; n < 2; n++) {
         printf("qsort, %s comparator: elements | sorts | already in order | comparisons | elements in all\n", n ? "language" : "other");
         for (int b = 2; b < 10; b++)
@@ -154,6 +156,105 @@ static int short_sort(const Cmp *c, uint32_t lo, uint32_t hi, uint32_t width)
     return 0;
 }
 
+/* The sort itself, step by step as the original does it. 1 when a comparison unwound (longjmp): then
+ * nothing more runs. */
+static int qsort_generic(const Cmp *c, uint32_t base, uint32_t num, uint32_t width)
+{
+    uint32_t lostk[STKSIZ], histk[STKSIZ];
+    int stkptr = 0, gone = 0;
+    uint32_t lo = base, hi = base + width * (num - 1);
+
+    for (;;) {
+        uint32_t size = (hi - lo) / width + 1;
+        if (size <= CUTOFF) {
+            if (short_sort(c, lo, hi, width)) return 1;
+        } else {
+            uint32_t mid = lo + (size / 2) * width;
+            swap_bytes(mid, lo, width);
+            uint32_t loguy = lo, higuy = hi + width;
+            for (;;) {
+                for (;;) {
+                    loguy += width;
+                    if (loguy > hi) break;
+                    int32_t r = compare(c, loguy, lo, &gone);
+                    if (gone) return 1;
+                    if (r > 0) break;
+                }
+                for (;;) {
+                    higuy -= width;
+                    if (higuy <= lo) break;
+                    int32_t r = compare(c, higuy, lo, &gone);
+                    if (gone) return 1;
+                    if (r < 0) break;
+                }
+                if (higuy < loguy) break;
+                swap_bytes(loguy, higuy, width);
+            }
+            swap_bytes(lo, higuy, width);
+            if ((int32_t)(higuy - 1 - lo) >= (int32_t)(hi - loguy)) {
+                if (lo + width < higuy) { lostk[stkptr] = lo; histk[stkptr] = higuy - width; stkptr++; }
+                if (loguy < hi) { lo = loguy; continue; }
+            } else {
+                if (loguy < hi) { lostk[stkptr] = loguy; histk[stkptr] = hi; stkptr++; }
+                if (lo + width < higuy) { hi = higuy - width; continue; }
+            }
+        }
+        if (--stkptr < 0) break;
+        lo = lostk[stkptr];
+        hi = histk[stkptr];
+    }
+    return 0;
+}
+
+/* The sort of a big table of language entries that is in order but for its last element. Profile of a new
+ * game (2026-10-31): all the qsort time is in 5861 sorts of more than 8 language entries, 28000 of them on
+ * average, 2.4 billion comparisons: the game adds one entry at the end of the table and sorts the whole table.
+ *
+ * When the keys (staff id, then language) are all different and compare as a proper order, the sorted
+ * array is the only one there is, so the order the original's sort goes through does not matter (it
+ * matters for equal elements, rule Q152, and those take the sort above). The conditions are checked, not
+ * assumed: the ids are below 2^31 (the difference of two of them does not wrap), no language is -1 (the
+ * wildcard that equals every language), the first num - 1 entries go up strictly, and the last one equals
+ * none of them. Then the last entry moves to its place. Returns 1 when it did the sort, with the array
+ * as the original's sort leaves it; 0 when the table is not of this kind (nothing was changed). */
+static int language_sort_fast(uint32_t base, uint32_t num)
+{
+    uint8_t *m = g_mem;
+    const uint32_t n1 = num - 1;
+    uint32_t pid = rd32(m, base);
+    int32_t pl = (int8_t)m[base + 4];
+    if (pid >= 0x80000000u || m[base + 4] == 0xff) return 0;
+    for (uint32_t i = 1; i < n1; i++) {
+        const uint8_t *e = m + base + 6 * i;
+        uint32_t id; memcpy(&id, e, 4);
+        int32_t l = (int8_t)e[4];
+        if (id >= 0x80000000u || e[4] == 0xff) return 0;
+        if (id < pid || (id == pid && l <= pl)) return 0;       /* not strictly up: the sort above */
+        pid = id; pl = l;
+    }
+    uint8_t last[6];
+    memcpy(last, m + base + 6 * n1, 6);
+    uint32_t lid; memcpy(&lid, last, 4);
+    int32_t ll = (int8_t)last[4];
+    if (lid >= 0x80000000u || last[4] == 0xff) return 0;
+    /* the first of the first n1 entries that is above the last one */
+    uint32_t lo = 0, hi = n1;
+    while (lo < hi) {
+        uint32_t mid = lo + (hi - lo) / 2, id; memcpy(&id, m + base + 6 * mid, 4);
+        int32_t l = (int8_t)m[base + 6 * mid + 4];
+        if (id < lid || (id == lid && l <= ll)) lo = mid + 1; else hi = mid;
+    }
+    if (lo > 0) {                                                /* equal to the one before it: the sort above */
+        uint32_t id; memcpy(&id, m + base + 6 * (lo - 1), 4);
+        if (id == lid && (int8_t)m[base + 6 * (lo - 1) + 4] == ll) return 0;
+    }
+    if (lo < n1) {
+        memmove(m + base + 6 * (lo + 1), m + base + 6 * lo, 6 * (size_t)(n1 - lo));
+        memcpy(m + base + 6 * lo, last, 6);
+    }
+    return 1;
+}
+
 RT_REPLACE(00945333, crt_qsort)
 {
     uint32_t base = rt_arg(0), num = rt_arg(1), width = rt_arg(2), comp = rt_arg(3);
@@ -173,49 +274,36 @@ RT_REPLACE(00945333, crt_qsort)
     }
 #endif
 
-    uint32_t lostk[STKSIZ], histk[STKSIZ];
-    int stkptr = 0, gone = 0;
-    uint32_t lo = base, hi = base + width * (num - 1);
-
-    for (;;) {
-        uint32_t size = (hi - lo) / width + 1;
-        if (size <= CUTOFF) {
-            if (short_sort(&c, lo, hi, width)) return;
-        } else {
-            uint32_t mid = lo + (size / 2) * width;
-            swap_bytes(mid, lo, width);
-            uint32_t loguy = lo, higuy = hi + width;
-            for (;;) {
-                for (;;) {
-                    loguy += width;
-                    if (loguy > hi) break;
-                    int32_t r = compare(&c, loguy, lo, &gone);
-                    if (gone) return;
-                    if (r > 0) break;
-                }
-                for (;;) {
-                    higuy -= width;
-                    if (higuy <= lo) break;
-                    int32_t r = compare(&c, higuy, lo, &gone);
-                    if (gone) return;
-                    if (r < 0) break;
-                }
-                if (higuy < loguy) break;
-                swap_bytes(loguy, higuy, width);
-            }
-            swap_bytes(lo, higuy, width);
-            if ((int32_t)(higuy - 1 - lo) >= (int32_t)(hi - loguy)) {
-                if (lo + width < higuy) { lostk[stkptr] = lo; histk[stkptr] = higuy - width; stkptr++; }
-                if (loguy < hi) { lo = loguy; continue; }
-            } else {
-                if (loguy < hi) { lostk[stkptr] = loguy; histk[stkptr] = hi; stkptr++; }
-                if (lo + width < higuy) { hi = higuy - width; continue; }
-            }
+    if (c.native && width == 6 && num > CUTOFF) {
+#ifdef CM0102_QSORT_VERIFY
+        /* The shortcut on the array, then the sort of the original on a copy of the array as it was:
+         * the two must leave the same bytes. */
+        uint8_t *orig = malloc(num * 6), *fast = malloc(num * 6);
+        memcpy(orig, g_mem + base, num * 6);
+        int did = language_sort_fast(base, num);
+        if (did) {
+            memcpy(fast, g_mem + base, num * 6);
+            memcpy(g_mem + base, orig, num * 6);
+            if (qsort_generic(&c, base, num, width)) { free(orig); free(fast); return; }
+            if (memcmp(fast, g_mem + base, num * 6))
+                rt_fatal("qsort: the shortcut for language entries differs from the sort (%u entries at %#x)", num, base);
+            free(orig); free(fast);
+            rt_ret_cdecl(cpu.eax);
+            return;
         }
-        if (--stkptr < 0) break;
-        lo = lostk[stkptr];
-        hi = histk[stkptr];
+        free(orig); free(fast);
+#else
+        if (language_sort_fast(base, num)) {
+#ifdef CM0102_QSORT_STATS
+            qs_fast++;
+#endif
+            rt_ret_cdecl(cpu.eax);
+            return;
+        }
+#endif
     }
+
+    if (qsort_generic(&c, base, num, width)) return;
 #ifdef CM0102_QSORT_STATS
     qs_cmps[sn][sb] += qs_cmp_count - sc0;
 #endif
