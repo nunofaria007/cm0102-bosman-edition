@@ -311,4 +311,6 @@ typedef struct { uint32_t addr; RtFn fn; const char *name; uint32_t flags; } RtE
 extern const RtEntry rt_table[];
 extern const uint32_t rt_table_size;
 
+#include "fastloops.h"
+
 #endif

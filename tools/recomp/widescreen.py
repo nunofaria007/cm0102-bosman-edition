@@ -95,6 +95,11 @@ from attribute_groups import PATCHES as GROUP_PATCHES  # noqa: E402
 
 PATCHES.update(GROUP_PATCHES)
 
+# Native versions of hot loops (speedups.py).
+from speedups import INSNS as SPEEDUP_INSNS  # noqa: E402
+
+INSNS.update(SPEEDUP_INSNS)
+
 # Not a screen size: a fix for an endless loop (0.4.0 slice 12, custom data sets). euro.cfg is read by 0x9059e0
 # (docs/research/2026-10-16-update-team-databases.md). When a line of it is not a "*" header (after a header
 # that names an unknown nation, or a file that does not match the database), the original tests the same line
