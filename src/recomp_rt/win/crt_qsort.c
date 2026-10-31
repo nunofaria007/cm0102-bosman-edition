@@ -58,12 +58,26 @@ static inline int32_t cmp_language(uint32_t a, uint32_t b)
 static uint64_t qs_calls[2][10], qs_sorted[2][10], qs_cmps[2][10], qs_elems[2][10];
 static uint64_t bs_calls[2], bs_cmps[2], bs_found[2];
 static uint64_t qs_cmp_count, qs_fast;
+/* The sorts by comparator address (the first 24 different ones): sorts, elements, comparisons. */
+static struct { uint32_t comp; uint64_t sorts, elems, cmps; } qs_by[24];
+static int qs_by_slot(uint32_t comp)
+{
+    for (int i = 0; i < 24; i++) {
+        if (qs_by[i].comp == comp) return i;
+        if (!qs_by[i].comp) { qs_by[i].comp = comp; return i; }
+    }
+    return 23;
+}
 QS_EXPORT void rt_qsort_reset(void) { memset(qs_calls, 0, sizeof qs_calls); memset(qs_sorted, 0, sizeof qs_sorted);
     memset(qs_cmps, 0, sizeof qs_cmps); memset(qs_elems, 0, sizeof qs_elems); memset(bs_calls, 0, sizeof bs_calls);
-    memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; qs_fast = 0; }
+    memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; qs_fast = 0; memset(qs_by, 0, sizeof qs_by); }
 QS_EXPORT void rt_qsort_report(void)
 {
     printf("qsort: %llu sorts of language entries done by the shortcut (language_sort_fast)\n", (unsigned long long)qs_fast);
+    printf("qsort by comparator: address | sorts | elements | comparisons\n");
+    for (int i = 0; i < 24 && qs_by[i].comp; i++)
+        printf("  %#x | %llu | %llu | %llu\n", qs_by[i].comp, (unsigned long long)qs_by[i].sorts,
+               (unsigned long long)qs_by[i].elems, (unsigned long long)qs_by[i].cmps);
     for (int n = 0; n < 2; n++) {
         printf("qsort, %s comparator: elements | sorts | already in order | comparisons | elements in all\n", n ? "language" : "other");
         for (int b = 2; b < 10; b++)
@@ -266,6 +280,8 @@ RT_REPLACE(00945333, crt_qsort)
     const int sb = num > 8 ? 9 : (int)num, sn = c.native;
     const uint64_t sc0 = qs_cmp_count;
     qs_calls[sn][sb]++; qs_elems[sn][sb] += num;
+    const int bi = qs_by_slot(comp);
+    qs_by[bi].sorts++; qs_by[bi].elems += num;
     if (sn && num <= 8) {
         int ord = 1;
         for (uint32_t i = 1; i < num; i++)
@@ -306,6 +322,7 @@ RT_REPLACE(00945333, crt_qsort)
     if (qsort_generic(&c, base, num, width)) return;
 #ifdef CM0102_QSORT_STATS
     qs_cmps[sn][sb] += qs_cmp_count - sc0;
+    qs_by[bi].cmps += qs_cmp_count - sc0;
 #endif
     rt_ret_cdecl(cpu.eax);
 }
