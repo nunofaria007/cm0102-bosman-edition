@@ -148,10 +148,20 @@ static int qs_by_slot(__typeof__(qs_by) *tab, uint32_t comp)
  * where in the table the first one is: [0] first quarter ... [3] last quarter. */
 static uint64_t qs_decline[6], qs_decline_pos[2][4], qs_decline_last;
 #define QS_NO(k) do { qs_decline[k]++; return 0; } while (0)
+/* Who calls: the return address of each qsort (bs = 0) and bsearch (bs = 1) by comparator (the first 512 pairs). */
+#define QS_CALLERS_N 512
+static struct { uint32_t comp, ret; uint64_t n[2]; } qs_callers[QS_CALLERS_N];
+static void qs_caller(uint32_t comp, uint32_t ret, int bs)
+{
+    for (int i = 0; i < QS_CALLERS_N; i++) {
+        if (qs_callers[i].comp == comp && qs_callers[i].ret == ret) { qs_callers[i].n[bs]++; return; }
+        if (!qs_callers[i].comp) { qs_callers[i].comp = comp; qs_callers[i].ret = ret; qs_callers[i].n[bs] = 1; return; }
+    }
+}
 QS_EXPORT void rt_qsort_reset(void) { memset(qs_calls, 0, sizeof qs_calls); memset(qs_sorted, 0, sizeof qs_sorted);
     memset(qs_cmps, 0, sizeof qs_cmps); memset(qs_elems, 0, sizeof qs_elems); memset(bs_calls, 0, sizeof bs_calls);
     memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; qs_fast = 0; memset(qs_by, 0, sizeof qs_by); memset(bs_by, 0, sizeof bs_by);
-    memset(qs_decline, 0, sizeof qs_decline); memset(qs_decline_pos, 0, sizeof qs_decline_pos); qs_decline_last = 0; }
+    memset(qs_decline, 0, sizeof qs_decline); memset(qs_decline_pos, 0, sizeof qs_decline_pos); qs_decline_last = 0; memset(qs_callers, 0, sizeof qs_callers); }
 QS_EXPORT void rt_qsort_report(void)
 {
     printf("qsort: %llu sorts of language entries done by the shortcut (language_sort_fast)\n", (unsigned long long)qs_fast);
@@ -169,6 +179,10 @@ QS_EXPORT void rt_qsort_report(void)
     for (int i = 0; i < QS_BY_N && (bs_by[i].comp || bs_by[i].sorts); i++)
         printf("  %#x | %llu | %llu | %llu\n", bs_by[i].comp, (unsigned long long)bs_by[i].sorts,
                (unsigned long long)bs_by[i].elems, (unsigned long long)bs_by[i].cmps);
+    printf("callers: comparator | return address | sorts | searches\n");
+    for (int i = 0; i < QS_CALLERS_N && qs_callers[i].comp; i++)
+        printf("  %#x | %#x | %llu | %llu\n", qs_callers[i].comp, qs_callers[i].ret,
+               (unsigned long long)qs_callers[i].n[0], (unsigned long long)qs_callers[i].n[1]);
     for (int n = 0; n < 2; n++) {
         printf("qsort, %s comparator: elements | sorts | already in order | comparisons | elements in all\n", n ? "language" : "other");
         for (int b = 2; b < 10; b++)
@@ -389,6 +403,7 @@ RT_REPLACE(00945333, crt_qsort)
     qs_calls[sn][sb]++; qs_elems[sn][sb] += num;
     const int bi = qs_by_slot(&qs_by, comp);
     qs_by[bi].sorts++; qs_by[bi].elems += num;
+    qs_caller(comp, rd32(g_mem, cpu.esp), 0);
     if (sn && num <= 8) {
         int ord = 1;
         for (uint32_t i = 1; i < num; i++)
@@ -455,6 +470,7 @@ RT_REPLACE(00946464, crt_bsearch)
     bs_calls[c.native]++;
     const int bbi = qs_by_slot(&bs_by, comp);
     bs_by[bbi].sorts++; bs_by[bbi].elems += num;
+    qs_caller(comp, rd32(g_mem, cpu.esp), 1);
 #endif
     if (base <= hi) {
         for (;;) {
