@@ -131,26 +131,44 @@ static inline int cmp_native(int kind, uint32_t a, uint32_t b, int32_t *r)
 static uint64_t qs_calls[2][10], qs_sorted[2][10], qs_cmps[2][10], qs_elems[2][10];
 static uint64_t bs_calls[2], bs_cmps[2], bs_found[2];
 static uint64_t qs_cmp_count, qs_fast;
-/* The sorts by comparator address (the first 24 different ones): sorts, elements, comparisons. */
-static struct { uint32_t comp; uint64_t sorts, elems, cmps; } qs_by[24];
-static int qs_by_slot(uint32_t comp)
+/* The sorts and the searches by comparator address (the first 255 different ones; a 256th and later are counted
+ * together in the last row, address 0): sorts or searches, elements, comparisons. */
+#define QS_BY_N 256
+static struct { uint32_t comp; uint64_t sorts, elems, cmps; } qs_by[QS_BY_N], bs_by[QS_BY_N];
+static int qs_by_slot(__typeof__(qs_by) *tab, uint32_t comp)
 {
-    for (int i = 0; i < 24; i++) {
-        if (qs_by[i].comp == comp) return i;
-        if (!qs_by[i].comp) { qs_by[i].comp = comp; return i; }
+    for (int i = 0; i < QS_BY_N - 1; i++) {
+        if ((*tab)[i].comp == comp) return i;
+        if (!(*tab)[i].comp) { (*tab)[i].comp = comp; return i; }
     }
-    return 23;
+    return QS_BY_N - 1;
 }
+/* Why language_sort_fast said no (0 = first entry not valid, 1 = a later entry not valid, 2 = two equal
+ * entries, 3 = entries going down, 4 = last entry not valid, 5 = last entry equals one before it), and for 2 and 3
+ * where in the table the first one is: [0] first quarter ... [3] last quarter. */
+static uint64_t qs_decline[6], qs_decline_pos[2][4], qs_decline_last;
+#define QS_NO(k) do { qs_decline[k]++; return 0; } while (0)
 QS_EXPORT void rt_qsort_reset(void) { memset(qs_calls, 0, sizeof qs_calls); memset(qs_sorted, 0, sizeof qs_sorted);
     memset(qs_cmps, 0, sizeof qs_cmps); memset(qs_elems, 0, sizeof qs_elems); memset(bs_calls, 0, sizeof bs_calls);
-    memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; qs_fast = 0; memset(qs_by, 0, sizeof qs_by); }
+    memset(bs_cmps, 0, sizeof bs_cmps); memset(bs_found, 0, sizeof bs_found); qs_cmp_count = 0; qs_fast = 0; memset(qs_by, 0, sizeof qs_by); memset(bs_by, 0, sizeof bs_by);
+    memset(qs_decline, 0, sizeof qs_decline); memset(qs_decline_pos, 0, sizeof qs_decline_pos); qs_decline_last = 0; }
 QS_EXPORT void rt_qsort_report(void)
 {
     printf("qsort: %llu sorts of language entries done by the shortcut (language_sort_fast)\n", (unsigned long long)qs_fast);
+    printf("language_sort_fast said no: first entry %llu, later entry %llu, equal entries %llu (by quarter %llu %llu %llu %llu), going down %llu (by quarter %llu %llu %llu %llu; only the last entry out of place: %llu), last entry %llu, last equals one before %llu\n",
+           (unsigned long long)qs_decline[0], (unsigned long long)qs_decline[1], (unsigned long long)qs_decline[2],
+           (unsigned long long)qs_decline_pos[0][0], (unsigned long long)qs_decline_pos[0][1], (unsigned long long)qs_decline_pos[0][2], (unsigned long long)qs_decline_pos[0][3],
+           (unsigned long long)qs_decline[3],
+           (unsigned long long)qs_decline_pos[1][0], (unsigned long long)qs_decline_pos[1][1], (unsigned long long)qs_decline_pos[1][2], (unsigned long long)qs_decline_pos[1][3],
+           (unsigned long long)qs_decline_last, (unsigned long long)qs_decline[4], (unsigned long long)qs_decline[5]);
     printf("qsort by comparator: address | sorts | elements | comparisons\n");
-    for (int i = 0; i < 24 && qs_by[i].comp; i++)
+    for (int i = 0; i < QS_BY_N && (qs_by[i].comp || qs_by[i].sorts); i++)
         printf("  %#x | %llu | %llu | %llu\n", qs_by[i].comp, (unsigned long long)qs_by[i].sorts,
                (unsigned long long)qs_by[i].elems, (unsigned long long)qs_by[i].cmps);
+    printf("bsearch by comparator: address | searches | elements | comparisons\n");
+    for (int i = 0; i < QS_BY_N && (bs_by[i].comp || bs_by[i].sorts); i++)
+        printf("  %#x | %llu | %llu | %llu\n", bs_by[i].comp, (unsigned long long)bs_by[i].sorts,
+               (unsigned long long)bs_by[i].elems, (unsigned long long)bs_by[i].cmps);
     for (int n = 0; n < 2; n++) {
         printf("qsort, %s comparator: elements | sorts | already in order | comparisons | elements in all\n", n ? "language" : "other");
         for (int b = 2; b < 10; b++)
@@ -307,26 +325,39 @@ static int qsort_generic(const Cmp *c, uint32_t base, uint32_t num, uint32_t wid
  * wildcard that equals every language), the first num - 1 entries go up strictly, and the last one equals
  * none of them. Then the last entry moves to its place. Returns 1 when it did the sort, with the array
  * as the original's sort leaves it; 0 when the table is not of this kind (nothing was changed). */
+#ifndef CM0102_QSORT_STATS
+#define QS_NO(k) return 0
+#endif
 static int language_sort_fast(uint32_t base, uint32_t num)
 {
     uint8_t *m = g_mem;
     const uint32_t n1 = num - 1;
     uint32_t pid = rd32(m, base);
     int32_t pl = (int8_t)m[base + 4];
-    if (pid >= 0x80000000u || m[base + 4] == 0xff) return 0;
+    if (pid >= 0x80000000u || m[base + 4] == 0xff) QS_NO(0);
     for (uint32_t i = 1; i < n1; i++) {
         const uint8_t *e = m + base + 6 * i;
         uint32_t id; memcpy(&id, e, 4);
         int32_t l = (int8_t)e[4];
-        if (id >= 0x80000000u || e[4] == 0xff) return 0;
-        if (id < pid || (id == pid && l <= pl)) return 0;       /* not strictly up: the sort above */
+        if (id >= 0x80000000u || e[4] == 0xff) QS_NO(1);
+        if (id < pid || (id == pid && l <= pl)) {              /* not strictly up: the sort above */
+#ifdef CM0102_QSORT_STATS
+            const int quarter = (int)((uint64_t)i * 4 / n1);
+            if (id == pid && l == pl) { qs_decline_pos[0][quarter]++; QS_NO(2); }
+            qs_decline_pos[1][quarter]++;
+            if (i == n1 - 1) qs_decline_last++;
+            QS_NO(3);
+#else
+            return 0;
+#endif
+        }
         pid = id; pl = l;
     }
     uint8_t last[6];
     memcpy(last, m + base + 6 * n1, 6);
     uint32_t lid; memcpy(&lid, last, 4);
     int32_t ll = (int8_t)last[4];
-    if (lid >= 0x80000000u || last[4] == 0xff) return 0;
+    if (lid >= 0x80000000u || last[4] == 0xff) QS_NO(4);
     /* the first of the first n1 entries that is above the last one */
     uint32_t lo = 0, hi = n1;
     while (lo < hi) {
@@ -336,7 +367,7 @@ static int language_sort_fast(uint32_t base, uint32_t num)
     }
     if (lo > 0) {                                                /* equal to the one before it: the sort above */
         uint32_t id; memcpy(&id, m + base + 6 * (lo - 1), 4);
-        if (id == lid && (int8_t)m[base + 6 * (lo - 1) + 4] == ll) return 0;
+        if (id == lid && (int8_t)m[base + 6 * (lo - 1) + 4] == ll) QS_NO(5);
     }
     if (lo < n1) {
         memmove(m + base + 6 * (lo + 1), m + base + 6 * lo, 6 * (size_t)(n1 - lo));
@@ -356,7 +387,7 @@ RT_REPLACE(00945333, crt_qsort)
     const int sb = num > 8 ? 9 : (int)num, sn = c.native;
     const uint64_t sc0 = qs_cmp_count;
     qs_calls[sn][sb]++; qs_elems[sn][sb] += num;
-    const int bi = qs_by_slot(comp);
+    const int bi = qs_by_slot(&qs_by, comp);
     qs_by[bi].sorts++; qs_by[bi].elems += num;
     if (sn && num <= 8) {
         int ord = 1;
@@ -422,6 +453,8 @@ RT_REPLACE(00946464, crt_bsearch)
 #ifdef CM0102_QSORT_STATS
     const uint64_t sc0 = qs_cmp_count;
     bs_calls[c.native]++;
+    const int bbi = qs_by_slot(&bs_by, comp);
+    bs_by[bbi].sorts++; bs_by[bbi].elems += num;
 #endif
     if (base <= hi) {
         for (;;) {
@@ -447,6 +480,7 @@ RT_REPLACE(00946464, crt_bsearch)
 #ifdef CM0102_QSORT_STATS
     bs_cmps[c.native] += qs_cmp_count - sc0;
     bs_found[c.native] += found != 0;
+    bs_by[bbi].cmps += qs_cmp_count - sc0;
 #endif
     rt_ret_cdecl(found);
 }
