@@ -6,8 +6,9 @@ FN = {
  0x7c6d90: "568b74240885f67507b8010000005ec38b54240c85d2750583c8ff5ec38b460a8b4a0a3bc17607b8010000005ec3730583c8ff5ec38b46048b4a043bc17607b8010000005ec32bc15ef7d81bc0c3",
  0x7c6de0: "568b74240885f67507b8010000005ec38b54240c85d274318b46048b4a043bc17607b8010000005ec3721e668b4608668b4a08663bc17e07b8010000005ec375088b068b0a2bc15ec383c8ff5ec3",
  0x778ed0: "8b4424048b088b51618b4c24080fbf42098b118b4a610fbf51092bd08bc2c3",
+ 0x4b0810: "8b4424048b5424088b088b0285c9750885c00f95c18bc1c385c0750483c8ffc30fbf90800000000fbf81800000002bc2c3",
 }
-KIND = {0x53fd40: 2, 0x7c6d90: 3, 0x7c6de0: 4, 0x778ed0: 5}
+KIND = {0x53fd40: 2, 0x7c6d90: 3, 0x7c6de0: 4, 0x778ed0: 5, 0x4b0810: 6}
 lib = ctypes.CDLL("./shim.so")
 SZ = 0x1000000
 buf = (ctypes.c_uint8*SZ)()
@@ -57,12 +58,18 @@ for it in range(6000):
     staff = [0xb60000 + 0x100*i for i in range(6)]
     for s_ in staff: mem[s_+0x61] = struct.pack("<I", rng.choice(pds))
     sp = 0xb70000
+    # clubs for 0x4b0810: reputation (signed word at +0x80), and NULL pointers
+    for c in clubs: mem[c+0x80] = struct.pack("<h", rng.choice([-32768, -5, 0, 5, 100, 5000, 32767]))
+    cp = 0xb80000
+    mem[cp] = struct.pack("<II", rng.choice(clubs + [0]), rng.choice(clubs + [0]))
     mem[sp] = struct.pack("<II", rng.choice(staff), rng.choice(staff))
     for addr, hexcode in FN.items():
         code = bytes.fromhex(hexcode)
         if addr == 0x53fd40:
             a, b = ptrs, ptrs + 4
             if (struct.unpack("<II", mem[ptrs])[0] == 0) : continue
+        elif addr == 0x4b0810:
+            a, b = cp, cp + 4
         elif addr == 0x778ed0:
             a, b = sp, sp + 4
         else:
