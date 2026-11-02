@@ -233,6 +233,32 @@ QS_EXPORT void rt_qsort_report(void)
                (unsigned long long)bs_calls[n], (unsigned long long)bs_cmps[n], (unsigned long long)bs_found[n]);
     }
 }
+
+/* Automatic snapshots by the game's date: every CM0102_QSORT_SNAPSHOT_DAYS game days (30 when not defined; 0 = off)
+ * the report is printed with the dates of its window and the counters start again, so a season gives one report
+ * per month without calling anything from the console (and the first one holds game creation). The date is
+ * g_current_date (0xae2c90, CM_DATE: day of the year as a word, then the year as a word). In the console,
+ * Module._rt_qsort_snapshot_days(n) changes the period (0 = off). Checked at the start of every sort and search. */
+#ifndef CM0102_QSORT_SNAPSHOT_DAYS
+#define CM0102_QSORT_SNAPSHOT_DAYS 30
+#endif
+#define G_CURRENT_DATE 0x00ae2c90u
+static int qs_snap_days = CM0102_QSORT_SNAPSHOT_DAYS;
+static int32_t qs_snap_last = -1;
+QS_EXPORT void rt_qsort_snapshot_days(int days) { qs_snap_days = days; qs_snap_last = -1; }
+static void qs_snapshot_check(void)
+{
+    if (qs_snap_days <= 0) return;
+    const int32_t day = (int16_t)rd16(g_mem, G_CURRENT_DATE), year = (int16_t)rd16(g_mem, G_CURRENT_DATE + 2);
+    if (year <= 0 || day < 0) return;                          /* the date is not set yet */
+    const int32_t key = year * 366 + day;
+    if (qs_snap_last < 0) { qs_snap_last = key; return; }
+    if (key >= qs_snap_last && key - qs_snap_last < qs_snap_days) return;
+    printf("== snapshot: window from year %d day %d to year %d day %d ==\n", qs_snap_last / 366, qs_snap_last % 366, year, day);
+    rt_qsort_report();
+    rt_qsort_reset();
+    qs_snap_last = key;
+}
 #endif
 
 #define CUTOFF 8
@@ -436,6 +462,9 @@ RT_REPLACE(00945333, crt_qsort)
     uint32_t base = rt_arg(0), num = rt_arg(1), width = rt_arg(2), comp = rt_arg(3);
     if (num < 2 || width == 0) { rt_ret_cdecl(cpu.eax); return; }
 
+#ifdef CM0102_QSORT_STATS
+    qs_snapshot_check();
+#endif
     Cmp c = { rt_lookup(comp), comp, cpu.esp, comp == CMP_LANGUAGE, cmp_kind(comp) };
     if (!c.fn) rt_fatal("qsort: the comparison %#x is not a recompiled function", comp);
 #ifdef CM0102_QSORT_STATS
@@ -504,6 +533,9 @@ RT_REPLACE(00946464, crt_bsearch)
     Cmp c = { rt_lookup(comp), comp, cpu.esp, comp == CMP_LANGUAGE, cmp_kind(comp) };
     if (!c.fn) rt_fatal("bsearch: the comparison %#x is not a recompiled function", comp);
 
+#ifdef CM0102_QSORT_STATS
+    qs_snapshot_check();
+#endif
     uint32_t hi = base + width * (num - 1), found = 0;
     int gone = 0;
 #ifdef CM0102_QSORT_STATS
