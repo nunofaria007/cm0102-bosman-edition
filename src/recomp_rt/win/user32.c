@@ -970,20 +970,28 @@ RT_IMPORT(GetCursor) { rt_ret_stdcall(current_cursor, 0); }
 RT_IMPORT(SetCursor)
 {
     static SDL_Cursor *cursors[SDL_NUM_SYSTEM_CURSORS];
+    static int shown_shape = -1;
     uint32_t h = rt_arg(0), old = current_cursor;
     current_cursor = h;
     if (window && h) {
         int shape = win_cursor_shape(h);          /* names.c */
-        if (!cursors[shape]) cursors[shape] = SDL_CreateSystemCursor((SDL_SystemCursor)shape);
-        if (cursors[shape]) SDL_SetCursor(cursors[shape]);
+        /* The same shape again does nothing: SDL_SetCursor calls the system's SetCursor each time, and that
+         * starts the busy cursor's animation over (a game that sets it at every step of a progress bar
+         * keeps it at the first frame) and costs a system call. */
+        if (shape != shown_shape) {
+            if (!cursors[shape]) cursors[shape] = SDL_CreateSystemCursor((SDL_SystemCursor)shape);
+            if (cursors[shape]) { SDL_SetCursor(cursors[shape]); shown_shape = shape; }
+        }
     }
     rt_ret_stdcall(old, 1);
 }
 
 RT_IMPORT(ShowCursor)
 {
+    static int shown_visible = -1;
     cursor_count += rt_arg(0) ? 1 : -1;
-    SDL_ShowCursor(cursor_count >= 0 ? SDL_ENABLE : SDL_DISABLE);
+    const int visible = cursor_count >= 0;
+    if (visible != shown_visible) { SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE); shown_visible = visible; }
     rt_ret_stdcall((uint32_t)cursor_count, 1);
 }
 
