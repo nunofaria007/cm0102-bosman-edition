@@ -31,8 +31,9 @@
 #define CMP_HISTORY_CLUB 0x007c6d90u  /* player_stats_compare_history_by_club(a, b): elements are history records */
 #define CMP_HISTORY_STAFF 0x007c6de0u /* player_stats_compare_history_by_staff(a, b) */
 #define CMP_HOME_REPUTATION 0x00778ed0u /* compare_players_by_home_reputation_desc(a, b): staff pointers */
+#define CMP_CLUB_REPUTATION 0x004b0810u /* compare_clubs_by_reputation_asc_nulls_last(a, b): elements are club pointers */
 
-enum { K_GENERATED, K_LANGUAGE, K_CLUB_LATITUDE, K_HISTORY_CLUB, K_HISTORY_STAFF, K_HOME_REPUTATION };
+enum { K_GENERATED, K_LANGUAGE, K_CLUB_LATITUDE, K_HISTORY_CLUB, K_HISTORY_STAFF, K_HOME_REPUTATION, K_CLUB_REPUTATION };
 
 static inline int cmp_kind(uint32_t comp)
 {
@@ -42,6 +43,7 @@ static inline int cmp_kind(uint32_t comp)
     case CMP_HISTORY_CLUB: return K_HISTORY_CLUB;
     case CMP_HISTORY_STAFF: return K_HISTORY_STAFF;
     case CMP_HOME_REPUTATION: return K_HOME_REPUTATION;
+    case CMP_CLUB_REPUTATION: return K_CLUB_REPUTATION;
     default: return K_GENERATED;
     }
 }
@@ -102,6 +104,17 @@ static inline int cmp_native(int kind, uint32_t a, uint32_t b, int32_t *r)
         int32_t ya = (int16_t)rd16(m, a + 8), yb = (int16_t)rd16(m, b + 8);
         if (ya != yb) { *r = ya > yb ? 1 : -1; return 1; }
         *r = (int32_t)(rd32(m, a) - rd32(m, b));
+        return 1;
+    }
+    case K_CLUB_REPUTATION: {
+        /* a and b point at club pointers. Profile of a season (2026-11-01, England): 3.27 million sorts of about 91
+         * clubs, 2.68 billion comparisons through the generated code. A NULL club sorts last: a NULL first
+         * one gives 1 when the other is not NULL (0 when both are), a NULL second one gives -1, else the
+         * difference of the reputations (signed word at +0x80), in 32 bits. */
+        uint32_t ca = rd32(m, a), cb = rd32(m, b);
+        if (!ca) { *r = cb != 0; return 1; }
+        if (!cb) { *r = -1; return 1; }
+        *r = (int32_t)(int16_t)rd16(m, ca + 0x80) - (int32_t)(int16_t)rd16(m, cb + 0x80);
         return 1;
     }
     case K_HOME_REPUTATION: {
