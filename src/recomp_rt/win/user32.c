@@ -978,6 +978,7 @@ RT_IMPORT(SetCursor)
         /* The same shape again does nothing: SDL_SetCursor calls the system's SetCursor each time, and that
          * starts the busy cursor's animation over (a game that sets it at every step of a progress bar
          * keeps it at the first frame) and costs a system call. */
+        WIN_TRACE("SetCursor(%#x) shape %d%s\n", h, shape, shape == shown_shape ? " (same, skipped)" : "");
         if (shape != shown_shape) {
             if (!cursors[shape]) cursors[shape] = SDL_CreateSystemCursor((SDL_SystemCursor)shape);
             if (cursors[shape]) { SDL_SetCursor(cursors[shape]); shown_shape = shape; }
@@ -991,6 +992,7 @@ RT_IMPORT(ShowCursor)
     static int shown_visible = -1;
     cursor_count += rt_arg(0) ? 1 : -1;
     const int visible = cursor_count >= 0;
+    WIN_TRACE("ShowCursor(%u) count %d%s\n", rt_arg(0), cursor_count, visible == shown_visible ? " (same, skipped)" : "");
     if (visible != shown_visible) { SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE); shown_visible = visible; }
     rt_ret_stdcall((uint32_t)cursor_count, 1);
 }
