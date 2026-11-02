@@ -20,6 +20,12 @@ target_sources(cm0102_recomp PRIVATE "${CMAKE_BINARY_DIR}/version.rc")
 # SDL2 and the C runtime go into the exe, so that it needs no DLL beside it. The exe has no symbols.
 # The main thread gets the same deep stack as on the Mac.
 target_link_options(cm0102_recomp PRIVATE -static -s "LINKER:--stack,0x10000000")
+# -DCM0102_WIN_CONSOLE=ON: the exe has the console subsystem, so a console window opens beside the game and
+# printf (the CM0102_QSORT_STATS report, the errors of rt_fatal) shows in it. For tests; the installer's exe has none.
+option(CM0102_WIN_CONSOLE "Open a console window beside the game (statistics and errors)" OFF)
+if(CM0102_WIN_CONSOLE)
+    target_link_options(cm0102_recomp PRIVATE "LINKER:--subsystem,console")
+endif()
 target_link_libraries(cm0102_recomp PRIVATE SDL2::SDL2main SDL2::SDL2-static)
 
 set(CM0102_GAME_DIR "" CACHE PATH "The folder of the clean files that the Windows installer holds")
