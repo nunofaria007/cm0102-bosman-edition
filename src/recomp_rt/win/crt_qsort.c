@@ -32,8 +32,11 @@
 #define CMP_HISTORY_STAFF 0x007c6de0u /* player_stats_compare_history_by_staff(a, b) */
 #define CMP_HOME_REPUTATION 0x00778ed0u /* compare_players_by_home_reputation_desc(a, b): staff pointers */
 #define CMP_CLUB_REPUTATION 0x004b0810u /* compare_clubs_by_reputation_asc_nulls_last(a, b): elements are club pointers */
+#define CMP_ID_PAIR 0x00757ea0u         /* compare_id_pair_keys(a, b): 8-byte records (id, id), -1 = wildcard */
+#define CMP_ID_PAIR_SECOND 0x00844740u  /* compare_id_pair_keys_by_second_id(a, b) */
+#define CMP_SHORTLIST 0x0083b670u       /* shortlist_compare_by_value_then_key(a, b) */
 
-enum { K_GENERATED, K_LANGUAGE, K_CLUB_LATITUDE, K_HISTORY_CLUB, K_HISTORY_STAFF, K_HOME_REPUTATION, K_CLUB_REPUTATION };
+enum { K_GENERATED, K_LANGUAGE, K_CLUB_LATITUDE, K_HISTORY_CLUB, K_HISTORY_STAFF, K_HOME_REPUTATION, K_CLUB_REPUTATION, K_ID_PAIR, K_ID_PAIR_SECOND, K_SHORTLIST };
 
 static inline int cmp_kind(uint32_t comp)
 {
@@ -44,6 +47,9 @@ static inline int cmp_kind(uint32_t comp)
     case CMP_HISTORY_STAFF: return K_HISTORY_STAFF;
     case CMP_HOME_REPUTATION: return K_HOME_REPUTATION;
     case CMP_CLUB_REPUTATION: return K_CLUB_REPUTATION;
+    case CMP_ID_PAIR: return K_ID_PAIR;
+    case CMP_ID_PAIR_SECOND: return K_ID_PAIR_SECOND;
+    case CMP_SHORTLIST: return K_SHORTLIST;
     default: return K_GENERATED;
     }
 }
@@ -115,6 +121,28 @@ static inline int cmp_native(int kind, uint32_t a, uint32_t b, int32_t *r)
         if (!ca) { *r = cb != 0; return 1; }
         if (!cb) { *r = -1; return 1; }
         *r = (int32_t)(int16_t)rd16(m, ca + 0x80) - (int32_t)(int16_t)rd16(m, cb + 0x80);
+        return 1;
+    }
+    case K_ID_PAIR:
+    case K_ID_PAIR_SECOND: {
+        /* Shortlist_Manager (2026-11-02 profile, vacation mode): the same array of 8-byte records is sorted by the first
+         * id and then by the second id, and searched by the first. The records are the arguments themselves (not pointers
+         * to pointers). A NULL record sorts first; ids that differ give their difference (32 bits); equal first
+         * ids compare the other id, and -1 in either of them is a wildcard that equals any (0). */
+        const uint32_t k = kind == K_ID_PAIR ? 0 : 4;          /* the main id; the other is at 4 - k */
+        if (!a) { *r = -1; return 1; }
+        if (!b) { *r = 1; return 1; }
+        uint32_t x = rd32(m, a + k), y = rd32(m, b + k);
+        if (x != y) { *r = (int32_t)(x - y); return 1; }
+        uint32_t p = rd32(m, a + 4 - k);
+        if (p == 0xffffffffu) { *r = 0; return 1; }
+        uint32_t q = rd32(m, b + 4 - k);
+        *r = q == 0xffffffffu ? 0 : (int32_t)(p - q);
+        return 1;
+    }
+    case K_SHORTLIST: {
+        int32_t d = (int32_t)(rd32(m, a + 8) - rd32(m, b + 8));
+        *r = d ? d : (int32_t)(rd32(m, a + 4) - rd32(m, b + 4));
         return 1;
     }
     case K_HOME_REPUTATION: {

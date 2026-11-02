@@ -6,9 +6,12 @@ FN = {
  0x7c6d90: "568b74240885f67507b8010000005ec38b54240c85d2750583c8ff5ec38b460a8b4a0a3bc17607b8010000005ec3730583c8ff5ec38b46048b4a043bc17607b8010000005ec32bc15ef7d81bc0c3",
  0x7c6de0: "568b74240885f67507b8010000005ec38b54240c85d274318b46048b4a043bc17607b8010000005ec3721e668b4608668b4a08663bc17e07b8010000005ec375088b068b0a2bc15ec383c8ff5ec3",
  0x778ed0: "8b4424048b088b51618b4c24080fbf42098b118b4a610fbf51092bd08bc2c3",
+ 0x757ea0: "8b54240456" "85d27505" "83c8ff5ec3" "8b74240c" "85f67507" "b8010000005ec3" "8b028b0e" "3bc17514" "8b420483f8ff7408" "8b4e0483f9ff7504" "33c05ec3" "2bc15ec3",
+ 0x844740: "8b54240456" "85d27505" "83c8ff5ec3" "8b74240c" "85f67507" "b8010000005ec3" "8b42048b4e04" "3bc17512" "8b0283f8ff7407" "8b0e83f9ff7504" "33c05ec3" "2bc15ec3",
+ 0x83b670: "8b4c24048b54240856" "8b41088b7208" "2bc65e7508" "8b41048b4a04" "2bc1c3",
  0x4b0810: "8b4424048b5424088b088b0285c9750885c00f95c18bc1c385c0750483c8ffc30fbf90800000000fbf81800000002bc2c3",
 }
-KIND = {0x53fd40: 2, 0x7c6d90: 3, 0x7c6de0: 4, 0x778ed0: 5, 0x4b0810: 6}
+KIND = {0x53fd40: 2, 0x7c6d90: 3, 0x7c6de0: 4, 0x778ed0: 5, 0x4b0810: 6, 0x757ea0: 7, 0x844740: 8, 0x83b670: 9}
 lib = ctypes.CDLL("./shim.so")
 SZ = 0x1000000
 buf = (ctypes.c_uint8*SZ)()
@@ -60,6 +63,11 @@ for it in range(6000):
     sp = 0xb70000
     # clubs for 0x4b0810: reputation (signed word at +0x80), and NULL pointers
     for c in clubs: mem[c+0x80] = struct.pack("<h", rng.choice([-32768, -5, 0, 5, 100, 5000, 32767]))
+    vals32 = [0, 1, 2, 5, 0x7fffffff, 0x80000000, 0xfffffffe, 0xffffffff]
+    rec = [0xb90000 + 0x10*i for i in range(6)]
+    for rr in rec:
+        mem[rr] = struct.pack("<I", rng.choice(vals32)); mem[rr+4] = struct.pack("<I", rng.choice(vals32))
+        mem[rr+8] = struct.pack("<I", rng.choice(vals32))
     cp = 0xb80000
     mem[cp] = struct.pack("<II", rng.choice(clubs + [0]), rng.choice(clubs + [0]))
     mem[sp] = struct.pack("<II", rng.choice(staff), rng.choice(staff))
@@ -68,6 +76,8 @@ for it in range(6000):
         if addr == 0x53fd40:
             a, b = ptrs, ptrs + 4
             if (struct.unpack("<II", mem[ptrs])[0] == 0) : continue
+        elif addr in (0x757ea0, 0x844740, 0x83b670):
+            a = rng.choice(rec + [0] if addr != 0x83b670 else rec); b = rng.choice(rec + [0] if addr != 0x83b670 else rec)
         elif addr == 0x4b0810:
             a, b = cp, cp + 4
         elif addr == 0x778ed0:
