@@ -732,6 +732,21 @@ static void run_script(void)
     }
 }
 
+/* The cursor the game asked for last (SetCursor) and the one on the screen. The game sets it from its hit test
+ * at every pass, and over the progress bar of the game creation it changes between two shapes there, many times
+ * a second. SDL_SetCursor is a system call and it starts the busy cursor's animation over, so the shape is
+ * applied at the input poll, once, and only when it differs from the one shown. */
+static int pending_shape = -1, shown_shape = -1;
+static void apply_cursor(void)
+{
+    static SDL_Cursor *cursors[SDL_NUM_SYSTEM_CURSORS];
+    if (!window || pending_shape < 0 || pending_shape == shown_shape) return;
+    if (!cursors[pending_shape]) cursors[pending_shape] = SDL_CreateSystemCursor((SDL_SystemCursor)pending_shape);
+    if (!cursors[pending_shape]) return;
+    SDL_SetCursor(cursors[pending_shape]);
+    shown_shape = pending_shape;
+}
+
 void win_poll_events(void)
 {
     uint64_t now = SDL_GetTicks64();
@@ -745,6 +760,7 @@ void win_poll_events(void)
     if (win_screen_dirty && now - last_present >= 16) present_now();
     if (now - last_poll < 2) return;              /* the game pumps very often; SDL needs less */
     last_poll = now;
+    apply_cursor();
     end_click_for_key();
     SDL_Event e;
     while (SDL_PollEvent(&e))
@@ -969,20 +985,11 @@ RT_IMPORT(GetCursor) { rt_ret_stdcall(current_cursor, 0); }
 
 RT_IMPORT(SetCursor)
 {
-    static SDL_Cursor *cursors[SDL_NUM_SYSTEM_CURSORS];
-    static int shown_shape = -1;
     uint32_t h = rt_arg(0), old = current_cursor;
     current_cursor = h;
-    if (window && h) {
-        int shape = win_cursor_shape(h);          /* names.c */
-        /* The same shape again does nothing: SDL_SetCursor calls the system's SetCursor each time, and that
-         * starts the busy cursor's animation over (a game that sets it at every step of a progress bar
-         * keeps it at the first frame) and costs a system call. */
-        WIN_TRACE("SetCursor(%#x) shape %d%s\n", h, shape, shape == shown_shape ? " (same, skipped)" : "");
-        if (shape != shown_shape) {
-            if (!cursors[shape]) cursors[shape] = SDL_CreateSystemCursor((SDL_SystemCursor)shape);
-            if (cursors[shape]) { SDL_SetCursor(cursors[shape]); shown_shape = shape; }
-        }
+    if (h) {
+        pending_shape = win_cursor_shape(h);      /* names.c; shown by the next input poll (apply_cursor) */
+        WIN_TRACE("SetCursor(%#x) shape %d\n", h, pending_shape);
     }
     rt_ret_stdcall(old, 1);
 }
