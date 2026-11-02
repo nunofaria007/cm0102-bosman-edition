@@ -277,6 +277,11 @@ RT_IMPORT(WinExec)
     web_restart = 1;
     rt_ret_stdcall(33, 2);
 }
+#else
+/* The recompiler finds the imports that the runtime replaces by reading the sources, so a WinExec that is only
+ * in the browser's block above leaves the other builds with no imp_WinExec at all (a link error). Here it is the
+ * stub that it would have made: Restart Game reports the missing import, as before the browser's WinExec. */
+RT_IMPORT(WinExec) { rt_missing_import("WinExec"); }
 #endif
 
 RT_IMPORT(ExitProcess)
