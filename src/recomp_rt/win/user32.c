@@ -737,10 +737,17 @@ static void run_script(void)
  * a second. SDL_SetCursor is a system call and it starts the busy cursor's animation over, so the shape is
  * applied at the input poll, once, and only when it differs from the one shown. */
 static int pending_shape = -1, shown_shape = -1;
+static int cursor_count;                          /* the ShowCursor counter; shown while >= 0 */
 static void apply_cursor(void)
 {
     static SDL_Cursor *cursors[SDL_NUM_SYSTEM_CURSORS];
-    if (!window || pending_shape < 0 || pending_shape == shown_shape) return;
+    static int shown_visible = -1;
+    if (!window) return;
+    /* The game hides and shows the cursor around each redraw of the progress bar (about 3000 ShowCursor calls
+     * in a game creation); each change in SDL restarts the busy cursor's animation. Only the state at the poll counts. */
+    const int visible = cursor_count >= 0;
+    if (visible != shown_visible) { SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE); shown_visible = visible; }
+    if (pending_shape < 0 || pending_shape == shown_shape) return;
     if (!cursors[pending_shape]) cursors[pending_shape] = SDL_CreateSystemCursor((SDL_SystemCursor)pending_shape);
     if (!cursors[pending_shape]) return;
     SDL_SetCursor(cursors[pending_shape]);
@@ -972,7 +979,6 @@ RT_IMPORT(EndPaint) { rt_ret_stdcall(1, 2); }
 /* Cursors: a handle per resource; system cursors stand in for the images (win_cursor_shape). */
 #define CURSOR_BASE 0x00030000u
 static uint32_t current_cursor;
-static int cursor_count;                          /* the ShowCursor counter; shown while >= 0 */
 
 RT_IMPORT(LoadCursorA)
 {
@@ -996,11 +1002,8 @@ RT_IMPORT(SetCursor)
 
 RT_IMPORT(ShowCursor)
 {
-    static int shown_visible = -1;
     cursor_count += rt_arg(0) ? 1 : -1;
-    const int visible = cursor_count >= 0;
-    WIN_TRACE("ShowCursor(%u) count %d%s\n", rt_arg(0), cursor_count, visible == shown_visible ? " (same, skipped)" : "");
-    if (visible != shown_visible) { SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE); shown_visible = visible; }
+    WIN_TRACE("ShowCursor(%u) count %d\n", rt_arg(0), cursor_count);
     rt_ret_stdcall((uint32_t)cursor_count, 1);
 }
 
