@@ -333,6 +333,41 @@ int qsort6_self_test(void)
     qsort6_insert_max_visit = 20000;
     if (insert_sorts == insert_before) test_fails++;     /* qsort6_insert must have run */
     fprintf(stderr, "qsort test: %llu sorts by qsort6_insert\n", (unsigned long long)(insert_sorts - insert_before));
+    /* The other host compares (qsort6_cmp.c): rows made from a few keys, so many compare equal, with the
+     * special values of each compare (-1 for 0x757ea0 and 0x844740, ids that differ by 0x80000000 or more, NULL
+     * and clubs of one reputation for 0x4b0810). Each sort runs in check mode. */
+    {
+        static const uint32_t others[] = {0x4b0810};
+        static const uint32_t widths[] = {4};
+        static const uint32_t keys[] = {0, 1, 2, 3, 7, 0x7fffffffu, 0x80000000u, 0x80000001u, 0xfffffffeu, 0xffffffffu};
+        uint32_t clubs = rt_alloc(8 * 0x100);
+        for (int c = 0; c < 8; c++) {
+            int16_t rep = (int16_t)(c < 3 ? 5 : c == 3 ? -32768 : c == 4 ? 32767 : (int)(test_random() % 200) - 100);
+            memcpy(g_mem + clubs + 0x100u * (uint32_t)c + 0x80, &rep, 2);
+        }
+        uint32_t others_mem = rt_alloc(MAX * 12);
+        uint8_t *orows = malloc(MAX * 12);
+        for (int o = 0; o < 1; o++) {
+            uint32_t w = widths[o], cmp = others[o];
+            static const uint32_t sizes[] = {0, 1, 2, 3, 7, 8, 9, 10, 16, 17, 31, 64, 100, 255, 257, 1000, 3001};
+            for (size_t z = 0; z < sizeof sizes / sizeof *sizes; z++)
+                for (int k = 0; k < (sizes[z] < 100 ? 12 : 3); k++) {
+                    uint32_t num = sizes[z], few = 1 + test_random() % 6;
+                    for (uint32_t i = 0; i < num; i++) {
+                        uint32_t v[3];
+                        for (int j = 0; j < 3; j++) v[j] = test_random() % 3 ? keys[test_random() % few] : keys[test_random() % 10];
+                        if (cmp == 0x4b0810) v[0] = test_random() % 9 == 0 ? 0 : clubs + 0x100u * (test_random() % 8);
+                        memcpy(orows + (size_t)i * w, v, w);
+                    }
+                    memcpy(g_mem + others_mem, orows, (size_t)num * w);
+                    uint32_t args[4] = {others_mem, num, w, cmp};
+                    cpu.eax = 0x5a5a5a5au;
+                    rt_callback(QSORT, 4, args);
+                    sorts++;
+                }
+        }
+        free(orows);
+    }
     free(rows);
     qsort_mode = -1;
     fprintf(stderr, "qsort test: %d sorts, %d differ\n", sorts, test_fails);

@@ -22,10 +22,24 @@ static inline uint32_t u32(const uint8_t *p)
     return v;
 }
 
+/* 0x4b0810 compare_clubs_by_reputation_asc_nulls_last. The rows are pointers to clubs; the reputation is the
+ * signed word at club + 0x80 (0x4b0830, 0x4b0837). A NULL club in the first row gives 1 when the second
+ * is not NULL, else 0 (setnz at 0x4b0822); a NULL second club -1 (0x4b082c). */
+static int cmp_club_reputation(const uint8_t *a, const uint8_t *b)
+{
+    uint32_t x = u32(a), y = u32(b);
+    if (!x) return y != 0;
+    if (!y) return -1;
+    int32_t rx = (int16_t)(g_mem[x + 0x80] | g_mem[x + 0x81] << 8);
+    int32_t ry = (int16_t)(g_mem[y + 0x80] | g_mem[y + 0x81] << 8);
+    return rx - ry;
+}
+
 qsort6_cmp_fn qsort6_host_cmp(uint32_t cmp)
 {
     switch (cmp) {
     case 0x7c6d40u: return qsort6_history_cmp;
+    case 0x4b0810u: return cmp_club_reputation;
     default: return NULL;
     }
 }
