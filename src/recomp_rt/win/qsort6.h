@@ -6,11 +6,14 @@
 
 /* The game stack that the original's qsort writes: mem is the game memory, q its ebp (esp at entry
  * minus 4), rows the game address of the rows, then the caller's ebp, ebx, esi and edi and the compare. */
+typedef int (*qsort6_cmp_fn)(const uint8_t *a, const uint8_t *b);
+
 typedef struct {
     uint8_t *mem;
     uint32_t q, rows, ebp, ebx, esi, edi, cmp;
     int sorted;         /* item 151b: 1 when the rows are already in strict order (qsort6_strict), so the
                            steps are known without a compare */
+    qsort6_cmp_fn fn;   /* the host compare for cmp; NULL means qsort6_history_cmp (0x7c6d40) */
 } qsort6_stack;
 
 /* The stack bytes that the original's qsort can write: from esp - QSORT6_BELOW to esp + QSORT6_ABOVE. */
@@ -22,6 +25,11 @@ typedef struct {
  * order. It also writes the game stack st as 0x945333 does. Gives back the row that 0x945333 leaves in
  * eax, or NULL when it leaves eax unchanged (fewer than 2 rows). */
 uint8_t *qsort6(uint8_t *base, uint32_t num, uint32_t width, const qsort6_stack *st);
+
+/* The host compare of the original compare at the game address cmp, or NULL when there is none. Every one of
+ * them is a function that pushes at most esi and no other stack word (qsort6_cmp.c has the list and the
+ * reading of each), so qsort6 leaves the stack as it does for 0x7c6d40. a and b point at the rows. */
+qsort6_cmp_fn qsort6_host_cmp(uint32_t cmp);
 
 /* The compare of the player history lists, 0x7c6d40: the id at +0, then the signed byte at +4, where
  * 0xff in either row counts as equal. */

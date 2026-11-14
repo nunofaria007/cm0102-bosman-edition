@@ -27,7 +27,8 @@ RT_REPLACE(0094f0f0, memmove)
 
 /* qsort 0x945333, cdecl (base, count, width, compare). For the compare of the player history lists
  * (0x7c6d40) the runtime sorts in host code with the same steps, the same stack writes and the same eax
- * (qsort6.c); every other compare keeps the recompiled qsort. RECOMP_QSORT=original turns the host sort
+ * (qsort6.c), and so for the compares that qsort6_host_cmp lists (qsort6_cmp.c); every other compare keeps the
+ * recompiled qsort. RECOMP_QSORT=original turns the host sort
  * off; RECOMP_QSORT=check runs both on each call and stops the program at the first row, stack byte or
  * eax that differs. */
 #define QSORT 0x945333u
@@ -107,9 +108,13 @@ static void keep_sorted_rows(const uint8_t *rows, uint32_t base, uint32_t num, u
 
 static int insert_off;             /* the self-test: 1 tests qsort6's own sorted path */
 
-static uint8_t *host_sort(uint8_t *rows, uint32_t base, uint32_t num, uint32_t width)
+static uint8_t *host_sort(uint8_t *rows, uint32_t base, uint32_t num, uint32_t width, uint32_t cmp)
 {
-    qsort6_stack st = {g_mem, cpu.esp - 4, base, cpu.ebp, cpu.ebx, cpu.esi, cpu.edi, HISTORY_CMP, 0};
+    qsort6_stack st = {g_mem, cpu.esp - 4, base, cpu.ebp, cpu.ebx, cpu.esi, cpu.edi, cmp, 0, NULL};
+    if (cmp != HISTORY_CMP) {            /* the other host compares: the plain steps, no sorted path */
+        st.fn = qsort6_host_cmp(cmp);
+        return qsort6(rows, num, width, &st);
+    }
     if (!sorted_path_on() || num < 2 || width < 5) return qsort6(rows, num, width, &st);
     int head = head_in_order(rows, base, num, width);
     if (head && insert_off) st.sorted = qsort6_strict(rows + (size_t)(num - 2) * width, 2, width);
@@ -141,7 +146,7 @@ static uint8_t *host_sort(uint8_t *rows, uint32_t base, uint32_t num, uint32_t w
 }
 
 /* Both sorts from the same rows and stack; the original's result stays. 0 when all is equal. */
-static int qsort_check(uint32_t base, uint32_t num, uint32_t width)
+static int qsort_check(uint32_t base, uint32_t num, uint32_t width, uint32_t cmp)
 {
     size_t bytes = (size_t)num * width;
     uint32_t low = cpu.esp - QSORT6_BELOW, span = QSORT6_BELOW + QSORT6_ABOVE;
@@ -150,7 +155,7 @@ static int qsort_check(uint32_t base, uint32_t num, uint32_t width)
     memcpy(copy, g_mem + base, bytes);
     memcpy(before, g_mem + low, span);
     uint32_t eax_in = cpu.eax;
-    uint8_t *eax = host_sort(copy, base, num, width);
+    uint8_t *eax = host_sort(copy, base, num, width, cmp);
     uint32_t want = eax ? base + (uint32_t)(eax - copy) : eax_in;
     memcpy(host, g_mem + low, span);
     memcpy(g_mem + low, before, span);
@@ -177,17 +182,17 @@ RT_WRAP(00945333, qsort)
         const char *v = getenv("RECOMP_QSORT");
         qsort_mode = !v ? 0 : !strcmp(v, "check") ? 1 : !strcmp(v, "original") ? 2 : 0;
     }
-    if (cmp != HISTORY_CMP || qsort_mode == 2) { o_00945333(); return; }
+    if (!qsort6_host_cmp(cmp) || qsort_mode == 2) { o_00945333(); return; }
     if (qsort_mode == 1) {
-        if (qsort_check(base, num, width)) abort();
+        if (qsort_check(base, num, width, cmp)) abort();
         if (!qsort_checked++) atexit(print_qsort_checked);
         return;
     }
     if (qsort_mode == 3) {
-        if (qsort_check(base, num, width)) test_fails++;
+        if (qsort_check(base, num, width, cmp)) test_fails++;
         return;
     }
-    uint8_t *eax = host_sort(g_mem + base, base, num, width);
+    uint8_t *eax = host_sort(g_mem + base, base, num, width, cmp);
     rt_ret_cdecl(eax ? (uint32_t)(eax - g_mem) : cpu.eax);
 }
 

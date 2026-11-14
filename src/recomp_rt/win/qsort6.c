@@ -68,9 +68,9 @@ static inline void put(const Sort *s, int32_t off, uint32_t v)
  * with pushes to all four words before any code reads the stack (the partition 0x9453f3..0x9453ff or
  * 0x9453f3..0x94540a, the short sort 0x9454bb..0x9454c0), so the words of the compares are left out and the
  * stack ends the same (0.6.2 slice 14). */
-static inline int compare(uint8_t *a, uint8_t *b)
+static inline int compare(const Sort *s, uint8_t *a, uint8_t *b)
 {
-    return qsort6_history_cmp(a, b);
+    return s->st->fn ? s->st->fn(a, b) : qsort6_history_cmp(a, b);
 }
 
 /* The swap 0x9454d5 after its three arguments are on the stack; at is the offset of its return
@@ -109,7 +109,7 @@ static uint8_t *short_sort(const Sort *s, uint8_t *lo, uint8_t *hi, uint32_t q_e
         if (s->st->sorted) max = hi, p = hi + w;    /* item 151b: the largest row is the last */
         else
             for (p = lo + w; p <= hi; p += w)
-                if (compare(p, max) > 0) max = p;
+                if (compare(s, p, max) > 0) max = p;
         put(s, -0x12c, w);
         put(s, -0x130, addr(s, hi));
         put(s, -0x134, addr(s, max));
@@ -155,7 +155,7 @@ uint8_t *qsort6(uint8_t *base, uint32_t num, uint32_t width, const qsort6_stack 
                     for (;;) {                      /* each step writes up at q - 8: the last one stays */
                         up += width;
                         if (up > hi) break;
-                        if (compare(up, lo) > 0) break;
+                        if (compare(&s, up, lo) > 0) break;
                     }
                 put(&s, -8, addr(&s, up));
                 if (st->sorted) down = mid;
@@ -163,7 +163,7 @@ uint8_t *qsort6(uint8_t *base, uint32_t num, uint32_t width, const qsort6_stack 
                     for (;;) {
                         down -= width;
                         if (down <= lo) break;
-                        if (compare(down, lo) < 0) break;
+                        if (compare(&s, down, lo) < 0) break;
                     }
                 put(&s, -0x108, width);
                 put(&s, -0x10c, addr(&s, down));
