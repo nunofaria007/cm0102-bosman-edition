@@ -337,8 +337,8 @@ int qsort6_self_test(void)
      * special values of each compare (-1 for 0x757ea0 and 0x844740, ids that differ by 0x80000000 or more, NULL
      * and clubs of one reputation for 0x4b0810). Each sort runs in check mode. */
     {
-        static const uint32_t others[] = {0x4b0810};
-        static const uint32_t widths[] = {4};
+        static const uint32_t others[] = {0x757ea0, 0x844740, 0x83b670, 0x4b0810};
+        static const uint32_t widths[] = {8, 8, 12, 4};
         static const uint32_t keys[] = {0, 1, 2, 3, 7, 0x7fffffffu, 0x80000000u, 0x80000001u, 0xfffffffeu, 0xffffffffu};
         uint32_t clubs = rt_alloc(8 * 0x100);
         for (int c = 0; c < 8; c++) {
@@ -347,7 +347,7 @@ int qsort6_self_test(void)
         }
         uint32_t others_mem = rt_alloc(MAX * 12);
         uint8_t *orows = malloc(MAX * 12);
-        for (int o = 0; o < 1; o++) {
+        for (int o = 0; o < 4; o++) {
             uint32_t w = widths[o], cmp = others[o];
             static const uint32_t sizes[] = {0, 1, 2, 3, 7, 8, 9, 10, 16, 17, 31, 64, 100, 255, 257, 1000, 3001};
             for (size_t z = 0; z < sizeof sizes / sizeof *sizes; z++)

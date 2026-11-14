@@ -35,11 +35,43 @@ static int cmp_club_reputation(const uint8_t *a, const uint8_t *b)
     return rx - ry;
 }
 
+/* 0x757ea0 compare_id_pair_keys. The ids at +0, then the ids at +4 where -1 in either row counts as equal
+ * (0x757ec8, 0x757ed0). The arguments are the rows; NULL is never a row of qsort. */
+static int cmp_id_pair(const uint8_t *a, const uint8_t *b)
+{
+    uint32_t x = u32(a), y = u32(b);
+    if (x != y) return (int32_t)(x - y);
+    uint32_t x4 = u32(a + 4), y4 = u32(b + 4);
+    if (x4 == 0xffffffffu || y4 == 0xffffffffu) return 0;
+    return (int32_t)(x4 - y4);
+}
+
+/* 0x844740 compare_id_pair_keys_by_second_id: the same with the ids at +4 first, then those at +0. */
+static int cmp_id_pair_second(const uint8_t *a, const uint8_t *b)
+{
+    uint32_t x = u32(a + 4), y = u32(b + 4);
+    if (x != y) return (int32_t)(x - y);
+    uint32_t x0 = u32(a), y0 = u32(b);
+    if (x0 == 0xffffffffu || y0 == 0xffffffffu) return 0;
+    return (int32_t)(x0 - y0);
+}
+
+/* 0x83b670 shortlist_compare_by_value_then_key: the dword at +8, then the dword at +4. */
+static int cmp_shortlist(const uint8_t *a, const uint8_t *b)
+{
+    uint32_t d = u32(a + 8) - u32(b + 8);
+    if (d) return (int32_t)d;
+    return (int32_t)(u32(a + 4) - u32(b + 4));
+}
+
 qsort6_cmp_fn qsort6_host_cmp(uint32_t cmp)
 {
     switch (cmp) {
     case 0x7c6d40u: return qsort6_history_cmp;
     case 0x4b0810u: return cmp_club_reputation;
+    case 0x757ea0u: return cmp_id_pair;
+    case 0x844740u: return cmp_id_pair_second;
+    case 0x83b670u: return cmp_shortlist;
     default: return NULL;
     }
 }
