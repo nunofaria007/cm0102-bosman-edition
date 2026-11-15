@@ -253,7 +253,7 @@ static uint32_t sye(uint32_t v) { return scale(v, rt_screen_h, CLASSIC_H, 1); }
  * the log changes (docs/research/2026-10-29-new-game-speed.md). */
 static int progress_log = -1;
 static char progress_text[64];
-static uint64_t progress_calls, progress_in_box, progress_since;
+static uint64_t progress_calls, progress_in_box, progress_since, progress_last;
 
 static void progress_log_line(uint32_t text, uint32_t step, uint32_t total)
 {
@@ -262,9 +262,9 @@ static void progress_log_line(uint32_t text, uint32_t step, uint32_t total)
     uint64_t t = SDL_GetTicks64();
     if (strcmp(now, progress_text) || !step) {
         if (progress_text[0])
-            fprintf(stderr, "recomp: progress done \"%s\" %llu ms, %llu calls, %llu ms in the box\n", progress_text,
-                    (unsigned long long)(t - progress_since), (unsigned long long)progress_calls,
-                    (unsigned long long)progress_in_box);
+            fprintf(stderr, "recomp: progress done \"%s\" %llu ms, %llu calls, %llu ms in the box, last call %llu ms after its start\n",
+                    progress_text, (unsigned long long)(t - progress_since), (unsigned long long)progress_calls,
+                    (unsigned long long)progress_in_box, (unsigned long long)(progress_last - progress_since));
         fprintf(stderr, "recomp: progress at %llu ms \"%s\" %d of %d\n", (unsigned long long)t, now,
                 (int32_t)step, (int32_t)total);
         snprintf(progress_text, sizeof progress_text, "%s", now);
@@ -272,6 +272,8 @@ static void progress_log_line(uint32_t text, uint32_t step, uint32_t total)
         progress_since = t;
     }
     progress_calls++;
+    progress_last = t;      /* a step that waits for the player (the manager name after Creating Shortlists) is
+                             * closed only by the next text, so its "ms" holds that wait; "last call" does not */
 }
 
 void progress_log_end(void)
