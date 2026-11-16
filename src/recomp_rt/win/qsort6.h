@@ -47,6 +47,21 @@ uint8_t *qsort6_insert(uint8_t *base, uint32_t num, uint32_t width, const qsort6
                        int *done);
 extern int qsort6_insert_max_visit;     /* the parts a walk may visit; the self-test lowers it */
 
+/* The bsearch of the original's CRT (0x946464) in host code (bsearch6.c has the details): the game stack that it
+ * writes, with esp the stack pointer at entry and the caller's ebp, ebx, esi and edi. */
+typedef struct {
+    uint8_t *mem;
+    uint32_t esp, ebp, ebx, esi, edi;
+} bsearch6_stack;
+
+/* 1 for the compares that bsearch6 takes (those of qsort6_host_cmp that push esi once). */
+int bsearch6_supported(uint32_t cmp);
+
+/* Searches num rows of width bytes at base for the key at the game address key, as 0x946464 does, and gives
+ * the game address that it leaves in eax: the row found, or 0. Key and rows are game addresses, not 0. */
+uint32_t bsearch6(const bsearch6_stack *st, uint32_t key, uint32_t base, uint32_t num, uint32_t width,
+                  uint32_t cmp);
+
 /* RECOMP_QSORT_TEST (crt.c): qsort6 against the recompiled qsort; the exit code, 0 when all are equal. */
 int qsort6_self_test(void);
 

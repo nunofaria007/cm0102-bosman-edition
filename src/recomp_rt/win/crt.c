@@ -196,6 +196,27 @@ RT_WRAP(00945333, qsort)
     rt_ret_cdecl(eax ? (uint32_t)(eax - g_mem) : cpu.eax);
 }
 
+/* The bsearch 0x946464 in host code (bsearch6.c), for the compares that qsort6 has. RECOMP_QSORT=original runs
+ * the original, as for qsort. */
+void o_00946464(void);
+
+static int qsort_mode_value(void)
+{
+    if (qsort_mode < 0) {
+        const char *v = getenv("RECOMP_QSORT");
+        qsort_mode = !v ? 0 : !strcmp(v, "check") ? 1 : !strcmp(v, "original") ? 2 : 0;
+    }
+    return qsort_mode;
+}
+
+RT_WRAP(00946464, bsearch)
+{
+    uint32_t key = rt_arg(0), base = rt_arg(1), num = rt_arg(2), width = rt_arg(3), cmp = rt_arg(4);
+    if (!bsearch6_supported(cmp) || !key || !base || qsort_mode_value() == 2) { o_00946464(); return; }
+    bsearch6_stack st = {g_mem, cpu.esp, cpu.ebp, cpu.ebx, cpu.esi, cpu.edi};
+    rt_ret_cdecl(bsearch6(&st, key, base, num, width, cmp));
+}
+
 /* RECOMP_QSORT_TEST: before the game starts, sorts rows made from a fixed seed with both sorts (the
  * check above, from a call of 0x945333 through the runtime) and compares the rows, the stack and eax.
  * The rows have many equal ids and 0xff bytes, so the order of rows that compare equal is tested. Also
